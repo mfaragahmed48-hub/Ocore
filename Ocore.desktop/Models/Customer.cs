@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 
 namespace Ocore.desktop.Models
 {
@@ -13,7 +12,18 @@ namespace Ocore.desktop.Models
 
         public string Phone { get; set; }
 
+        // حقل العنوان القديم محفوظ للتوافق مع الأجزاء الأخرى من البرنامج.
         public string Address { get; set; }
+
+        public string HouseNumber { get; set; }
+
+        public string Street { get; set; }
+
+        public string Area { get; set; }
+
+        public string Floor { get; set; }
+
+        public string Apartment { get; set; }
 
         public string Notes { get; set; }
 
@@ -29,6 +39,11 @@ namespace Ocore.desktop.Models
             Name = string.Empty;
             Phone = string.Empty;
             Address = string.Empty;
+            HouseNumber = string.Empty;
+            Street = string.Empty;
+            Area = string.Empty;
+            Floor = string.Empty;
+            Apartment = string.Empty;
             Notes = string.Empty;
             IsActive = true;
             CreatedAt = DateTime.Now;

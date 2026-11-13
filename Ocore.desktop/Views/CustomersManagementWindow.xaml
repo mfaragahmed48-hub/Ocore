@@ -158,11 +158,47 @@
                                  Padding="8"
                                  Margin="0,0,0,12"/>
 
-                        <TextBlock Text="العنوان"
+                        <TextBlock Text="رقم المنزل"
                                    FontWeight="Bold"
                                    Margin="0,0,0,5"/>
 
-                        <TextBox x:Name="CustomerAddressTextBox"
+                        <TextBox x:Name="CustomerHouseNumberTextBox"
+                                 Height="34"
+                                 Padding="8"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="الشارع"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,5"/>
+
+                        <TextBox x:Name="CustomerStreetTextBox"
+                                 Height="34"
+                                 Padding="8"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="المنطقة"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,5"/>
+
+                        <TextBox x:Name="CustomerAreaTextBox"
+                                 Height="34"
+                                 Padding="8"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="الدور"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,5"/>
+
+                        <TextBox x:Name="CustomerFloorTextBox"
+                                 Height="34"
+                                 Padding="8"
+                                 Margin="0,0,0,12"/>
+
+                        <TextBlock Text="الشقة"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,5"/>
+
+                        <TextBox x:Name="CustomerApartmentTextBox"
                                  Height="34"
                                  Padding="8"
                                  Margin="0,0,0,12"/>

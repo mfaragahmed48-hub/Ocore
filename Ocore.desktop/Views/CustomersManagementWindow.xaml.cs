@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -89,7 +88,11 @@ namespace Ocore.desktop.Views
             CustomerCodeTextBox.Text = customer.CustomerCode;
             CustomerNameTextBox.Text = customer.Name;
             CustomerPhoneTextBox.Text = customer.Phone;
-            CustomerAddressTextBox.Text = customer.Address;
+            CustomerHouseNumberTextBox.Text = customer.HouseNumber;
+            CustomerStreetTextBox.Text = customer.Street;
+            CustomerAreaTextBox.Text = customer.Area;
+            CustomerFloorTextBox.Text = customer.Floor;
+            CustomerApartmentTextBox.Text = customer.Apartment;
             CustomerNotesTextBox.Text = customer.Notes;
 
             ToggleCustomerButton.Content = customer.IsActive
@@ -114,7 +117,11 @@ namespace Ocore.desktop.Views
             CustomerCodeTextBox.Text = "يتم توليده تلقائيًا";
             CustomerNameTextBox.Clear();
             CustomerPhoneTextBox.Clear();
-            CustomerAddressTextBox.Clear();
+            CustomerHouseNumberTextBox.Clear();
+            CustomerStreetTextBox.Clear();
+            CustomerAreaTextBox.Clear();
+            CustomerFloorTextBox.Clear();
+            CustomerApartmentTextBox.Clear();
             CustomerNotesTextBox.Clear();
 
             ToggleCustomerButton.Content = "إيقاف / تنشيط العميل";
@@ -148,7 +155,11 @@ namespace Ocore.desktop.Views
                 {
                     Name = CustomerNameTextBox.Text.Trim(),
                     Phone = CustomerPhoneTextBox.Text.Trim(),
-                    Address = CustomerAddressTextBox.Text.Trim(),
+                    HouseNumber = CustomerHouseNumberTextBox.Text.Trim(),
+                    Street = CustomerStreetTextBox.Text.Trim(),
+                    Area = CustomerAreaTextBox.Text.Trim(),
+                    Floor = CustomerFloorTextBox.Text.Trim(),
+                    Apartment = CustomerApartmentTextBox.Text.Trim(),
                     Notes = CustomerNotesTextBox.Text.Trim()
                 };
 
@@ -208,6 +219,7 @@ namespace Ocore.desktop.Views
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 
+                CustomerNameTextBox.Focus();
                 return;
             }
 
@@ -219,8 +231,20 @@ namespace Ocore.desktop.Views
                 selectedCustomer.Phone =
                     CustomerPhoneTextBox.Text.Trim();
 
-                selectedCustomer.Address =
-                    CustomerAddressTextBox.Text.Trim();
+                selectedCustomer.HouseNumber =
+                    CustomerHouseNumberTextBox.Text.Trim();
+
+                selectedCustomer.Street =
+                    CustomerStreetTextBox.Text.Trim();
+
+                selectedCustomer.Area =
+                    CustomerAreaTextBox.Text.Trim();
+
+                selectedCustomer.Floor =
+                    CustomerFloorTextBox.Text.Trim();
+
+                selectedCustomer.Apartment =
+                    CustomerApartmentTextBox.Text.Trim();
 
                 selectedCustomer.Notes =
                     CustomerNotesTextBox.Text.Trim();

@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
@@ -23,9 +22,79 @@ namespace Ocore.desktop.Services
             connectionString =
                 "Data Source=" + database.GetDatabasePath() + ";Version=3;";
 
+            EnsureCustomerAddressColumns();
+
             permissionService = new PermissionService();
             auditService = new AuditService();
         }
+
+        #region Database Migration
+
+        private void EnsureCustomerAddressColumns()
+        {
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                var existingColumns = new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+
+                using (var command = new SQLiteCommand(
+                    "PRAGMA table_info(Customers);", connection))
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        existingColumns.Add(
+                            Convert.ToString(reader["name"]));
+                    }
+                }
+
+                var requiredColumns = new Dictionary<string, string>
+                {
+                    { "HouseNumber", "TEXT NOT NULL DEFAULT ''" },
+                    { "Street", "TEXT NOT NULL DEFAULT ''" },
+                    { "Area", "TEXT NOT NULL DEFAULT ''" },
+                    { "Floor", "TEXT NOT NULL DEFAULT ''" },
+                    { "Apartment", "TEXT NOT NULL DEFAULT ''" }
+                };
+
+                foreach (var column in requiredColumns)
+                {
+                    if (existingColumns.Contains(column.Key))
+                        continue;
+
+                    using (var command = new SQLiteCommand(
+                        "ALTER TABLE Customers ADD COLUMN "
+                        + column.Key + " " + column.Value + ";",
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+
+                // نقل العنوان النصي القديم إلى خانة الشارع
+                // فقط إذا كانت جميع الخانات الجديدة فارغة.
+                const string migrateLegacyAddressSql = @"
+                    UPDATE Customers
+                    SET Street = Address
+                    WHERE
+                        IFNULL(TRIM(Address), '') <> ''
+                        AND IFNULL(TRIM(HouseNumber), '') = ''
+                        AND IFNULL(TRIM(Street), '') = ''
+                        AND IFNULL(TRIM(Area), '') = ''
+                        AND IFNULL(TRIM(Floor), '') = ''
+                        AND IFNULL(TRIM(Apartment), '') = '';";
+
+                using (var command = new SQLiteCommand(
+                    migrateLegacyAddressSql, connection))
+                {
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        #endregion
 
         #region Get Customers
 
@@ -49,6 +118,11 @@ namespace Ocore.desktop.Services
                         Name,
                         Phone,
                         Address,
+                        HouseNumber,
+                        Street,
+                        Area,
+                        Floor,
+                        Apartment,
                         Notes,
                         IsActive,
                         CreatedAt,
@@ -113,6 +187,11 @@ namespace Ocore.desktop.Services
                         Name,
                         Phone,
                         Address,
+                        HouseNumber,
+                        Street,
+                        Area,
+                        Floor,
+                        Apartment,
                         Notes,
                         IsActive,
                         CreatedAt,
@@ -160,7 +239,6 @@ namespace Ocore.desktop.Services
                 {
                     try
                     {
-                        // نستخدم كودًا مؤقتًا فريدًا حتى نحصل على رقم العميل.
                         string temporaryCode =
                             "TMP-" + Guid.NewGuid().ToString("N");
 
@@ -171,6 +249,11 @@ namespace Ocore.desktop.Services
                                 Name,
                                 Phone,
                                 Address,
+                                HouseNumber,
+                                Street,
+                                Area,
+                                Floor,
+                                Apartment,
                                 Notes,
                                 IsActive,
                                 CreatedAt,
@@ -182,6 +265,11 @@ namespace Ocore.desktop.Services
                                 @Name,
                                 @Phone,
                                 @Address,
+                                @HouseNumber,
+                                @Street,
+                                @Area,
+                                @Floor,
+                                @Apartment,
                                 @Notes,
                                 1,
                                 @CreatedAt,
@@ -201,7 +289,22 @@ namespace Ocore.desktop.Services
                                 "@Phone", Normalize(customer.Phone));
 
                             command.Parameters.AddWithValue(
-                                "@Address", Normalize(customer.Address));
+                                "@Address", BuildLegacyAddress(customer));
+
+                            command.Parameters.AddWithValue(
+                                "@HouseNumber", Normalize(customer.HouseNumber));
+
+                            command.Parameters.AddWithValue(
+                                "@Street", Normalize(customer.Street));
+
+                            command.Parameters.AddWithValue(
+                                "@Area", Normalize(customer.Area));
+
+                            command.Parameters.AddWithValue(
+                                "@Floor", Normalize(customer.Floor));
+
+                            command.Parameters.AddWithValue(
+                                "@Apartment", Normalize(customer.Apartment));
 
                             command.Parameters.AddWithValue(
                                 "@Notes", Normalize(customer.Notes));
@@ -263,6 +366,7 @@ namespace Ocore.desktop.Services
 
             customer.Id = customerId;
             customer.CustomerCode = customerCode;
+            customer.Address = BuildLegacyAddress(customer);
             customer.IsActive = true;
             customer.CreatedBy = currentUserId;
             customer.CreatedAt = DateTime.Now;
@@ -303,6 +407,11 @@ namespace Ocore.desktop.Services
                         Name = @Name,
                         Phone = @Phone,
                         Address = @Address,
+                        HouseNumber = @HouseNumber,
+                        Street = @Street,
+                        Area = @Area,
+                        Floor = @Floor,
+                        Apartment = @Apartment,
                         Notes = @Notes
                     WHERE Id = @Id;";
 
@@ -315,7 +424,22 @@ namespace Ocore.desktop.Services
                         "@Phone", Normalize(customer.Phone));
 
                     command.Parameters.AddWithValue(
-                        "@Address", Normalize(customer.Address));
+                        "@Address", BuildLegacyAddress(customer));
+
+                    command.Parameters.AddWithValue(
+                        "@HouseNumber", Normalize(customer.HouseNumber));
+
+                    command.Parameters.AddWithValue(
+                        "@Street", Normalize(customer.Street));
+
+                    command.Parameters.AddWithValue(
+                        "@Area", Normalize(customer.Area));
+
+                    command.Parameters.AddWithValue(
+                        "@Floor", Normalize(customer.Floor));
+
+                    command.Parameters.AddWithValue(
+                        "@Apartment", Normalize(customer.Apartment));
 
                     command.Parameters.AddWithValue(
                         "@Notes", Normalize(customer.Notes));
@@ -327,6 +451,8 @@ namespace Ocore.desktop.Services
                         throw new Exception("العميل غير موجود.");
                 }
             }
+
+            customer.Address = BuildLegacyAddress(customer);
 
             auditService.Log(
                 currentUserId,
@@ -473,17 +599,61 @@ namespace Ocore.desktop.Services
                 : value.Trim();
         }
 
+        private string BuildLegacyAddress(Customer customer)
+        {
+            if (customer == null)
+                return string.Empty;
+
+            var parts = new List<string>();
+
+            AddAddressPart(parts, "رقم المنزل", customer.HouseNumber);
+            AddAddressPart(parts, "الشارع", customer.Street);
+            AddAddressPart(parts, "المنطقة", customer.Area);
+            AddAddressPart(parts, "الدور", customer.Floor);
+            AddAddressPart(parts, "الشقة", customer.Apartment);
+
+            return string.Join(" - ", parts);
+        }
+
+        private void AddAddressPart(
+            List<string> parts,
+            string label,
+            string value)
+        {
+            string normalizedValue = Normalize(value);
+
+            if (!string.IsNullOrWhiteSpace(normalizedValue))
+                parts.Add(label + ": " + normalizedValue);
+        }
+
         private Customer MapCustomer(SQLiteDataReader reader)
         {
             var customer = new Customer();
 
             customer.Id = Convert.ToInt32(reader["Id"]);
+
             customer.CustomerCode =
                 Convert.ToString(reader["CustomerCode"]);
 
             customer.Name = Convert.ToString(reader["Name"]);
             customer.Phone = Convert.ToString(reader["Phone"]);
             customer.Address = Convert.ToString(reader["Address"]);
+
+            customer.HouseNumber =
+                Convert.ToString(reader["HouseNumber"]);
+
+            customer.Street =
+                Convert.ToString(reader["Street"]);
+
+            customer.Area =
+                Convert.ToString(reader["Area"]);
+
+            customer.Floor =
+                Convert.ToString(reader["Floor"]);
+
+            customer.Apartment =
+                Convert.ToString(reader["Apartment"]);
+
             customer.Notes = Convert.ToString(reader["Notes"]);
 
             customer.IsActive =
