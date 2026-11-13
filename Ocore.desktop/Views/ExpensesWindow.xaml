@@ -1,0 +1,281 @@
+﻿
+<Window x:Class="Ocore.desktop.Views.ExpensesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - مصروفات الصيدلية"
+        Height="760"
+        Width="1180"
+        MinHeight="650"
+        MinWidth="950"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Background="#F3F6FA">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- عنوان الشاشة -->
+        <Border Grid.Row="0"
+                Background="White"
+                CornerRadius="10"
+                Padding="18"
+                Margin="0,0,0,15">
+
+            <StackPanel>
+                <TextBlock Text="مصروفات الصيدلية"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="#1E293B"/>
+
+                <TextBlock Text="تسجيل ومتابعة المصروفات التشغيلية المرتبطة بالشيفت الحالي"
+                           FontSize="13"
+                           Foreground="#64748B"
+                           Margin="0,6,0,0"/>
+
+                <TextBlock x:Name="ShiftStatusText"
+                           Text="جاري التحقق من حالة الشيفت..."
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="#2563EB"
+                           Margin="0,10,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- تسجيل مصروف جديد -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="10"
+                Padding="18"
+                Margin="0,0,0,15">
+
+            <StackPanel>
+                <TextBlock Text="تسجيل مصروف جديد"
+                           FontSize="17"
+                           FontWeight="Bold"
+                           Foreground="#1E293B"
+                           Margin="0,0,0,15"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="15"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="15"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="قيمة المصروف"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,7"/>
+
+                        <TextBox x:Name="AmountTextBox"
+                                 Height="38"
+                                 FontSize="15"
+                                 Padding="8"
+                                 VerticalContentAlignment="Center"
+                                 FlowDirection="LeftToRight"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="بند المصروف"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,7"/>
+
+                        <ComboBox x:Name="CategoryComboBox"
+                                  Height="38"
+                                  FontSize="14"
+                                  Padding="6"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="وسيلة الدفع"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,7"/>
+
+                        <ComboBox x:Name="PaymentMethodComboBox"
+                                  Height="38"
+                                  FontSize="14"
+                                  Padding="6"/>
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Margin="0,15,0,0">
+                    <TextBlock Text="بيان المصروف (اختياري)"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,7"/>
+
+                    <TextBox x:Name="DescriptionTextBox"
+                             Height="65"
+                             FontSize="14"
+                             Padding="8"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"/>
+                </StackPanel>
+
+                <Grid Margin="0,15,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="FormStatusText"
+                               Text=""
+                               Foreground="#64748B"
+                               VerticalAlignment="Center"
+                               FontSize="12"/>
+
+                    <Button x:Name="AddExpenseButton"
+                            Grid.Column="1"
+                            Content="تسجيل المصروف"
+                            Width="155"
+                            Height="40"
+                            Background="#2563EB"
+                            Foreground="White"
+                            FontWeight="Bold"
+                            FontSize="14"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- سجل المصروفات -->
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="10"
+                Padding="12">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0"
+                      Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="مصروفات الشيفت"
+                                   FontSize="17"
+                                   FontWeight="Bold"
+                                   Foreground="#1E293B"/>
+
+                        <TextBlock x:Name="ExpensesSummaryText"
+                                   Text="عدد المصروفات: 0"
+                                   FontSize="12"
+                                   Foreground="#64748B"
+                                   Margin="0,5,0,0"/>
+                    </StackPanel>
+
+                    <Button x:Name="RefreshButton"
+                            Grid.Column="1"
+                            Content="تحديث السجل"
+                            Width="115"
+                            Height="35"
+                            Background="#E2E8F0"
+                            Foreground="#334155"
+                            FontWeight="SemiBold"/>
+                </Grid>
+
+                <DataGrid x:Name="ExpensesDataGrid"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeight="38"
+                          FontSize="13"
+                          Background="White"
+                          BorderThickness="0"
+                          AlternatingRowBackground="#F8FAFC">
+
+                    <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="رقم"
+                                            Binding="{Binding Id}"
+                                            Width="55"/>
+
+                        <DataGridTextColumn Header="البند"
+                                            Binding="{Binding Category}"
+                                            Width="1.2*"/>
+
+                        <DataGridTextColumn Header="القيمة"
+                                            Binding="{Binding Amount, StringFormat={}{0:N2}}"
+                                            Width="1*"/>
+
+                        <DataGridTextColumn Header="وسيلة الدفع"
+                                            Binding="{Binding PaymentMethod}"
+                                            Width="1*"/>
+
+                        <DataGridTextColumn Header="البيان"
+                                            Binding="{Binding Description}"
+                                            Width="1.5*"/>
+
+                        <DataGridTextColumn Header="مسجل المصروف"
+                                            Binding="{Binding CreatedByName}"
+                                            Width="1.2*"/>
+
+                        <DataGridTextColumn Header="التاريخ"
+                                            Binding="{Binding CreatedAt}"
+                                            Width="1.3*"/>
+
+                        <DataGridCheckBoxColumn Header="ملغي"
+                                                Binding="{Binding IsVoided}"
+                                                Width="65"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- الأزرار السفلية -->
+        <Grid Grid.Row="3"
+              Margin="0,12,0,0">
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="StatusText"
+                       Text="جاهز"
+                       Foreground="#64748B"
+                       VerticalAlignment="Center"
+                       FontSize="12"/>
+
+            <Button x:Name="CancelExpenseButton"
+                    Grid.Column="1"
+                    Content="إلغاء المصروف المحدد"
+                    Width="165"
+                    Height="38"
+                    Background="#DC2626"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    Visibility="Collapsed"/>
+
+            <Button Grid.Column="3"
+                    Content="إغلاق"
+                    Width="100"
+                    Height="38"
+                    Background="#334155"
+                    Foreground="White"
+                    FontWeight="SemiBold"
+                    Click="CloseButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>
