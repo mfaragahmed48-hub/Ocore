@@ -319,6 +319,7 @@ SELECT
     p.SalePrice,
     p.PurchasePrice,
     p.MaxDiscountPercentage,
+p.MinimumStockLevel,
     p.IsArchived,
 
     COALESCE(
@@ -397,6 +398,8 @@ ORDER BY p.Name;";
 
                                 MaxDiscountPercentage = Convert.ToDouble(
                                     reader["MaxDiscountPercentage"]),
+                                MinimumStockLevel = Convert.ToDouble(
+    reader["MinimumStockLevel"]),
 
                                 Quantity = Convert.ToDouble(reader["Quantity"]),
                                 TotalQuantity = Convert.ToDouble(reader["TotalQuantity"]),
@@ -1542,6 +1545,127 @@ ORDER BY Name;";
 
         #endregion
 
+        #region Product Minimum Stock Level
+
+        public void SetProductMinimumStockLevel(
+            int currentUserId,
+            int productId,
+            double minimumStockLevel)
+        {
+            if (productId <= 0)
+            {
+                throw new ArgumentException(
+                    "الصنف المحدد غير صحيح.");
+            }
+
+            if (double.IsNaN(minimumStockLevel) ||
+                double.IsInfinity(minimumStockLevel) ||
+                minimumStockLevel < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(minimumStockLevel),
+                    "الحد الأدنى للمخزون لا يمكن أن يكون سالبًا.");
+            }
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                using (var transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        CheckManagerPermission(connection, currentUserId);
+
+                        string productName;
+                        double oldMinimumStockLevel;
+
+                        using (var command = new SQLiteCommand(
+                            @"SELECT Name, MinimumStockLevel
+                      FROM Products
+                      WHERE Id = @ProductId;",
+                            connection,
+                            transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@ProductId", productId);
+
+                            using (var reader = command.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                {
+                                    throw new InvalidOperationException(
+                                        "الصنف غير موجود.");
+                                }
+
+                                productName = Convert.ToString(
+                                    reader["Name"]);
+
+                                oldMinimumStockLevel = Convert.ToDouble(
+                                    reader["MinimumStockLevel"]);
+                            }
+                        }
+
+                        if (Math.Abs(
+                            oldMinimumStockLevel -
+                            minimumStockLevel) < 0.00000001)
+                        {
+                            transaction.Commit();
+                            return;
+                        }
+
+                        using (var command = new SQLiteCommand(
+                            @"UPDATE Products
+                      SET MinimumStockLevel = @MinimumStockLevel
+                      WHERE Id = @ProductId;",
+                            connection,
+                            transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@MinimumStockLevel",
+                                minimumStockLevel);
+
+                            command.Parameters.AddWithValue(
+                                "@ProductId", productId);
+
+                            if (command.ExecuteNonQuery() != 1)
+                            {
+                                throw new InvalidOperationException(
+                                    "تعذر تحديث الحد الأدنى للمخزون.");
+                            }
+                        }
+
+                        string oldValue = oldMinimumStockLevel.ToString(
+                            "0.##",
+                            System.Globalization.CultureInfo.InvariantCulture);
+
+                        string newValue = minimumStockLevel.ToString(
+                            "0.##",
+                            System.Globalization.CultureInfo.InvariantCulture);
+
+                        WriteProductAudit(
+                            connection,
+                            transaction,
+                            currentUserId,
+                            productId,
+                            "UpdateMinimumStockLevel",
+                            "تعديل الحد الأدنى للمخزون للصنف: " +
+                            productName +
+                            " - القيمة القديمة: " + oldValue +
+                            " - القيمة الجديدة: " + newValue);
+
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
+        }
+
+        #endregion
         #region Archive Product
 
         public void ArchiveProduct(int currentUserId, int productId)
