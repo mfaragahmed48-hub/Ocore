@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 
@@ -447,6 +446,10 @@ VALUES (1);
 
             EnsureProductPackageColumns(connection);
             EnsureProductMaxDiscountPercentageColumn(connection);
+
+            // إضافة الحد الأدنى للمخزون لكل صنف.
+            EnsureProductMinimumStockLevelColumn(connection);
+
             EnsureProductDrugCatalogIdColumn(connection);
             EnsurePurchaseInvoiceDateColumn(connection);
             EnsurePurchaseInvoiceItemUnitColumns(connection);
@@ -658,9 +661,8 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
 
             return false;
         }
-
         private static void EnsureSalesInvoicesCustomerIdIndex(
-            SQLiteConnection connection)
+    SQLiteConnection connection)
         {
             var existingColumns = new List<string>();
 
@@ -913,6 +915,38 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
             }
         }
 
+        // إضافة الحد الأدنى للمخزون لكل صنف.
+        // القيمة الافتراضية صفر تعني عدم تفعيل تنبيه انخفاض المخزون.
+        // يتم الحفاظ على جميع الأصناف والبيانات القديمة.
+        private static void EnsureProductMinimumStockLevelColumn(
+            SQLiteConnection connection)
+        {
+            var existingColumns = new List<string>();
+
+            using (var command = new SQLiteCommand(
+                "PRAGMA table_info(Products);", connection))
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    existingColumns.Add(reader["name"].ToString());
+                }
+            }
+
+            if (!ContainsColumn(
+                existingColumns,
+                "MinimumStockLevel"))
+            {
+                using (var command = new SQLiteCommand(
+                    @"ALTER TABLE Products
+                      ADD COLUMN MinimumStockLevel REAL NOT NULL DEFAULT 0;",
+                    connection))
+                {
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
         // ربط الأصناف بدليل الأدوية دون التأثير على الأصناف القديمة
         private static void EnsureProductDrugCatalogIdColumn(
             SQLiteConnection connection)
@@ -957,9 +991,8 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
                 command.ExecuteNonQuery();
             }
         }
-
         private static void EnsurePurchaseInvoiceDateColumn(
-            SQLiteConnection connection)
+    SQLiteConnection connection)
         {
             var existingColumns = new List<string>();
 
@@ -1199,7 +1232,7 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
 
         // إضافة أعمدة استيراد DrugCatalog دون حذف البيانات القديمة
         private static void EnsureDrugCatalogImportColumns(
-            SQLiteConnection connection)
+    SQLiteConnection connection)
         {
             var existingColumns = new List<string>();
 
