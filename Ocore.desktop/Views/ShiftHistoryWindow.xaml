@@ -48,7 +48,8 @@
                         Background="#246B58"
                         Foreground="White"
                         FontWeight="Bold"
-                        BorderThickness="0"/>
+                        BorderThickness="0"
+                        Click="RefreshButton_Click"/>
             </DockPanel>
         </Border>
 
@@ -379,7 +380,8 @@
                     DockPanel.Dock="Left"
                     Background="#E2E8F0"
                     Foreground="#334155"
-                    BorderThickness="0"/>
+                    BorderThickness="0"
+                    Click="CloseButton_Click"/>
         </DockPanel>
     </Grid>
 </Window>
