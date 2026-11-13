@@ -33,7 +33,6 @@ namespace Ocore.desktop.Services
             connectionString =
                 "Data Source=" + database.GetDatabasePath() + ";Version=3;";
 
-            // التأكد من وجود جداول الشيفت أولاً.
             new ShiftService();
 
             EnsureSchema();
@@ -50,38 +49,27 @@ namespace Ocore.desktop.Services
                     CREATE TABLE IF NOT EXISTS ExpenseTransactions
                     (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
-
                         ShiftId INTEGER NOT NULL,
-
                         Amount REAL NOT NULL,
                         Category TEXT NOT NULL,
                         Description TEXT NOT NULL DEFAULT '',
                         PaymentMethod TEXT NOT NULL,
-
                         CreatedByUserId INTEGER NOT NULL,
                         CreatedAt TEXT NOT NULL,
-
                         IsVoided INTEGER NOT NULL DEFAULT 0,
                         VoidedByUserId INTEGER NULL,
                         VoidedAt TEXT NULL,
                         VoidReason TEXT NULL,
 
-                        FOREIGN KEY (ShiftId)
-                            REFERENCES Shifts(Id),
-
-                        FOREIGN KEY (CreatedByUserId)
-                            REFERENCES Users(Id),
-
-                        FOREIGN KEY (VoidedByUserId)
-                            REFERENCES Users(Id),
+                        FOREIGN KEY (ShiftId) REFERENCES Shifts(Id),
+                        FOREIGN KEY (CreatedByUserId) REFERENCES Users(Id),
+                        FOREIGN KEY (VoidedByUserId) REFERENCES Users(Id),
 
                         CHECK (Amount > 0),
-
                         CHECK (
                             PaymentMethod IN
                             ('Cash', 'Card', 'InstaPay', 'Transfer')
                         ),
-
                         CHECK (IsVoided IN (0, 1))
                     );
 
@@ -362,6 +350,7 @@ namespace Ocore.desktop.Services
         }
 
         // إلغاء مصروف: المدير فقط.
+        // لا يسمح بإلغاء مصروف تابع لشيفت مغلق.
         // لا يتم حذف السجل الأصلي.
         public bool CancelExpense(
             int managerUserId,
@@ -400,6 +389,59 @@ namespace Ocore.desktop.Services
                             managerUserId,
                             true);
 
+                        string shiftStatus;
+                        int isVoided;
+
+                        // قراءة حالة المصروف والشيفت قبل السماح بالإلغاء.
+                        using (var command = new SQLiteCommand(@"
+                            SELECT
+                                s.Status,
+                                COALESCE(e.IsVoided, 0) AS IsVoided
+                            FROM ExpenseTransactions e
+                            INNER JOIN Shifts s
+                                ON s.Id = e.ShiftId
+                            WHERE e.Id = @ExpenseId
+                            LIMIT 1;",
+                            connection,
+                            transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@ExpenseId",
+                                expenseId);
+
+                            using (var reader = command.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                {
+                                    throw new InvalidOperationException(
+                                        "المصروف غير موجود.");
+                                }
+
+                                shiftStatus = Convert.ToString(
+                                    reader["Status"]);
+
+                                isVoided = Convert.ToInt32(
+                                    reader["IsVoided"]);
+                            }
+                        }
+
+                        if (isVoided == 1)
+                        {
+                            throw new InvalidOperationException(
+                                "تم إلغاء هذا المصروف بالفعل.");
+                        }
+
+                        if (!string.Equals(
+                            shiftStatus,
+                            "Open",
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            throw new InvalidOperationException(
+                                "لا يمكن إلغاء مصروف مرتبط بشيفت مغلق. "
+                                + "يجب معالجة الخطأ بقيد عكسي موثق "
+                                + "في شيفت مفتوح.");
+                        }
+
                         using (var command = new SQLiteCommand(@"
                             UPDATE ExpenseTransactions
                             SET
@@ -408,7 +450,14 @@ namespace Ocore.desktop.Services
                                 VoidedAt = @VoidedAt,
                                 VoidReason = @VoidReason
                             WHERE Id = @ExpenseId
-                              AND IsVoided = 0;",
+                              AND IsVoided = 0
+                              AND EXISTS
+                              (
+                                  SELECT 1
+                                  FROM Shifts s
+                                  WHERE s.Id = ExpenseTransactions.ShiftId
+                                    AND s.Status = 'Open'
+                              );",
                             connection,
                             transaction))
                         {
@@ -435,7 +484,8 @@ namespace Ocore.desktop.Services
                             if (affected == 0)
                             {
                                 throw new InvalidOperationException(
-                                    "المصروف غير موجود أو تم إلغاؤه بالفعل.");
+                                    "تعذر إلغاء المصروف. "
+                                    + "ربما تغيرت حالة الشيفت أو المصروف.");
                             }
                         }
 
