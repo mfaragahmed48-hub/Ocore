@@ -18,6 +18,7 @@ namespace Ocore.desktop.Views
         private readonly string currentRole;
         private readonly PermissionService permissionService;
         private readonly ProductService productService;
+        private readonly ShiftService shiftService;
 
         public DashboardWindow(
             int userId,
@@ -31,8 +32,12 @@ namespace Ocore.desktop.Views
 
             permissionService = new PermissionService();
             productService = new ProductService();
+            shiftService = new ShiftService();
 
-            // تحديث نواقص المخزون عند العودة إلى لوحة التحكم
+            // ربط زر إغلاق الشيفت وتحديث بياناته.
+            CloseShiftButton.Click += CloseShiftButton_Click;
+
+            // تحديث البيانات عند العودة إلى لوحة التحكم.
             Activated += DashboardWindow_Activated;
 
             UserNameText.Text = fullName;
@@ -119,6 +124,7 @@ namespace Ocore.desktop.Views
                     : Visibility.Collapsed;
 
             RefreshLowStockSummary();
+            RefreshShiftSummary();
         }
 
         // ==========================================
@@ -130,6 +136,168 @@ namespace Ocore.desktop.Views
             EventArgs e)
         {
             RefreshLowStockSummary();
+            RefreshShiftSummary();
+        }
+
+        // ==========================================
+        // الشيفت الحالي وإغلاقه
+        // ==========================================
+
+        private bool CanCloseShift()
+        {
+            return string.Equals(
+                       currentRole,
+                       "Pharmacist",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(
+                       currentRole,
+                       "Manager",
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void RefreshShiftSummary()
+        {
+            try
+            {
+                var shift = shiftService.GetCurrentShift();
+
+                if (shift == null)
+                {
+                    ShiftStatusText.Text = "لا يوجد شيفت مفتوح";
+
+                    ShiftStatusText.Foreground = new SolidColorBrush(
+                        Color.FromRgb(100, 115, 111));
+
+                    ShiftNumberText.Text = "—";
+                    ShiftOpenedByText.Text = "—";
+                    ShiftOpenedAtText.Text = "—";
+
+                    CloseShiftButton.IsEnabled = false;
+
+                    return;
+                }
+
+                ShiftStatusText.Text = "مفتوح";
+
+                ShiftStatusText.Foreground = new SolidColorBrush(
+                    Color.FromRgb(22, 134, 93));
+
+                ShiftNumberText.Text =
+                    string.IsNullOrWhiteSpace(shift.ShiftNumber)
+                        ? shift.Id.ToString()
+                        : shift.ShiftNumber;
+
+                ShiftOpenedByText.Text =
+                    string.IsNullOrWhiteSpace(shift.OpenedByName)
+                        ? "غير محدد"
+                        : shift.OpenedByName;
+
+                DateTime openedAt;
+
+                if (DateTime.TryParse(
+                    shift.OpenedAt,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out openedAt))
+                {
+                    ShiftOpenedAtText.Text =
+                        openedAt.ToString("yyyy/MM/dd hh:mm tt");
+                }
+                else
+                {
+                    ShiftOpenedAtText.Text =
+                        shift.OpenedAt ?? "—";
+                }
+
+                CloseShiftButton.IsEnabled = CanCloseShift();
+            }
+            catch (Exception ex)
+            {
+                ShiftStatusText.Text = "تعذر تحميل الحالة";
+
+                ShiftStatusText.Foreground = new SolidColorBrush(
+                    Color.FromRgb(168, 50, 50));
+
+                ShiftNumberText.Text = "—";
+                ShiftOpenedByText.Text = "—";
+                ShiftOpenedAtText.Text = "—";
+
+                CloseShiftButton.IsEnabled = false;
+
+                System.Diagnostics.Debug.WriteLine(
+                    "RefreshShiftSummary error: " + ex);
+            }
+        }
+
+        private void CloseShiftButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (!CanCloseShift())
+            {
+                MessageBox.Show(
+                    "إغلاق الشيفت متاح للصيادلة ومدير النظام فقط.",
+                    "صلاحيات المستخدم",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            var result = MessageBox.Show(
+                "هل أنت متأكد من إغلاق الشيفت الحالي؟\n"
+                + "سيتم تسجيل اسمك ووقت الإغلاق.",
+                "تأكيد إغلاق الشيفت",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                bool closed =
+                    shiftService.CloseCurrentShift(currentUserId);
+
+                if (!closed)
+                {
+                    MessageBox.Show(
+                        "لا يوجد شيفت مفتوح لإغلاقه.",
+                        "إغلاق الشيفت",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        "تم إغلاق الشيفت بنجاح.",
+                        "إغلاق الشيفت",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+
+                RefreshShiftSummary();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "صلاحيات المستخدم",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                RefreshShiftSummary();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "حدث خطأ أثناء إغلاق الشيفت:\n\n" + ex.Message,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                RefreshShiftSummary();
+            }
         }
 
         // ==========================================
@@ -456,6 +624,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية إدارة المستخدمين.");
+
                 return;
             }
 
@@ -478,6 +647,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية إدارة الصلاحيات.");
+
                 return;
             }
 
@@ -498,6 +668,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية عرض سجل النشاطات.");
+
                 return;
             }
 
@@ -522,6 +693,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية الدخول إلى شاشة المبيعات.");
+
                 return;
             }
 
@@ -544,6 +716,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية عرض سجل فواتير البيع.");
+
                 return;
             }
 
@@ -645,6 +818,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية الدخول إلى شاشة إدارة الأصناف.");
+
                 return;
             }
 
@@ -706,6 +880,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية الدخول إلى شاشة المشتريات.");
+
                 return;
             }
 
@@ -728,6 +903,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية عرض سجل فواتير الشراء.");
+
                 return;
             }
 
@@ -751,6 +927,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية الدخول إلى شاشة إدارة الموردين.");
+
                 return;
             }
 
@@ -813,6 +990,7 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "ليس لديك صلاحية تعديل إعدادات الصيدلية.");
+
                 return;
             }
 

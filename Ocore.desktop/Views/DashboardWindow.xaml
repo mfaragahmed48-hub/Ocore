@@ -2,9 +2,9 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="O CORE - لوحة التحكم"
-        Height="650"
+        Height="720"
         Width="1050"
-        MinHeight="500"
+        MinHeight="600"
         MinWidth="800"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
@@ -193,9 +193,11 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
+            <!-- رأس لوحة التحكم -->
             <Border Grid.Row="0"
                     Background="White"
                     CornerRadius="10"
@@ -224,6 +226,7 @@
                 </DockPanel>
             </Border>
 
+            <!-- إحصائيات لوحة التحكم -->
             <UniformGrid Grid.Row="1"
                          Columns="4"
                          Margin="0,12,0,12">
@@ -298,7 +301,105 @@
 
             </UniformGrid>
 
+            <!-- حالة الشيفت الحالي -->
             <Border Grid.Row="2"
+                    Background="White"
+                    CornerRadius="10"
+                    Padding="16"
+                    Margin="0,0,0,12"
+                    BorderBrush="#DCE8E3"
+                    BorderThickness="1">
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+
+                            <TextBlock Text="حالة الشيفت"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="#183F36"/>
+
+                            <TextBlock x:Name="ShiftStatusText"
+                                       Text="جاري تحميل الحالة..."
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="#B7791F"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="رقم الشيفت"
+                                           Foreground="#64736F"
+                                           FontSize="12"/>
+
+                                <TextBlock x:Name="ShiftNumberText"
+                                           Text="—"
+                                           FontWeight="Bold"
+                                           Foreground="#183F36"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="بدأ بواسطة"
+                                           Foreground="#64736F"
+                                           FontSize="12"/>
+
+                                <TextBlock x:Name="ShiftOpenedByText"
+                                           Text="—"
+                                           FontWeight="Bold"
+                                           Foreground="#183F36"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="وقت بداية الشيفت"
+                                           Foreground="#64736F"
+                                           FontSize="12"/>
+
+                                <TextBlock x:Name="ShiftOpenedAtText"
+                                           Text="—"
+                                           FontWeight="Bold"
+                                           Foreground="#183F36"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Grid>
+
+                    </StackPanel>
+
+                    <Button x:Name="CloseShiftButton"
+                            Grid.Column="1"
+                            Content="🔒   إغلاق الشيفت"
+                            Width="145"
+                            Height="42"
+                            Margin="15,0,0,0"
+                            Padding="10"
+                            Background="#A83232"
+                            Foreground="White"
+                            FontWeight="Bold"
+                            BorderThickness="0"
+                            IsEnabled="False"
+                            ToolTip="سيتم تفعيل إغلاق الشيفت في الخطوة التالية"/>
+
+                </Grid>
+            </Border>
+
+            <!-- محتوى لوحة التحكم -->
+            <Border Grid.Row="3"
                     Background="White"
                     CornerRadius="10"
                     Padding="20">
