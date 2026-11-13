@@ -247,6 +247,9 @@ namespace Ocore.desktop.Views
             PurchaseUnitComboBox.IsEnabled = false;
             UnitPriceTextBox.Clear();
 
+            // مسح سعر البيع عند إلغاء اختيار الصنف
+            SalePriceTextBox.Clear();
+
             if (product == null)
                 return;
 
@@ -280,6 +283,12 @@ namespace Ocore.desktop.Views
 
             UnitPriceTextBox.Text =
                 product.PurchasePrice.ToString(
+                    "0.00",
+                    CultureInfo.CurrentCulture);
+
+            // عرض سعر البيع المسجل بالفعل في بيانات الصنف
+            SalePriceTextBox.Text =
+                product.SalePrice.ToString(
                     "0.00",
                     CultureInfo.CurrentCulture);
         }
@@ -631,6 +640,7 @@ namespace Ocore.desktop.Views
             PurchaseUnitComboBox.IsEnabled = false;
 
             UnitPriceTextBox.Clear();
+            SalePriceTextBox.Clear();
 
             ProductComboBox.Focus();
         }
@@ -920,6 +930,7 @@ namespace Ocore.desktop.Views
                 BatchNumberTextBox.Clear();
                 QuantityTextBox.Text = "1";
                 UnitPriceTextBox.Clear();
+                SalePriceTextBox.Clear();
 
                 ExpiryDatePicker.SelectedDate = null;
 

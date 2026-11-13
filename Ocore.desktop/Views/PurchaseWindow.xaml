@@ -278,8 +278,9 @@
 
                 <Grid Margin="0,5,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.2*"/>
-                        <ColumnDefinition Width="1.2*"/>
+                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition Width="1.1*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
@@ -296,14 +297,26 @@
                                  HorizontalContentAlignment="Center"/>
                     </StackPanel>
 
-                    <Button Grid.Column="2"
+                    <!-- سعر البيع المسجل في الأصناف والمخزن: للعرض فقط -->
+                    <StackPanel Grid.Column="2" Margin="3">
+                        <TextBlock Text="سعر البيع الحالي" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="SalePriceTextBox"
+                                 IsReadOnly="True"
+                                 IsTabStop="False"
+                                 Background="#F2F6F4"
+                                 Foreground="{StaticResource PrimaryBrush}"
+                                 FontWeight="Bold"
+                                 HorizontalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="3"
                             Content="إضافة إلى الفاتورة"
                             Width="140"
                             Margin="5,17,3,0"
                             Style="{StaticResource PrimaryButton}"
                             Click="AddItemButton_Click"/>
 
-                    <Button Grid.Column="3"
+                    <Button Grid.Column="4"
                             x:Name="RemoveItemButton"
                             Content="حذف الصنف المحدد"
                             Width="130"
