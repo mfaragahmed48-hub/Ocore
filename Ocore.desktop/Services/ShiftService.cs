@@ -484,25 +484,88 @@ namespace Ocore.desktop.Services
                 }
             }
 
+            // مصروفات الشيفت غير الملغاة، موزعة حسب وسيلة الدفع.
+            // إذا لم يتم إنشاء جدول المصروفات بعد، تكون القيم صفرًا.
+            bool expenseTableExists = false;
+
+            using (var command = new SQLiteCommand(@"
+                SELECT COUNT(*)
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name = 'ExpenseTransactions';",
+                connection,
+                transaction))
+            {
+                expenseTableExists =
+                    Convert.ToInt32(command.ExecuteScalar()) > 0;
+            }
+
+            if (expenseTableExists)
+            {
+                using (var command = new SQLiteCommand(@"
+                    SELECT
+                        COALESCE(SUM(CASE
+                            WHEN PaymentMethod = 'Cash'
+                            THEN Amount ELSE 0 END), 0) AS CashAmount,
+
+                        COALESCE(SUM(CASE
+                            WHEN PaymentMethod = 'Card'
+                            THEN Amount ELSE 0 END), 0) AS CardAmount,
+
+                        COALESCE(SUM(CASE
+                            WHEN PaymentMethod = 'InstaPay'
+                            THEN Amount ELSE 0 END), 0) AS InstaPayAmount,
+
+                        COALESCE(SUM(CASE
+                            WHEN PaymentMethod = 'Transfer'
+                            THEN Amount ELSE 0 END), 0) AS TransferAmount
+
+                    FROM ExpenseTransactions
+                    WHERE ShiftId = @ShiftId
+                      AND COALESCE(IsVoided, 0) = 0;",
+                    connection,
+                    transaction))
+                {
+                    command.Parameters.AddWithValue("@ShiftId", shiftId);
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            summary.ExpensesCash = ReadMoney(reader["CashAmount"]);
+                            summary.ExpensesCard = ReadMoney(reader["CardAmount"]);
+                            summary.ExpensesInstaPay = ReadMoney(reader["InstaPayAmount"]);
+                            summary.ExpensesTransfer = ReadMoney(reader["TransferAmount"]);
+                        }
+                    }
+                }
+            }
+
+            // المتوقع لكل وسيلة:
+            // المبيعات + التحصيلات - المرتجعات الفعلية - المصروفات.
             summary.ExpectedCash = RoundMoney(
                 summary.SalesCash +
                 summary.CollectionsCash -
-                summary.RefundsCash);
+                summary.RefundsCash -
+                summary.ExpensesCash);
 
             summary.ExpectedCard = RoundMoney(
                 summary.SalesCard +
                 summary.CollectionsCard -
-                summary.RefundsCard);
+                summary.RefundsCard -
+                summary.ExpensesCard);
 
             summary.ExpectedInstaPay = RoundMoney(
                 summary.SalesInstaPay +
                 summary.CollectionsInstaPay -
-                summary.RefundsInstaPay);
+                summary.RefundsInstaPay -
+                summary.ExpensesInstaPay);
 
             summary.ExpectedTransfer = RoundMoney(
                 summary.SalesTransfer +
                 summary.CollectionsTransfer -
-                summary.RefundsTransfer);
+                summary.RefundsTransfer -
+                summary.ExpensesTransfer);
 
             summary.TotalExpected = RoundMoney(
                 summary.ExpectedCash +
@@ -933,6 +996,11 @@ namespace Ocore.desktop.Services
             public double RefundsCard { get; set; }
             public double RefundsInstaPay { get; set; }
             public double RefundsTransfer { get; set; }
+
+            public double ExpensesCash { get; set; }
+            public double ExpensesCard { get; set; }
+            public double ExpensesInstaPay { get; set; }
+            public double ExpensesTransfer { get; set; }
 
             public double ExpectedCash { get; set; }
             public double ExpectedCard { get; set; }
