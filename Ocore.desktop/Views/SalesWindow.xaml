@@ -318,7 +318,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- Invoice Summary: same position -->
+                    <!-- Invoice Summary -->
                     <Border Grid.Row="3"
                             Background="#F4F8F6"
                             CornerRadius="6"
@@ -399,6 +399,7 @@
                               FontSize="13"
                               IsEditable="True"
                               IsTextSearchEnabled="False"
+                              TextSearch.TextPath="Name"
                               StaysOpenOnEdit="True"
                               ToolTip="ابحث باسم العميل أو رقم الهاتف أو كود العميل، أو اتركه فارغًا للبيع النقدي">
                         <ComboBox.ItemTemplate>
