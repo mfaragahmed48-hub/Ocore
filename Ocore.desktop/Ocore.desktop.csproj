@@ -143,6 +143,7 @@
     <Compile Include="Services\Printing\PrinterSettingsNavigationService.cs" />
     <Compile Include="Services\Printing\PrintingDeviceService.cs" />
     <Compile Include="Services\Printing\PrintingProfileService.cs" />
+    <Compile Include="Services\ShiftService.cs" />
     <Compile Include="Services\ThermalReceiptDocumentBuilder.cs" />
     <Compile Include="Views\BatchSelectionWindow.xaml.cs">
       <DependentUpon>BatchSelectionWindow.xaml</DependentUpon>
