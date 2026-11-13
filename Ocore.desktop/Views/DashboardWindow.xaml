@@ -11,7 +11,8 @@
         ResizeMode="CanResize"
         WindowState="Normal"
         FlowDirection="RightToLeft"
-        Background="#F3F6F8">
+        Background="#F3F6F8"
+        Loaded="DashboardWindow_ShiftHandover_Loaded">
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -393,7 +394,8 @@
                                 Foreground="White"
                                 FontWeight="Bold"
                                 BorderThickness="0"
-                                IsEnabled="False"/>
+                                IsEnabled="False"
+                                Click="HandoverShiftButton_Click"/>
 
                         <Button x:Name="TakeOverShiftButton"
                                 Content="استلام الشيفت"
@@ -405,7 +407,8 @@
                                 Foreground="#183F36"
                                 FontWeight="Bold"
                                 BorderThickness="0"
-                                IsEnabled="False"/>
+                                IsEnabled="False"
+                                Click="TakeOverShiftButton_Click"/>
 
                         <Button x:Name="CloseShiftButton"
                                 Content="🔒   إنهاء الشيفت"
