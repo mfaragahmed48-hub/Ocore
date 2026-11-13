@@ -1,4 +1,5 @@
-﻿<Window x:Class="Ocore.desktop.Views.DashboardWindow"
+﻿
+<Window x:Class="Ocore.desktop.Views.DashboardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="O CORE - لوحة التحكم"
@@ -197,7 +198,6 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- رأس لوحة التحكم -->
             <Border Grid.Row="0"
                     Background="White"
                     CornerRadius="10"
@@ -226,7 +226,6 @@
                 </DockPanel>
             </Border>
 
-            <!-- إحصائيات لوحة التحكم -->
             <UniformGrid Grid.Row="1"
                          Columns="4"
                          Margin="0,12,0,12">
@@ -301,7 +300,6 @@
 
             </UniformGrid>
 
-            <!-- حالة الشيفت الحالي -->
             <Border Grid.Row="2"
                     Background="White"
                     CornerRadius="10"
@@ -381,24 +379,49 @@
 
                     </StackPanel>
 
-                    <Button x:Name="CloseShiftButton"
-                            Grid.Column="1"
-                            Content="🔒   إغلاق الشيفت"
-                            Width="145"
-                            Height="42"
-                            Margin="15,0,0,0"
-                            Padding="10"
-                            Background="#A83232"
-                            Foreground="White"
-                            FontWeight="Bold"
-                            BorderThickness="0"
-                            IsEnabled="False"
-                            ToolTip="سيتم تفعيل إغلاق الشيفت في الخطوة التالية"/>
+                    <StackPanel Grid.Column="1"
+                                Margin="15,0,0,0"
+                                VerticalAlignment="Center">
+
+                        <Button x:Name="HandoverShiftButton"
+                                Content="⇄   تسليم الشيفت"
+                                Width="155"
+                                Height="38"
+                                Margin="0,0,0,6"
+                                Padding="8"
+                                Background="#246B58"
+                                Foreground="White"
+                                FontWeight="Bold"
+                                BorderThickness="0"
+                                IsEnabled="False"/>
+
+                        <Button x:Name="TakeOverShiftButton"
+                                Content="استلام الشيفت"
+                                Width="155"
+                                Height="38"
+                                Margin="0,0,0,6"
+                                Padding="8"
+                                Background="#D9A441"
+                                Foreground="#183F36"
+                                FontWeight="Bold"
+                                BorderThickness="0"
+                                IsEnabled="False"/>
+
+                        <Button x:Name="CloseShiftButton"
+                                Content="🔒   إنهاء الشيفت"
+                                Width="155"
+                                Height="38"
+                                Padding="8"
+                                Background="#A83232"
+                                Foreground="White"
+                                FontWeight="Bold"
+                                BorderThickness="0"
+                                IsEnabled="False"/>
+                    </StackPanel>
 
                 </Grid>
             </Border>
 
-            <!-- محتوى لوحة التحكم -->
             <Border Grid.Row="3"
                     Background="White"
                     CornerRadius="10"
