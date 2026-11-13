@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props" Condition="Exists('..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props')" />
@@ -139,17 +138,19 @@
     <Compile Include="Models\SalesReturnInvoiceItem.cs" />
     <Compile Include="Models\SalesReturnItem.cs" />
     <Compile Include="Models\Supplier.cs" />
+    <Compile Include="Services\ExpenseService.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationDefaults.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationService.cs" />
     <Compile Include="Services\Printing\PrinterSettingsNavigationService.cs" />
     <Compile Include="Services\Printing\PrintingDeviceService.cs" />
     <Compile Include="Services\Printing\PrintingProfileService.cs" />
+    <Compile Include="Services\ShiftHandoverService.cs" />
     <Compile Include="Services\ShiftService.cs" />
-    <Compile Include="Services\ExpenseService.cs" />
     <Compile Include="Services\ThermalReceiptDocumentBuilder.cs" />
     <Compile Include="Views\BatchSelectionWindow.xaml.cs">
       <DependentUpon>BatchSelectionWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\DashboardWindow.ShiftHandover.cs" />
     <Compile Include="Views\PrinterSettingsHubWindow.xaml.cs">
       <DependentUpon>PrinterSettingsHubWindow.xaml</DependentUpon>
     </Compile>
@@ -402,11 +403,11 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\SalesReturnsWindow.xaml">
+    <Page Include="Views\SalesReturnsHistoryWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\SalesReturnsHistoryWindow.xaml">
+    <Page Include="Views\SalesReturnsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
