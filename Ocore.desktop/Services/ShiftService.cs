@@ -62,12 +62,36 @@ namespace Ocore.desktop.Services
                 EnsureColumn(connection, "SalesReturns", "ShiftId",
                     "INTEGER NULL");
 
+                EnsureColumn(
+                    connection,
+                    "CustomerAccountTransactions",
+                    "ShiftId",
+                    "INTEGER NULL");
+
+                // إجمالي المبلغ الذي تم رده فعليًا للعميل.
+                // لا نفترض أنه يساوي إجمالي قيمة الأصناف المرتجعة.
+                EnsureColumn(
+                    connection,
+                    "SalesReturns",
+                    "RefundAmount",
+                    "REAL NOT NULL DEFAULT 0");
+
+                // وسيلة رد المبلغ الفعلية وقت تنفيذ المرتجع.
+                EnsureColumn(
+                    connection,
+                    "SalesReturns",
+                    "RefundPaymentMethod",
+                    "TEXT NOT NULL DEFAULT ''");
+
                 using (var command = new SQLiteCommand(@"
                     CREATE INDEX IF NOT EXISTS IX_SalesInvoices_ShiftId
                     ON SalesInvoices(ShiftId);
 
                     CREATE INDEX IF NOT EXISTS IX_SalesReturns_ShiftId
                     ON SalesReturns(ShiftId);
+
+                    CREATE INDEX IF NOT EXISTS IX_CustomerAccountTransactions_ShiftId
+                    ON CustomerAccountTransactions(ShiftId);
                 ", connection))
                 {
                     command.ExecuteNonQuery();

@@ -220,6 +220,7 @@ namespace Ocore.desktop.Services
 
         // تسجيل تحصيل من مديونية العميل.
         // المبلغ يُسجل بالسالب في دفتر الحساب.
+        // يتم ربط التحصيل بالشيفت المفتوح.
         // لا يتم تسجيله كدفعة فاتورة بيع جديدة.
         public long CollectPayment(
             int currentUserId,
@@ -326,6 +327,14 @@ namespace Ocore.desktop.Services
                             "yyyy-MM-dd HH:mm:ss",
                             CultureInfo.InvariantCulture);
 
+                        // ربط التحصيل بالشيفت المفتوح.
+                        // إذا لم يوجد شيفت مفتوح يتم إنشاء شيفت تلقائيًا.
+                        int shiftId = ShiftService.EnsureOpenShift(
+                            connection,
+                            transaction,
+                            currentUserId,
+                            createdAt);
+
                         long transactionId;
 
                         using (var command = new SQLiteCommand(
@@ -341,7 +350,8 @@ namespace Ocore.desktop.Services
                                 ReferenceNumber,
                                 Notes,
                                 UserId,
-                                CreatedAt
+                                CreatedAt,
+                                ShiftId
                             )
                             VALUES
                             (
@@ -354,7 +364,8 @@ namespace Ocore.desktop.Services
                                 @referenceNumber,
                                 @notes,
                                 @userId,
-                                @createdAt
+                                @createdAt,
+                                @shiftId
                             );",
                             connection,
                             transaction))
@@ -379,6 +390,9 @@ namespace Ocore.desktop.Services
 
                             command.Parameters.AddWithValue(
                                 "@createdAt", createdAt);
+
+                            command.Parameters.AddWithValue(
+                                "@shiftId", shiftId);
 
                             command.ExecuteNonQuery();
                         }
@@ -656,6 +670,15 @@ namespace Ocore.desktop.Services
                 value == "فيزا")
             {
                 return "Card";
+            }
+
+            if (string.Equals(
+                value, "InstaPay", StringComparison.OrdinalIgnoreCase) ||
+                value == "إنستا باي" ||
+                value == "انستا باي" ||
+                value == "انستاباي")
+            {
+                return "InstaPay";
             }
 
             if (string.Equals(
