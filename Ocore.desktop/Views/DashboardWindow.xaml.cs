@@ -1,8 +1,14 @@
 ﻿
 using System;
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Data;
 using Ocore.desktop.Services;
 using Ocore.desktop.Services.Printing;
+using Ocore.desktop.Models;
 
 namespace Ocore.desktop.Views
 {
@@ -11,6 +17,7 @@ namespace Ocore.desktop.Views
         private readonly int currentUserId;
         private readonly string currentRole;
         private readonly PermissionService permissionService;
+        private readonly ProductService productService;
 
         public DashboardWindow(
             int userId,
@@ -23,17 +30,19 @@ namespace Ocore.desktop.Views
             currentRole = role;
 
             permissionService = new PermissionService();
+            productService = new ProductService();
+
+            // تحديث نواقص المخزون عند العودة إلى لوحة التحكم
+            Activated += DashboardWindow_Activated;
 
             UserNameText.Text = fullName;
             UserRoleText.Text = GetRoleDisplayName(role);
 
-            // بيانات حسابي: للمدير فقط
             ManagerAccountButton.Visibility =
                 currentRole == "Manager"
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
-            // النسخ الاحتياطي والاستعادة: للمدير فقط
             BackupManagementButton.Visibility =
                 currentRole == "Manager"
                     ? Visibility.Visible
@@ -54,13 +63,11 @@ namespace Ocore.desktop.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
-            // إدارة الأصناف
             ProductsManagementButton.Visibility =
                 permissionService.HasPermission(currentRole, "Products.View")
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
-            // طباعة الباركود: تحتاج صلاحية عرض الأصناف
             BarcodePrintingButton.Visibility =
                 permissionService.HasPermission(currentRole, "Products.View")
                     ? Visibility.Visible
@@ -86,7 +93,6 @@ namespace Ocore.desktop.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
-            // إدارة العملاء
             CustomersManagementButton.Visibility =
                 permissionService.HasPermission(currentRole, "Customers.View")
                     ? Visibility.Visible
@@ -111,6 +117,228 @@ namespace Ocore.desktop.Views
                 permissionService.HasPermission(currentRole, "Sales.Return")
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+
+            RefreshLowStockSummary();
+        }
+
+        // ==========================================
+        // تحديث لوحة التحكم عند العودة إليها
+        // ==========================================
+
+        private void DashboardWindow_Activated(
+            object sender,
+            EventArgs e)
+        {
+            RefreshLowStockSummary();
+        }
+
+        // ==========================================
+        // نواقص المخزون
+        // ==========================================
+
+        private System.Collections.Generic.List<Product> GetLowStockProducts()
+        {
+            if (!permissionService.HasPermission(
+                currentRole,
+                "Products.View"))
+            {
+                return new System.Collections.Generic.List<Product>();
+            }
+
+            return productService.GetProductsForManagement(currentUserId)
+                .Where(p =>
+                    !p.IsArchived &&
+                    p.MinimumStockLevel > 0 &&
+                    p.Quantity <= p.MinimumStockLevel)
+                .OrderBy(p => p.Name)
+                .ToList();
+        }
+
+        private void RefreshLowStockSummary()
+        {
+            if (!permissionService.HasPermission(
+                currentRole,
+                "Products.View"))
+            {
+                LowStockCountText.Text = "—";
+                return;
+            }
+
+            try
+            {
+                var products = GetLowStockProducts();
+
+                LowStockCountText.Text =
+                    products.Count.ToString();
+            }
+            catch
+            {
+                LowStockCountText.Text = "!";
+            }
+        }
+
+        private void LowStockCard_MouseLeftButtonUp(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            if (!permissionService.HasPermission(
+                currentRole,
+                "Products.View"))
+            {
+                MessageBox.Show(
+                    "ليس لديك صلاحية عرض نواقص المخزون.",
+                    "صلاحيات المستخدم",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            try
+            {
+                var products = GetLowStockProducts();
+
+                Window window = new Window
+                {
+                    Title = "نواقص المخزون",
+                    Width = 850,
+                    Height = 520,
+                    MinWidth = 650,
+                    MinHeight = 350,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    FlowDirection = FlowDirection.RightToLeft,
+                    Background = new SolidColorBrush(
+                        Color.FromRgb(243, 246, 248))
+                };
+
+                Grid root = new Grid
+                {
+                    Margin = new Thickness(15)
+                };
+
+                root.RowDefinitions.Add(
+                    new RowDefinition
+                    {
+                        Height = GridLength.Auto
+                    });
+
+                root.RowDefinitions.Add(
+                    new RowDefinition
+                    {
+                        Height = new GridLength(
+                            1,
+                            GridUnitType.Star)
+                    });
+
+                root.RowDefinitions.Add(
+                    new RowDefinition
+                    {
+                        Height = GridLength.Auto
+                    });
+
+                TextBlock title = new TextBlock
+                {
+                    Text = "الأصناف التي وصلت إلى الحد الأدنى للمخزون",
+                    FontSize = 19,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(24, 63, 54)),
+                    Margin = new Thickness(0, 0, 0, 12)
+                };
+
+                Grid.SetRow(title, 0);
+                root.Children.Add(title);
+
+                DataGrid dataGrid = new DataGrid
+                {
+                    AutoGenerateColumns = false,
+                    IsReadOnly = true,
+                    CanUserAddRows = false,
+                    CanUserDeleteRows = false,
+                    SelectionMode = DataGridSelectionMode.Single,
+                    SelectionUnit = DataGridSelectionUnit.FullRow,
+                    ItemsSource = products,
+                    Background = Brushes.White,
+                    BorderBrush = new SolidColorBrush(
+                        Color.FromRgb(220, 228, 225)),
+                    HeadersVisibility = DataGridHeadersVisibility.Column,
+                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                    RowHeight = 34,
+                    FontSize = 13
+                };
+
+                dataGrid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "كود الصنف",
+                    Binding = new Binding("ProductCode"),
+                    Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+                });
+
+                dataGrid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "اسم الصنف",
+                    Binding = new Binding("Name"),
+                    Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+                });
+
+                dataGrid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "الرصيد الصالح للبيع",
+                    Binding = new Binding("Quantity")
+                    {
+                        StringFormat = "N3"
+                    },
+                    Width = new DataGridLength(1.2, DataGridLengthUnitType.Star)
+                });
+
+                dataGrid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "الحد الأدنى",
+                    Binding = new Binding("MinimumStockLevel")
+                    {
+                        StringFormat = "N3"
+                    },
+                    Width = new DataGridLength(1.2, DataGridLengthUnitType.Star)
+                });
+
+                dataGrid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "الوحدة",
+                    Binding = new Binding("SmallUnitName"),
+                    Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+                });
+
+                Grid.SetRow(dataGrid, 1);
+                root.Children.Add(dataGrid);
+
+                TextBlock footer = new TextBlock
+                {
+                    Text = "عدد الأصناف التي تحتاج إلى مراجعة: "
+                           + products.Count,
+                    FontSize = 14,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(183, 121, 31)),
+                    Margin = new Thickness(0, 12, 0, 0)
+                };
+
+                Grid.SetRow(footer, 2);
+                root.Children.Add(footer);
+
+                window.Content = root;
+
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "حدث خطأ أثناء عرض نواقص المخزون:\n\n"
+                    + ex.Message,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         // ==========================================

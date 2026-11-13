@@ -274,17 +274,24 @@
                     </StackPanel>
                 </Border>
 
-                <Border Background="White"
+                <Border x:Name="LowStockCard"
+                        Background="White"
                         CornerRadius="10"
                         Padding="12"
-                        Margin="4">
+                        Margin="4"
+                        Cursor="Hand"
+                        ToolTip="اضغط لعرض الأصناف منخفضة المخزون"
+                        MouseLeftButtonUp="LowStockCard_MouseLeftButtonUp">
+
                     <StackPanel>
                         <TextBlock Text="نواقص المخزون"
                                    Foreground="#64736F"/>
 
-                        <TextBlock Text="0"
+                        <TextBlock x:Name="LowStockCountText"
+                                   Text="0"
                                    FontSize="22"
                                    FontWeight="Bold"
+                                   Foreground="#B7791F"
                                    Margin="0,8,0,0"/>
                     </StackPanel>
                 </Border>

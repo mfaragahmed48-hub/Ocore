@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Globalization;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -39,6 +40,18 @@ namespace Ocore.desktop.Views
         private List<Customer> allCustomers;
         private ICollectionView customersView;
 
+        // تحسين البحث:
+        // تجهيز حقول البحث مرة واحدة لكل صنف.
+        private DispatcherTimer searchDebounceTimer;
+        private List<SalesProductSearchEntry> indexedSearchResults;
+
+        private class SalesProductSearchEntry
+        {
+            public SalesProductSearchResult Result { get; set; }
+
+            public string[] SearchFields { get; set; }
+        }
+
         private const double BatchQuantityEpsilon = 0.000001;
 
         public SalesWindow(int userId)
@@ -53,7 +66,19 @@ namespace Ocore.desktop.Views
             productService = new ProductService();
 
             allSearchResults = new List<SalesProductSearchResult>();
+            indexedSearchResults = new List<SalesProductSearchEntry>();
             invoiceItems = new ObservableCollection<SaleInvoiceItem>();
+
+            // مؤقت البحث: لا ينفذ البحث مع كل حرف.
+            searchDebounceTimer = new DispatcherTimer();
+            searchDebounceTimer.Interval =
+                TimeSpan.FromMilliseconds(200);
+
+            searchDebounceTimer.Tick += (s, e) =>
+            {
+                searchDebounceTimer.Stop();
+                ApplySearchFilter();
+            };
 
             // ربط جدول الفاتورة بالقائمة الأصلية مباشرة.
             InvoiceDataGrid.ItemsSource = invoiceItems;
@@ -145,15 +170,64 @@ namespace Ocore.desktop.Views
             UpdatePaymentFieldsVisibility();
         }
 
-        private void SalesWindow_Loaded(
+        private async void SalesWindow_Loaded(
             object sender,
             RoutedEventArgs e)
         {
             UpdatePaymentFieldsVisibility();
 
             LoadCustomers();
-            LoadProducts();
             RefreshInvoice();
+
+            // تحميل الأصناف في الخلفية حتى لا تتجمد الواجهة.
+            await LoadProductsAsync();
+        }
+
+        private async Task LoadProductsAsync()
+        {
+            try
+            {
+                List<SalesProductSearchResult> loadedResults =
+                    await Task.Run(
+                        () => searchService.GetSearchResults(currentUserId));
+
+                // قد تكون النافذة أُغلقت أثناء تحميل البيانات.
+                if (!IsLoaded)
+                    return;
+
+                allSearchResults =
+                    loadedResults ??
+                    new List<SalesProductSearchResult>();
+
+                BuildProductSearchIndex();
+
+                ApplySearchFilter();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                if (!IsLoaded)
+                    return;
+
+                MessageBox.Show(
+                    ex.Message,
+                    "الصلاحيات",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                Close();
+            }
+            catch (Exception ex)
+            {
+                if (!IsLoaded)
+                    return;
+
+                MessageBox.Show(
+                    "حدث خطأ أثناء تحميل الأدوية والأصناف:\n" +
+                    ex.Message,
+                    "خطأ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         #region Customers
@@ -648,7 +722,7 @@ namespace Ocore.desktop.Views
         private string GetDiscountType()
         {
             ComboBoxItem selected =
-                                DiscountTypeComboBox.SelectedItem as ComboBoxItem;
+                DiscountTypeComboBox.SelectedItem as ComboBoxItem;
 
             if (selected == null || selected.Tag == null)
                 return "Amount";
@@ -1298,9 +1372,10 @@ namespace Ocore.desktop.Views
         #endregion
 
         #region Product Search
+
         private void EnterToAddProduct_PreviewKeyDown(
-    object sender,
-    KeyEventArgs e)
+            object sender,
+            KeyEventArgs e)
         {
             if (e.Key != Key.Enter &&
                 e.Key != Key.Return)
@@ -1310,6 +1385,17 @@ namespace Ocore.desktop.Views
 
             if (sender == SearchTextBox)
             {
+                // قارئ الباركود يرسل Enter:
+                // نفّذ البحث فورًا دون انتظار المؤقت.
+                if (searchDebounceTimer != null)
+                    searchDebounceTimer.Stop();
+
+                if (allSearchResults == null ||
+                    allSearchResults.Count == 0)
+                    return;
+
+                ApplySearchFilter();
+
                 if (ItemsDataGrid.SelectedItem == null &&
                     ItemsDataGrid.Items.Count > 0)
                 {
@@ -1347,41 +1433,63 @@ namespace Ocore.desktop.Views
             SearchTextBox.SelectAll();
         }
 
-        private void LoadProducts()
+        private void BuildProductSearchIndex()
         {
-            try
-            {
-                allSearchResults =
-                    searchService.GetSearchResults(currentUserId);
+            indexedSearchResults =
+                new List<SalesProductSearchEntry>();
 
-                ApplySearchFilter();
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                MessageBox.Show(
-                    ex.Message,
-                    "الصلاحيات",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+            if (allSearchResults == null)
+                return;
 
-                Close();
-            }
-            catch (Exception ex)
+            foreach (SalesProductSearchResult result in allSearchResults)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل الأدوية والأصناف:\n" +
-                    ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                if (result == null)
+                    continue;
+
+                indexedSearchResults.Add(
+                    new SalesProductSearchEntry
+                    {
+                        Result = result,
+
+                        SearchFields = new[]
+                        {
+                            NormalizeSearchField(result.Name),
+                            NormalizeSearchField(result.TradeNameArabic),
+                            NormalizeSearchField(result.GenericName),
+                            NormalizeSearchField(result.ProductCode),
+                            NormalizeSearchField(result.Barcode)
+                        }
+                    });
             }
+        }
+
+        private string NormalizeSearchField(string value)
+        {
+            return (value ?? string.Empty).ToUpperInvariant();
         }
 
         private void SearchTextBox_TextChanged(
             object sender,
             TextChangedEventArgs e)
         {
-            ApplySearchFilter();
+            if (searchDebounceTimer == null)
+                return;
+
+            // عند مسح مربع البحث نعرض القائمة فورًا.
+            if (string.IsNullOrWhiteSpace(SearchTextBox.Text))
+            {
+                searchDebounceTimer.Stop();
+                ApplySearchFilter();
+                return;
+            }
+
+            // لا نبحث قبل انتهاء تحميل الأصناف.
+            if (allSearchResults == null ||
+                allSearchResults.Count == 0)
+                return;
+
+            searchDebounceTimer.Stop();
+            searchDebounceTimer.Start();
         }
 
         private void ApplySearchFilter()
@@ -1396,7 +1504,8 @@ namespace Ocore.desktop.Views
 
             ResetSelectedProduct();
 
-            string searchText = SearchTextBox.Text.Trim();
+            string searchText =
+                (SearchTextBox.Text ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(searchText))
             {
@@ -1407,15 +1516,19 @@ namespace Ocore.desktop.Views
             }
 
             string searchPattern =
-                NormalizeWildcardPattern(searchText);
+                NormalizeWildcardPattern(searchText)
+                    .ToUpperInvariant();
 
-            var filteredResults = allSearchResults
-                .Where(p =>
-                    ContainsText(p.Name, searchPattern) ||
-                    ContainsText(p.TradeNameArabic, searchPattern) ||
-                    ContainsText(p.GenericName, searchPattern) ||
-                    ContainsText(p.ProductCode, searchPattern) ||
-                    ContainsText(p.Barcode, searchPattern))
+            if (indexedSearchResults == null)
+                BuildProductSearchIndex();
+
+            var filteredResults = indexedSearchResults
+                .Where(entry =>
+                    entry.SearchFields.Any(field =>
+                        ContainsNormalizedText(
+                            field,
+                            searchPattern)))
+                .Select(entry => entry.Result)
                 .ToList();
 
             ItemsDataGrid.ItemsSource = filteredResults;
@@ -1455,7 +1568,9 @@ namespace Ocore.desktop.Views
             return result.ToString();
         }
 
-        private bool ContainsText(
+        // البحث هنا يقارن نصوصًا تم تجهيزها مسبقًا
+        // بحروف كبيرة، لذلك لا يعيد تحويل الأحرف لكل صنف.
+        private bool ContainsNormalizedText(
             string source,
             string searchPattern)
         {
@@ -1475,8 +1590,7 @@ namespace Ocore.desktop.Views
             {
                 if (patternIndex < searchPattern.Length &&
                     searchPattern[patternIndex] != '*' &&
-                    char.ToUpperInvariant(source[sourceIndex]) ==
-                    char.ToUpperInvariant(searchPattern[patternIndex]))
+                    source[sourceIndex] == searchPattern[patternIndex])
                 {
                     sourceIndex++;
                     patternIndex++;
@@ -1507,6 +1621,22 @@ namespace Ocore.desktop.Views
             }
 
             return patternIndex == searchPattern.Length;
+        }
+
+        // الإبقاء على الدالة القديمة تحسبًا لأي استخدام آخر داخل الملف.
+        private bool ContainsText(
+            string source,
+            string searchPattern)
+        {
+            if (string.IsNullOrEmpty(source))
+                return false;
+
+            if (string.IsNullOrEmpty(searchPattern))
+                return true;
+
+            return ContainsNormalizedText(
+                source.ToUpperInvariant(),
+                searchPattern.ToUpperInvariant());
         }
 
         private void ItemsDataGrid_SelectionChanged(
@@ -1653,46 +1783,15 @@ namespace Ocore.desktop.Views
                 unitPrice.ToString("0.00");
         }
 
-        #endregion
-
-        #region Invoice Items
-
         private void AddToInvoiceButton_Click(
             object sender,
             RoutedEventArgs e)
         {
-            if (selectedSearchResult == null ||
-                selectedProduct == null)
+            if (selectedProduct == null)
             {
                 MessageBox.Show(
-                    "هذا الدواء غير مضاف إلى المخزون، ولا يمكن بيعه.\n" +
-                    "أضف الدواء إلى الأصناف والمخزون أولًا.",
-                    "الدواء غير متاح للبيع",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-
-                return;
-            }
-
-            if (selectedProduct.Quantity <= 0)
-            {
-                MessageBox.Show(
-                    "رصيد هذا الصنف صفر، ولا يمكن بيعه.",
-                    "رصيد غير متاح",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-
-                return;
-            }
-
-            if (!IsFinite(selectedProduct.MaxDiscountPercentage) ||
-                selectedProduct.MaxDiscountPercentage < 0 ||
-                selectedProduct.MaxDiscountPercentage > 100)
-            {
-                MessageBox.Show(
-                    "الحد الأقصى للخصم المسجل لهذا الصنف غير صحيح.\n\n" +
-                    "راجع بيانات الصنف قبل إضافته للفاتورة.",
-                    "حد الخصم غير صحيح",
+                    "اختر صنفًا أولًا.",
+                    "تنبيه",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 
@@ -1701,29 +1800,38 @@ namespace Ocore.desktop.Views
 
             double quantity;
 
-            if (!TryParseQuantity(
+            if (!double.TryParse(
                 SaleQuantityTextBox.Text,
-                out quantity) ||
-                quantity <= 0 ||
-                !IsFinite(quantity))
+                NumberStyles.Any,
+                CultureInfo.CurrentCulture,
+                out quantity) &&
+                !double.TryParse(
+                    SaleQuantityTextBox.Text,
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out quantity))
             {
                 MessageBox.Show(
-                    "أدخل كمية صحيحة أكبر من صفر.",
-                    "تنبيه",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-
-                return;
-            }
-
-            if (!IsWholeQuantity(quantity))
-            {
-                MessageBox.Show(
-                    "يجب أن تكون كمية البيع عددًا صحيحًا من الوحدات.",
+                    "أدخل كمية صحيحة.",
                     "كمية غير صحيحة",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 
+                SaleQuantityTextBox.Focus();
+                SaleQuantityTextBox.SelectAll();
+                return;
+            }
+
+            if (!IsFinite(quantity) || quantity <= 0)
+            {
+                MessageBox.Show(
+                    "يجب أن تكون الكمية أكبر من صفر.",
+                    "كمية غير صحيحة",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                SaleQuantityTextBox.Focus();
+                SaleQuantityTextBox.SelectAll();
                 return;
             }
 
@@ -1731,46 +1839,41 @@ namespace Ocore.desktop.Views
                 SaleUnitComboBox.SelectedItem as ComboBoxItem;
 
             if (selectedUnit == null)
-                return;
-
-            string unitType =
-                selectedUnit.Tag == null
-                    ? ""
-                    : selectedUnit.Tag.ToString();
-
-            bool isSmallUnit = unitType == "SmallUnit";
-
-            int unitsPerPackage =
-                Math.Max(1, selectedProduct.UnitsPerPackage);
-
-            string unitName =
-                isSmallUnit
-                    ? selectedProduct.SmallUnitName
-                    : selectedProduct.UnitName;
-
-            double unitPrice =
-                isSmallUnit
-                    ? selectedProduct.SalePrice / unitsPerPackage
-                    : selectedProduct.SalePrice;
-
-            double packageQuantity =
-                isSmallUnit
-                    ? quantity / unitsPerPackage
-                    : quantity;
-
-            packageQuantity = Math.Round(packageQuantity, 8);
-
-            if (isSmallUnit &&
-                string.IsNullOrWhiteSpace(selectedProduct.SmallUnitName))
             {
                 MessageBox.Show(
-                    "الوحدة الصغيرة غير معرفة لهذا الصنف.",
-                    "وحدة غير متاحة",
+                    "اختر وحدة البيع.",
+                    "تنبيه",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 
                 return;
             }
+
+            string unitName =
+                selectedUnit.Content == null
+                    ? string.Empty
+                    : selectedUnit.Content.ToString();
+
+            string unitType =
+                selectedUnit.Tag == null
+                    ? string.Empty
+                    : selectedUnit.Tag.ToString();
+
+            int unitsPerPackage =
+                Math.Max(1, selectedProduct.UnitsPerPackage);
+
+            bool isSmallUnit = unitType == "SmallUnit";
+
+            double unitPrice = isSmallUnit
+                ? selectedProduct.SalePrice / unitsPerPackage
+                : selectedProduct.SalePrice;
+
+            double packageQuantity = isSmallUnit
+                ? quantity / unitsPerPackage
+                : quantity;
+
+            packageQuantity =
+                Math.Round(packageQuantity, 8);
 
             double alreadyAdded =
                 invoiceItems
@@ -1791,68 +1894,49 @@ namespace Ocore.desktop.Views
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 
+                SaleQuantityTextBox.Focus();
+                SaleQuantityTextBox.SelectAll();
                 return;
             }
 
-            string packageUnitName =
-                string.IsNullOrWhiteSpace(selectedProduct.UnitName)
-                    ? "العبوة"
-                    : selectedProduct.UnitName.Trim();
+            SaleInvoiceItem invoiceItem =
+                new SaleInvoiceItem
+                {
+                    ProductId = selectedProduct.Id,
+                    ItemName = selectedProduct.Name,
+                    UnitName = unitName,
+                    Quantity = quantity,
+                    UnitPrice = unitPrice,
+                    Total = RoundMoney(quantity * unitPrice),
+                    PackageQuantity = packageQuantity,
 
-            string smallUnitName =
-                string.IsNullOrWhiteSpace(selectedProduct.SmallUnitName)
-                    ? ""
-                    : selectedProduct.SmallUnitName.Trim();
+                    UnitsPerPackage = unitsPerPackage,
+                    PackageUnitName = selectedProduct.UnitName,
+                    SmallUnitName = selectedProduct.SmallUnitName,
+                    IsSmallUnit = isSmallUnit,
+                    MaxDiscountPercentage =
+                        selectedProduct.MaxDiscountPercentage,
 
-            List<string> unitOptions = new List<string>();
-            unitOptions.Add(packageUnitName);
+                    BatchAllocations =
+                        new ObservableCollection<SaleInvoiceBatchAllocation>()
+                };
 
-            if (!string.IsNullOrWhiteSpace(smallUnitName) &&
-                !string.Equals(
-                    packageUnitName,
-                    smallUnitName,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                unitOptions.Add(smallUnitName);
-            }
+            invoiceItem.PropertyChanged +=
+                InvoiceItem_PropertyChanged;
 
-            double addedTotal =
-                RoundMoney(quantity * unitPrice);
-
-            // كل إضافة تنشئ صفًا مستقلًا.
-            // لا يتم دمج الصنف مع أي صف سابق، حتى لو كان نفس الصنف.
-            var invoiceItem = new SaleInvoiceItem
-            {
-                ProductId = selectedProduct.Id,
-                ItemName = selectedProduct.Name,
-                PackageUnitName = packageUnitName,
-                SmallUnitName = smallUnitName,
-                UnitOptions = unitOptions,
-                UnitsPerPackage = unitsPerPackage,
-                IsSmallUnit = isSmallUnit,
-                UnitName = isSmallUnit ? smallUnitName : packageUnitName,
-                Quantity = quantity,
-                UnitPrice = unitPrice,
-                Total = addedTotal,
-                PackageQuantity = packageQuantity,
-
-                MaxDiscountPercentage =
-                    selectedProduct.MaxDiscountPercentage,
-
-                DiscountPercentage = 0,
-                DiscountAmount = 0
-            };
-
-            invoiceItem.PropertyChanged += InvoiceItem_PropertyChanged;
             invoiceItems.Add(invoiceItem);
 
             RefreshInvoice(invoiceItem);
 
-            // محاولة اختيار تشغيلة واحدة لهذا الصف الجديد.
+            // اختيار تشغيلة واحدة لهذا الصف الجديد.
             OpenBatchSelectionWindow(invoiceItem);
 
             SaleQuantityTextBox.Text = "1";
         }
+
+        #endregion
+
+        #region Invoice Items
 
         private void InvoiceItem_PropertyChanged(
             object sender,
@@ -1948,10 +2032,10 @@ namespace Ocore.desktop.Views
                     item.MaxDiscountPercentage > 100)
                 {
                     MessageBox.Show(
-    "الحد الأقصى للخصم لهذا الصنف غير صحيح.",
-    "حد الخصم",
-    MessageBoxButton.OK,
-    MessageBoxImage.Warning);
+                        "الحد الأقصى للخصم لهذا الصنف غير صحيح.",
+                        "حد الخصم",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
 
                     e.Cancel = true;
                     return;
@@ -2597,8 +2681,9 @@ namespace Ocore.desktop.Views
 
                 return false;
             }
+
             if (!IsFinite(allocation.AllocatedQuantity) ||
-    allocation.AllocatedQuantity <= 0)
+                allocation.AllocatedQuantity <= 0)
             {
                 errorMessage =
                     "كمية الصرف غير صحيحة للصنف: " +
@@ -2952,7 +3037,8 @@ namespace Ocore.desktop.Views
 
                     ClearSavedInvoice();
 
-                    LoadProducts();
+                    // إعادة تحميل الأصناف بالخلفية دون تجميد الواجهة.
+                    LoadProductsAsync();
 
                     MessageBox.Show(
                         "تم حفظ الفاتورة بنجاح.\n\n" +
@@ -3206,6 +3292,9 @@ namespace Ocore.desktop.Views
 
                 allSearchResults = refreshedResults;
 
+                // إعادة بناء الفهرس لأن نتائج الأصناف تغيرت.
+                BuildProductSearchIndex();
+
                 foreach (SaleInvoiceItem item in invoiceItems)
                 {
                     item.UnitPrice = updatedPrices[item.ProductId];
@@ -3287,6 +3376,9 @@ namespace Ocore.desktop.Views
             object sender,
             RoutedEventArgs e)
         {
+            if (searchDebounceTimer != null)
+                searchDebounceTimer.Stop();
+
             Close();
         }
 
