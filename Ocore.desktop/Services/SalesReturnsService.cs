@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
@@ -18,6 +19,9 @@ namespace Ocore.desktop.Services
         {
             var database = new DatabaseManager();
             database.InitializeDatabase();
+
+            // تجهيز جداول الشيفت وعمود ShiftId قبل تنفيذ المرتجعات.
+            new ShiftService();
 
             connectionString =
                 "Data Source=" + database.GetDatabasePath() + ";Version=3;";
@@ -935,6 +939,15 @@ namespace Ocore.desktop.Services
                             "yyyy-MM-dd HH:mm:ss",
                             CultureInfo.InvariantCulture);
 
+                        // فتح شيفت تلقائيًا مع أول عملية مرتجع،
+                        // أو استخدام الشيفت المفتوح بالفعل.
+                        // يتم ذلك داخل نفس معاملة حفظ المرتجع.
+                        int shiftId = ShiftService.EnsureOpenShift(
+                            connection,
+                            transaction,
+                            userId,
+                            createdAt);
+
                         int returnId;
 
                         using (var command = new SQLiteCommand(@"
@@ -943,6 +956,7 @@ namespace Ocore.desktop.Services
                                 ReturnNumber,
                                 InvoiceId,
                                 UserId,
+                                ShiftId,
                                 Total,
                                 Reason,
                                 Status,
@@ -953,6 +967,7 @@ namespace Ocore.desktop.Services
                                 @ReturnNumber,
                                 @InvoiceId,
                                 @UserId,
+                                @ShiftId,
                                 @Total,
                                 @Reason,
                                 'Completed',
@@ -970,6 +985,9 @@ namespace Ocore.desktop.Services
 
                             command.Parameters.AddWithValue(
                                 "@UserId", userId);
+
+                            command.Parameters.AddWithValue(
+                                "@ShiftId", shiftId);
 
                             command.Parameters.AddWithValue(
                                 "@Total", returnTotal);
