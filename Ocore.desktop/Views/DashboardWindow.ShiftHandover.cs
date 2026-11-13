@@ -31,6 +31,17 @@ namespace Ocore.desktop.Views
             object sender,
             RoutedEventArgs e)
         {
+            // تحديث الأزرار كلما عادت لوحة التحكم للنشاط.
+            Activated -= DashboardWindow_ShiftHandover_Activated;
+            Activated += DashboardWindow_ShiftHandover_Activated;
+
+            RefreshShiftHandoverButtons();
+        }
+
+        private void DashboardWindow_ShiftHandover_Activated(
+            object sender,
+            EventArgs e)
+        {
             RefreshShiftHandoverButtons();
         }
 
