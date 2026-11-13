@@ -1,6 +1,7 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -27,6 +28,8 @@ namespace Ocore.desktop.Views
             returnsService = new SalesReturnsService();
 
             ReturnTotalText.Text = "0.00";
+            RefundAmountTextBox.Text = "0";
+            RefundPaymentMethodComboBox.SelectedIndex = -1;
         }
 
         // ==========================================
@@ -325,10 +328,8 @@ namespace Ocore.desktop.Views
             if (string.IsNullOrWhiteSpace(selectedUnit))
                 return;
 
-            // تحديث الوحدة المختارة مباشرة
             item.ReturnUnitName = selectedUnit;
 
-            // إعادة حساب السعر والإجمالي بعد تحديث الاختيار
             Dispatcher.BeginInvoke(
                 DispatcherPriority.ContextIdle,
                 new Action(delegate
@@ -522,6 +523,102 @@ namespace Ocore.desktop.Views
         }
 
         // ==========================================
+        // قراءة والتحقق من مبلغ الرد الفعلي
+        // ==========================================
+
+        private bool TryGetRefundDetails(
+            double returnTotal,
+            out double refundAmount,
+            out string refundPaymentMethod,
+            out string errorMessage)
+        {
+            refundAmount = 0;
+            refundPaymentMethod = "";
+            errorMessage = "";
+
+            string amountText =
+                (RefundAmountTextBox.Text ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(amountText))
+                amountText = "0";
+
+            // دعم إدخال الأرقام بالفاصلة العشرية أو النقطة
+            string normalizedAmount = amountText
+                .Replace("٬", "")
+                .Replace("٫", ".")
+                .Replace(",", ".");
+
+            if (!double.TryParse(
+                normalizedAmount,
+                NumberStyles.AllowDecimalPoint |
+                NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture,
+                out refundAmount))
+            {
+                errorMessage =
+                    "أدخل مبلغ الرد الفعلي بصورة رقمية صحيحة.";
+
+                return false;
+            }
+
+            if (double.IsNaN(refundAmount) ||
+                double.IsInfinity(refundAmount) ||
+                refundAmount < 0)
+            {
+                errorMessage =
+                    "مبلغ الرد لا يمكن أن يكون سالبًا أو غير صحيح.";
+
+                return false;
+            }
+
+            refundAmount = Math.Round(
+                refundAmount,
+                2,
+                MidpointRounding.AwayFromZero);
+
+            if (refundAmount > returnTotal + Epsilon)
+            {
+                errorMessage =
+                    "مبلغ الرد الفعلي لا يمكن أن يتجاوز إجمالي المرتجع.";
+
+                return false;
+            }
+
+            // عند عدم صرف أي مبلغ لا نحتاج إلى وسيلة رد.
+            if (refundAmount <= Epsilon)
+            {
+                refundAmount = 0;
+                return true;
+            }
+
+            ComboBoxItem selectedMethod =
+                RefundPaymentMethodComboBox.SelectedItem as ComboBoxItem;
+
+            if (selectedMethod == null)
+            {
+                errorMessage =
+                    "اختر وسيلة رد المبلغ المصروف: نقدي أو فيزا أو إنستا باي.";
+
+                return false;
+            }
+
+            refundPaymentMethod =
+                Convert.ToString(selectedMethod.Tag);
+
+            if (refundPaymentMethod != "Cash" &&
+                refundPaymentMethod != "Card" &&
+                refundPaymentMethod != "InstaPay")
+            {
+                errorMessage =
+                    "وسيلة الرد المختارة غير صحيحة.";
+
+                return false;
+            }
+
+            return true;
+        }
+
+        // ==========================================
         // حفظ المرتجع
         // ==========================================
 
@@ -608,8 +705,33 @@ namespace Ocore.desktop.Views
                     2,
                     MidpointRounding.AwayFromZero);
 
+                // قراءة مبلغ الرد الفعلي ووسيلته قبل الحفظ
+                double refundAmount;
+                string refundPaymentMethod;
+                string refundError;
+
+                if (!TryGetRefundDetails(
+                    total,
+                    out refundAmount,
+                    out refundPaymentMethod,
+                    out refundError))
+                {
+                    MessageBox.Show(
+                        refundError,
+                        "بيانات مبلغ الرد غير صحيحة",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
                 string invoiceNumber =
                     selectedItems[0].InvoiceNumber;
+
+                string refundMethodDisplay =
+                    refundAmount > 0
+                        ? GetRefundMethodDisplay(refundPaymentMethod)
+                        : "لم يتم صرف مبلغ";
 
                 MessageBoxResult confirmation =
                     MessageBox.Show(
@@ -620,6 +742,10 @@ namespace Ocore.desktop.Views
                         selectedItems.Count +
                         "\nإجمالي المرتجع: " +
                         total.ToString("N2") +
+                        "\nالمبلغ المصروف فعليًا: " +
+                        refundAmount.ToString("N2") +
+                        "\nوسيلة الرد: " +
+                        refundMethodDisplay +
                         "\n\nسيتم تحديث المخزون وفقًا للتشغيلات الأصلية الصالحة فقط.",
                         "تأكيد المرتجع",
                         MessageBoxButton.YesNo,
@@ -634,16 +760,25 @@ namespace Ocore.desktop.Views
                     currentUserId,
                     originalInvoiceId,
                     ReasonTextBox.Text,
-                    selectedItems);
+                    selectedItems,
+                    refundAmount,
+                    refundPaymentMethod);
 
                 MessageBox.Show(
                     "تم حفظ المرتجع بنجاح.\n\n" +
-                    "رقم عملية المرتجع: " + returnId,
+                    "رقم عملية المرتجع: " + returnId +
+                    "\nإجمالي المرتجع: " + total.ToString("N2") +
+                    "\nالمبلغ المصروف فعليًا: " +
+                    refundAmount.ToString("N2") +
+                    "\nوسيلة الرد: " + refundMethodDisplay,
                     "نجاح",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
 
                 ReasonTextBox.Clear();
+
+                RefundAmountTextBox.Text = "0";
+                RefundPaymentMethodComboBox.SelectedIndex = -1;
 
                 SearchReturnableItems();
             }
@@ -658,6 +793,28 @@ namespace Ocore.desktop.Views
             finally
             {
                 SaveReturnButton.IsEnabled = true;
+            }
+        }
+
+        // ==========================================
+        // اسم وسيلة الرد للعرض
+        // ==========================================
+
+        private string GetRefundMethodDisplay(string method)
+        {
+            switch (method)
+            {
+                case "Cash":
+                    return "نقدي";
+
+                case "Card":
+                    return "فيزا";
+
+                case "InstaPay":
+                    return "إنستا باي";
+
+                default:
+                    return "غير محدد";
             }
         }
 
