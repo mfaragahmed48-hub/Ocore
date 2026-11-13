@@ -546,6 +546,36 @@ ORDER BY p.Name;";
             return products;
         }
 
+        // حساب عدد الأصناف النشطة فقط دون تحميل بيانات الأصناف بالكامل.
+        public int GetActiveProductCount(int currentUserId)
+        {
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                string role = GetActiveUserRole(
+                    connection,
+                    currentUserId);
+
+                if (!permissionService.HasPermission(
+                    role,
+                    "Products.View"))
+                {
+                    throw new UnauthorizedAccessException(
+                        "ليس لديك صلاحية عرض الأصناف.");
+                }
+
+                using (var command = new SQLiteCommand(
+                    @"SELECT COUNT(*)
+                      FROM Products
+                      WHERE IsArchived = 0;",
+                    connection))
+                {
+                    return Convert.ToInt32(command.ExecuteScalar());
+                }
+            }
+        }
+
         public List<Product> GetProductsAvailableForSale(int currentUserId)
         {
             var products = new List<Product>();
@@ -1666,6 +1696,7 @@ ORDER BY Name;";
         }
 
         #endregion
+
         #region Archive Product
 
         public void ArchiveProduct(int currentUserId, int productId)
