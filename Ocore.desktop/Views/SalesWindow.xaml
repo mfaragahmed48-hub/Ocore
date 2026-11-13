@@ -398,9 +398,26 @@
                               Height="32"
                               FontSize="13"
                               IsEditable="True"
-                              IsTextSearchEnabled="True"
+                              IsTextSearchEnabled="False"
                               StaysOpenOnEdit="True"
-                              ToolTip="اختر العميل أو اتركه فارغًا للبيع النقدي"/>
+                              ToolTip="ابحث باسم العميل أو رقم الهاتف أو كود العميل، أو اتركه فارغًا للبيع النقدي">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="Bold"
+                                               Foreground="#183F36"/>
+                                    <TextBlock FontSize="11"
+                                               Foreground="#64736F">
+                                        <Run Text="الكود: "/>
+                                        <Run Text="{Binding CustomerCode}"/>
+                                        <Run Text="   الهاتف: "/>
+                                        <Run Text="{Binding Phone}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
 
                     <TextBlock Text="اتركه فارغًا عند البيع النقدي دون حساب عميل"
                                FontSize="10"

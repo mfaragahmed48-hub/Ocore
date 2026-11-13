@@ -34,6 +34,10 @@ namespace Ocore.desktop.Views
         private bool isSaving;
         private bool isUpdatingInvoice;
         private bool isLoadingCustomers;
+        private bool isUpdatingCustomerSearch;
+
+        private List<Customer> allCustomers;
+        private ICollectionView customersView;
 
         private const double BatchQuantityEpsilon = 0.000001;
 
@@ -106,6 +110,10 @@ namespace Ocore.desktop.Views
             CustomerComboBox.SelectionChanged +=
                 CustomerComboBox_SelectionChanged;
 
+            CustomerComboBox.AddHandler(
+                TextBox.TextChangedEvent,
+                new TextChangedEventHandler(CustomerComboBox_TextChanged));
+
             DiscountValueTextBox.TextChanged +=
                 AccountingInput_TextChanged;
 
@@ -156,14 +164,17 @@ namespace Ocore.desktop.Views
 
             try
             {
-                List<Customer> customers =
-                    customerService.GetCustomers(
-                        currentUserId,
-                        false,
-                        "");
+                allCustomers = customerService.GetCustomers(
+                    currentUserId,
+                    false,
+                    "");
 
-                CustomerComboBox.ItemsSource = customers;
-                CustomerComboBox.DisplayMemberPath = "Name";
+                customersView =
+                    CollectionViewSource.GetDefaultView(allCustomers);
+
+                customersView.Filter = CustomerSearchFilter;
+
+                CustomerComboBox.ItemsSource = customersView;
                 CustomerComboBox.SelectedValuePath = "Id";
                 CustomerComboBox.SelectedIndex = -1;
                 CustomerComboBox.Text = string.Empty;
@@ -171,6 +182,8 @@ namespace Ocore.desktop.Views
             catch (UnauthorizedAccessException ex)
             {
                 CustomerComboBox.ItemsSource = null;
+                allCustomers = null;
+                customersView = null;
 
                 MessageBox.Show(
                     "يمكنك متابعة البيع، لكن لا توجد لديك صلاحية عرض العملاء.\n\n" +
@@ -182,6 +195,8 @@ namespace Ocore.desktop.Views
             catch (Exception ex)
             {
                 CustomerComboBox.ItemsSource = null;
+                allCustomers = null;
+                customersView = null;
 
                 MessageBox.Show(
                     "تعذر تحميل قائمة العملاء.\n\n" + ex.Message,
@@ -193,6 +208,89 @@ namespace Ocore.desktop.Views
             {
                 isLoadingCustomers = false;
             }
+        }
+
+        private void CustomerComboBox_TextChanged(
+            object sender,
+            TextChangedEventArgs e)
+        {
+            if (isLoadingCustomers || isUpdatingCustomerSearch)
+                return;
+
+            if (customersView == null)
+                return;
+
+            // لا نعتبر النص الذي يظهر بعد اختيار عميل عملية بحث جديدة.
+            if (CustomerComboBox.SelectedItem is Customer)
+                return;
+
+            // عند كتابة بحث جديد، نتأكد من عدم الاحتفاظ بعميل سابق.
+            if (CustomerComboBox.SelectedIndex != -1)
+            {
+                isUpdatingCustomerSearch = true;
+
+                CustomerComboBox.SelectedIndex = -1;
+
+                isUpdatingCustomerSearch = false;
+            }
+
+            customersView.Refresh();
+
+            if (!string.IsNullOrWhiteSpace(CustomerComboBox.Text))
+                CustomerComboBox.IsDropDownOpen = true;
+        }
+
+        private bool CustomerSearchFilter(object item)
+        {
+            Customer customer = item as Customer;
+
+            if (customer == null)
+                return false;
+
+            string searchText =
+                (CustomerComboBox.Text ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(searchText))
+                return true;
+
+            bool nameMatches =
+                !string.IsNullOrWhiteSpace(customer.Name) &&
+                customer.Name.IndexOf(
+                    searchText,
+                    StringComparison.CurrentCultureIgnoreCase) >= 0;
+
+            bool codeMatches =
+                !string.IsNullOrWhiteSpace(customer.CustomerCode) &&
+                customer.CustomerCode.IndexOf(
+                    searchText,
+                    StringComparison.CurrentCultureIgnoreCase) >= 0;
+
+            string normalizedSearch =
+                NormalizeCustomerPhone(searchText);
+
+            string normalizedPhone =
+                NormalizeCustomerPhone(customer.Phone);
+
+            bool phoneMatches =
+                normalizedSearch.Length > 0 &&
+                normalizedPhone.Length > 0 &&
+                normalizedPhone.Contains(normalizedSearch);
+
+            return nameMatches || codeMatches || phoneMatches;
+        }
+
+        private string NormalizeCustomerPhone(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            return value
+                .Replace(" ", "")
+                .Replace("-", "")
+                .Replace("+", "")
+                .Replace("(", "")
+                .Replace(")", "")
+                .Trim();
         }
 
         private void CustomerComboBox_SelectionChanged(
@@ -550,7 +648,7 @@ namespace Ocore.desktop.Views
         private string GetDiscountType()
         {
             ComboBoxItem selected =
-                DiscountTypeComboBox.SelectedItem as ComboBoxItem;
+                                DiscountTypeComboBox.SelectedItem as ComboBoxItem;
 
             if (selected == null || selected.Tag == null)
                 return "Amount";
@@ -1200,10 +1298,9 @@ namespace Ocore.desktop.Views
         #endregion
 
         #region Product Search
-
         private void EnterToAddProduct_PreviewKeyDown(
-            object sender,
-            KeyEventArgs e)
+    object sender,
+    KeyEventArgs e)
         {
             if (e.Key != Key.Enter &&
                 e.Key != Key.Return)
@@ -1851,10 +1948,10 @@ namespace Ocore.desktop.Views
                     item.MaxDiscountPercentage > 100)
                 {
                     MessageBox.Show(
-                        "الحد الأقصى للخصم لهذا الصنف غير صحيح.",
-                        "حد الخصم",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+    "الحد الأقصى للخصم لهذا الصنف غير صحيح.",
+    "حد الخصم",
+    MessageBoxButton.OK,
+    MessageBoxImage.Warning);
 
                     e.Cancel = true;
                     return;
@@ -2500,9 +2597,8 @@ namespace Ocore.desktop.Views
 
                 return false;
             }
-
             if (!IsFinite(allocation.AllocatedQuantity) ||
-                allocation.AllocatedQuantity <= 0)
+    allocation.AllocatedQuantity <= 0)
             {
                 errorMessage =
                     "كمية الصرف غير صحيحة للصنف: " +
