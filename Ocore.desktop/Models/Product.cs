@@ -32,6 +32,10 @@ namespace Ocore.desktop.Models
         // صفر يعني عدم السماح بأي خصم
         public double MaxDiscountPercentage { get; set; } = 0;
 
+        // الحد الأدنى المستقل للمخزون
+        // صفر يعني عدم تفعيل تنبيه انخفاض المخزون
+        public double MinimumStockLevel { get; set; } = 0;
+
         // الرصيد الصالح للبيع
         public double Quantity { get; set; }
 
