@@ -76,6 +76,12 @@
                                 Padding="10"
                                 Click="SalesButton_Click"/>
 
+                        <Button x:Name="ExpensesButton"
+                                Content="💰   مصروفات الصيدلية"
+                                Margin="10,3"
+                                Padding="10"
+                                Visibility="Collapsed"/>
+
                         <Button x:Name="SalesInvoicesButton"
                                 Content="📋   سجل فواتير البيع"
                                 Margin="10,3"
