@@ -1,0 +1,385 @@
+﻿
+<Window x:Class="Ocore.desktop.Views.ShiftHistoryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - سجل الشيفتات والإغلاقات"
+        Height="820"
+        Width="1250"
+        MinHeight="650"
+        MinWidth="950"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="#F3F6F8">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="3*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- العنوان -->
+        <Border Grid.Row="0"
+                Background="White"
+                CornerRadius="8"
+                Padding="15"
+                Margin="0,0,0,12">
+            <DockPanel>
+                <StackPanel>
+                    <TextBlock Text="سجل الشيفتات والإغلاقات"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="#183F36"/>
+
+                    <TextBlock Text="عرض تاريخ الشيفتات والحركات المالية وتقارير الإغلاق"
+                               FontSize="13"
+                               Foreground="#64736F"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <Button x:Name="RefreshButton"
+                        Content="⟳  تحديث السجل"
+                        Width="125"
+                        Height="36"
+                        DockPanel.Dock="Left"
+                        Background="#246B58"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        BorderThickness="0"/>
+            </DockPanel>
+        </Border>
+
+        <!-- قائمة الشيفتات -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="8"
+                Padding="10"
+                Margin="0,0,0,10">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="جميع الشيفتات"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Foreground="#183F36"
+                           Margin="0,0,0,10"/>
+
+                <DataGrid x:Name="ShiftsGrid"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeight="34"
+                          ColumnHeaderHeight="38"
+                          Background="White"
+                          BorderThickness="0"
+                          FlowDirection="RightToLeft"
+                          SelectionChanged="ShiftsGrid_SelectionChanged">
+
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="رقم الشيفت"
+                                            Binding="{Binding ShiftNumber}"
+                                            Width="1.2*"/>
+
+                        <DataGridTextColumn Header="الحالة"
+                                            Binding="{Binding StatusDisplay}"
+                                            Width="0.8*"/>
+
+                        <DataGridTextColumn Header="وقت البداية"
+                                            Binding="{Binding OpenedAtDisplay}"
+                                            Width="1.3*"/>
+
+                        <DataGridTextColumn Header="بدأ بواسطة"
+                                            Binding="{Binding OpenedByName}"
+                                            Width="1.1*"/>
+
+                        <DataGridTextColumn Header="وقت النهاية"
+                                            Binding="{Binding ClosedAtDisplay}"
+                                            Width="1.3*"/>
+
+                        <DataGridTextColumn Header="أغلق بواسطة"
+                                            Binding="{Binding ClosedByName}"
+                                            Width="1.1*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- بيانات الشيفت المحدد -->
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,0,0,10">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="الشيفت المحدد"
+                               Foreground="#64736F"
+                               FontSize="12"/>
+                    <TextBlock x:Name="SelectedShiftNumberText"
+                               Text="—"
+                               FontWeight="Bold"
+                               FontSize="15"
+                               Foreground="#183F36"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="الحالة"
+                               Foreground="#64736F"
+                               FontSize="12"/>
+                    <TextBlock x:Name="SelectedShiftStatusText"
+                               Text="—"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="بدأ بواسطة"
+                               Foreground="#64736F"
+                               FontSize="12"/>
+                    <TextBlock x:Name="SelectedOpenedByText"
+                               Text="—"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3">
+                    <TextBlock Text="أغلق بواسطة"
+                               Foreground="#64736F"
+                               FontSize="12"/>
+                    <TextBlock x:Name="SelectedClosedByText"
+                               Text="—"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- تفاصيل الشيفت -->
+        <Border Grid.Row="3"
+                Background="White"
+                CornerRadius="8"
+                Padding="10">
+
+            <TabControl x:Name="DetailsTabs"
+                        FlowDirection="RightToLeft">
+
+                <!-- الحركات المالية -->
+                <TabItem Header="الحركات المالية">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="ملخص الحركات المالية حسب وسيلة الدفع"
+                                   FontSize="15"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"
+                                   Margin="0,0,0,10"/>
+
+                        <DataGrid x:Name="FinancialGrid"
+                                  Grid.Row="1"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  RowHeight="38"
+                                  ColumnHeaderHeight="40"
+                                  Background="White">
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="البيان"
+                                                    Binding="{Binding Name}"
+                                                    Width="1.3*"/>
+
+                                <DataGridTextColumn Header="نقدية"
+                                                    Binding="{Binding Cash, StringFormat=N2}"
+                                                    Width="*"/>
+
+                                <DataGridTextColumn Header="فيزا"
+                                                    Binding="{Binding Card, StringFormat=N2}"
+                                                    Width="*"/>
+
+                                <DataGridTextColumn Header="إنستا باي"
+                                                    Binding="{Binding InstaPay, StringFormat=N2}"
+                                                    Width="*"/>
+
+                                <DataGridTextColumn Header="تحويل بنكي"
+                                                    Binding="{Binding Transfer, StringFormat=N2}"
+                                                    Width="*"/>
+
+                                <DataGridTextColumn Header="الإجمالي"
+                                                    Binding="{Binding Total, StringFormat=N2}"
+                                                    Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
+                <!-- تقرير الإغلاق -->
+                <TabItem Header="تقرير الإغلاق">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock x:Name="ClosureStatusText"
+                                   Text="اختر شيفتًا لعرض تقرير الإغلاق."
+                                   FontSize="14"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"
+                                   Margin="0,0,0,10"/>
+
+                        <DataGrid x:Name="ClosureGrid"
+                                  Grid.Row="1"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  RowHeight="38"
+                                  ColumnHeaderHeight="40"
+                                  Background="White">
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="وسيلة الدفع"
+                                                    Binding="{Binding PaymentMethod}"
+                                                    Width="1.2*"/>
+
+                                <DataGridTextColumn Header="المتوقع"
+                                                    Binding="{Binding Expected, StringFormat=N2}"
+                                                    Width="*"/>
+
+                                <DataGridTextColumn Header="الفعلي"
+                                                    Binding="{Binding Actual, StringFormat=N2}"
+                                                    Width="*"/>
+
+                                <DataGridTextColumn Header="الفرق"
+                                                    Binding="{Binding Difference, StringFormat=N2}"
+                                                    Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
+                <!-- المصروفات -->
+                <TabItem Header="مصروفات الشيفت">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="جميع المصروفات المسجلة في الشيفت، بما فيها المصروفات الملغاة"
+                                   FontSize="14"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"
+                                   Margin="0,0,0,10"/>
+
+                        <DataGrid x:Name="ExpensesGrid"
+                                  Grid.Row="1"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  RowHeight="38"
+                                  ColumnHeaderHeight="40"
+                                  Background="White"
+                                  HorizontalScrollBarVisibility="Auto">
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="التاريخ"
+                                                    Binding="{Binding CreatedAt}"
+                                                    Width="1.3*"/>
+
+                                <DataGridTextColumn Header="البند"
+                                                    Binding="{Binding Category}"
+                                                    Width="1.1*"/>
+
+                                <DataGridTextColumn Header="الوصف"
+                                                    Binding="{Binding Description}"
+                                                    Width="1.5*"/>
+
+                                <DataGridTextColumn Header="المبلغ"
+                                                    Binding="{Binding Amount, StringFormat=N2}"
+                                                    Width="0.8*"/>
+
+                                <DataGridTextColumn Header="وسيلة الدفع"
+                                                    Binding="{Binding PaymentMethodDisplay}"
+                                                    Width="0.9*"/>
+
+                                <DataGridTextColumn Header="سجل بواسطة"
+                                                    Binding="{Binding CreatedByName}"
+                                                    Width="1.1*"/>
+
+                                <DataGridTextColumn Header="الحالة"
+                                                    Binding="{Binding StatusDisplay}"
+                                                    Width="0.8*"/>
+
+                                <DataGridTextColumn Header="ألغاه المدير"
+                                                    Binding="{Binding VoidedByName}"
+                                                    Width="1.1*"/>
+
+                                <DataGridTextColumn Header="وقت الإلغاء"
+                                                    Binding="{Binding VoidedAt}"
+                                                    Width="1.3*"/>
+
+                                <DataGridTextColumn Header="سبب الإلغاء"
+                                                    Binding="{Binding VoidReason}"
+                                                    Width="1.5*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Border>
+
+        <!-- أسفل الشاشة -->
+        <DockPanel Grid.Row="4" Margin="0,10,0,0">
+            <TextBlock x:Name="RecordCountText"
+                       Text="عدد الشيفتات: 0"
+                       Foreground="#64736F"
+                       VerticalAlignment="Center"/>
+
+            <Button x:Name="CloseButton"
+                    Content="إغلاق"
+                    Width="105"
+                    Height="36"
+                    DockPanel.Dock="Left"
+                    Background="#E2E8F0"
+                    Foreground="#334155"
+                    BorderThickness="0"/>
+        </DockPanel>
+    </Grid>
+</Window>
