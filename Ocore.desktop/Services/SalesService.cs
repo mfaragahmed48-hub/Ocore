@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
 using System.Globalization;
-using System.Transactions;
 
 namespace Ocore.desktop.Services
 {
@@ -127,7 +126,7 @@ namespace Ocore.desktop.Services
                 }
 
                 using (var transaction = connection.BeginTransaction(
-                    IsolationLevel.Serializable))
+                    System.Data.IsolationLevel.Serializable))
                 {
                     try
                     {
@@ -193,7 +192,6 @@ namespace Ocore.desktop.Services
                             command.Parameters.AddWithValue("@createdAt", createdAt);
                             command.ExecuteNonQuery();
                         }
-
 
                         long invoiceId;
 
@@ -364,239 +362,233 @@ namespace Ocore.desktop.Services
                                 GeneralDiscountCents = 0
                             });
 
+                            // جمع إجمالي كل صنف مرة واحدة فقط.
                             subtotal += lineTotal;
 
-                            if (double.IsNaN(subtotal) || double.IsInfinity(subtotal))
+                            if (double.IsNaN(subtotal) ||
+                                double.IsInfinity(subtotal))
+                            {
                                 throw new InvalidOperationException(
                                     "إجمالي الفاتورة غير صحيح.");
+                            }
                         }
-
-
-                        subtotal += lineTotal;
-
-                        if (double.IsNaN(subtotal) || double.IsInfinity(subtotal))
-                            throw new InvalidOperationException(
-                                "إجمالي الفاتورة غير صحيح.");
-                    }
 
                         subtotal = RoundMoney(subtotal);
 
-                    long subtotalCents = ToMoneyCents(subtotal);
-                    long manualDiscountTotalCents = 0;
+                        long subtotalCents = ToMoneyCents(subtotal);
+                        long manualDiscountTotalCents = 0;
 
-                    foreach (var line in preparedItems)
-                        manualDiscountTotalCents += line.ItemDiscountCents;
+                        foreach (var line in preparedItems)
+                            manualDiscountTotalCents += line.ItemDiscountCents;
 
-                    long subtotalAfterManualDiscountCents =
-                        subtotalCents - manualDiscountTotalCents;
+                        long subtotalAfterManualDiscountCents =
+                            subtotalCents - manualDiscountTotalCents;
 
-                    if (subtotalAfterManualDiscountCents < 0)
-                        throw new InvalidOperationException(
-                            "إجمالي الخصومات اليدوية غير صحيح.");
-
-                    // الخصم النسبي يُحسب على صافي الفاتورة
-                    // بعد الخصومات اليدوية، وليس على الإجمالي الأصلي.
-                    double requestedGeneralDiscount;
-
-                    if (string.Equals(
-                        discountType, "Percentage",
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (discountValue > 100)
+                        if (subtotalAfterManualDiscountCents < 0)
                             throw new InvalidOperationException(
-                                "نسبة الخصم العام لا يمكن أن تتجاوز 100%.");
+                                "إجمالي الخصومات اليدوية غير صحيح.");
 
-                        requestedGeneralDiscount = RoundMoney(
-                            FromMoneyCents(subtotalAfterManualDiscountCents) *
-                            discountValue / 100.0);
-                    }
-                    else
-                    {
-                        long requestedAmountCents =
-                            ToMoneyCents(RoundMoney(discountValue));
+                        // الخصم النسبي يُحسب على صافي الفاتورة
+                        // بعد الخصومات اليدوية، وليس على الإجمالي الأصلي.
+                        double requestedGeneralDiscount;
 
-                        if (requestedAmountCents >
-                            subtotalAfterManualDiscountCents)
+                        if (string.Equals(
+                            discountType, "Percentage",
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (discountValue > 100)
+                                throw new InvalidOperationException(
+                                    "نسبة الخصم العام لا يمكن أن تتجاوز 100%.");
+
+                            requestedGeneralDiscount = RoundMoney(
+                                FromMoneyCents(subtotalAfterManualDiscountCents) *
+                                discountValue / 100.0);
+                        }
+                        else
+                        {
+                            long requestedAmountCents =
+                                ToMoneyCents(RoundMoney(discountValue));
+
+                            if (requestedAmountCents >
+                                subtotalAfterManualDiscountCents)
+                                throw new InvalidOperationException(
+                                    "قيمة الخصم العام لا يمكن أن تتجاوز إجمالي الأصناف بعد الخصم اليدوي.");
+
+                            requestedGeneralDiscount = RoundMoney(discountValue);
+                        }
+
+                        long requestedGeneralDiscountCents =
+                            ToMoneyCents(requestedGeneralDiscount);
+
+                        AllocateGeneralDiscount(
+                            preparedItems,
+                            discountType,
+                            discountValue,
+                            requestedGeneralDiscountCents);
+
+                        bool hasAnyDiscount = false;
+                        long totalItemDiscountCents = 0;
+                        long totalGeneralDiscountCents = 0;
+
+                        foreach (var line in preparedItems)
+                        {
+                            totalItemDiscountCents += line.ItemDiscountCents;
+                            totalGeneralDiscountCents += line.GeneralDiscountCents;
+
+                            if (line.ItemDiscountCents > 0 ||
+                                line.GeneralDiscountCents > 0)
+                                hasAnyDiscount = true;
+                        }
+
+                        if (hasAnyDiscount)
+                            ValidateDiscountPermission(connection, transaction, role);
+
+                        long totalDiscountCents =
+                            totalItemDiscountCents + totalGeneralDiscountCents;
+
+                        if (totalDiscountCents > subtotalCents)
                             throw new InvalidOperationException(
-                                "قيمة الخصم العام لا يمكن أن تتجاوز إجمالي الأصناف بعد الخصم اليدوي.");
+                                "إجمالي الخصومات أكبر من إجمالي الفاتورة.");
 
-                        requestedGeneralDiscount = RoundMoney(discountValue);
-                    }
+                        double itemDiscountTotal =
+                            FromMoneyCents(totalItemDiscountCents);
 
-                    long requestedGeneralDiscountCents =
-                        ToMoneyCents(requestedGeneralDiscount);
+                        double generalDiscountAmount =
+                            FromMoneyCents(totalGeneralDiscountCents);
 
-                    AllocateGeneralDiscount(
-                        preparedItems,
-                        discountType,
-                        discountValue,
-                        requestedGeneralDiscountCents);
+                        double discountAmount =
+                            FromMoneyCents(totalDiscountCents);
 
-                    bool hasAnyDiscount = false;
-                    long totalItemDiscountCents = 0;
-                    long totalGeneralDiscountCents = 0;
+                        double netTotal = FromMoneyCents(
+                            subtotalCents - totalDiscountCents);
 
-                    foreach (var line in preparedItems)
-                    {
-                        totalItemDiscountCents += line.ItemDiscountCents;
-                        totalGeneralDiscountCents += line.GeneralDiscountCents;
+                        double cashPaymentAmount = 0;
+                        double cardPaymentAmount = 0;
+                        double instaPayPaymentAmount = 0;
 
-                        if (line.ItemDiscountCents > 0 ||
-                            line.GeneralDiscountCents > 0)
-                            hasAnyDiscount = true;
-                    }
+                        if (legacyCall && !explicitPaymentSplit)
+                        {
+                            paidAmount = netTotal;
+                            paymentMethod = "Cash";
+                        }
 
-                    if (hasAnyDiscount)
-                        ValidateDiscountPermission(connection, transaction, role);
+                        if (explicitPaymentSplit)
+                        {
+                            if (cashAmount > netTotal + MoneyTolerance ||
+                                cardAmount > netTotal + MoneyTolerance ||
+                                instaPayAmount > netTotal + MoneyTolerance)
+                                throw new InvalidOperationException(
+                                    "أحد مبالغ الدفع يتجاوز صافي الفاتورة.");
 
-                    long totalDiscountCents =
-                        totalItemDiscountCents + totalGeneralDiscountCents;
+                            cashPaymentAmount = RoundMoney(cashAmount);
+                            cardPaymentAmount = RoundMoney(cardAmount);
+                            instaPayPaymentAmount = RoundMoney(instaPayAmount);
 
-                    if (totalDiscountCents > subtotalCents)
-                        throw new InvalidOperationException(
-                            "إجمالي الخصومات أكبر من إجمالي الفاتورة.");
+                            double splitTotal = RoundMoney(
+                                cashPaymentAmount +
+                                cardPaymentAmount +
+                                instaPayPaymentAmount);
 
-                    double itemDiscountTotal =
-                        FromMoneyCents(totalItemDiscountCents);
+                            if (Math.Abs(splitTotal - netTotal) > MoneyTolerance)
+                                throw new InvalidOperationException(
+                                    "مجموع مبالغ النقدي والفيزا وإنستا باي يجب أن يساوي صافي الفاتورة.");
 
-                    double generalDiscountAmount =
-                        FromMoneyCents(totalGeneralDiscountCents);
+                            ValidateSplitPaymentMethod(
+                                paymentMethod,
+                                cashPaymentAmount,
+                                cardPaymentAmount,
+                                instaPayPaymentAmount,
+                                netTotal);
 
-                    double discountAmount =
-                        FromMoneyCents(totalDiscountCents);
+                            if (cardPaymentAmount > 0 &&
+                                string.IsNullOrWhiteSpace(cardReference))
+                                throw new InvalidOperationException(
+                                    "يجب إدخال رقم عملية الفيزا.");
 
-                    double netTotal = FromMoneyCents(
-                        subtotalCents - totalDiscountCents);
+                            if (cardPaymentAmount <= 0 &&
+                                !string.IsNullOrWhiteSpace(cardReference))
+                                throw new InvalidOperationException(
+                                    "لا يمكن إدخال رقم عملية فيزا دون وجود مبلغ فيزا.");
 
-                    double cashPaymentAmount = 0;
-                    double cardPaymentAmount = 0;
-                    double instaPayPaymentAmount = 0;
+                            paidAmount = netTotal;
+                        }
+                        else if (automaticCardSplit)
+                        {
+                            if (cardAmount > netTotal + MoneyTolerance)
+                                throw new InvalidOperationException(
+                                    "مبلغ الفيزا لا يمكن أن يتجاوز صافي الفاتورة.");
 
-                    if (legacyCall && !explicitPaymentSplit)
-                    {
-                        paidAmount = netTotal;
-                        paymentMethod = "Cash";
-                    }
+                            cardPaymentAmount = RoundMoney(
+                                Math.Min(cardAmount, netTotal));
 
-                    if (explicitPaymentSplit)
-                    {
-                        if (cashAmount > netTotal + MoneyTolerance ||
-                            cardAmount > netTotal + MoneyTolerance ||
-                            instaPayAmount > netTotal + MoneyTolerance)
+                            if (cardPaymentAmount > 0 &&
+                                string.IsNullOrWhiteSpace(cardReference))
+                                throw new InvalidOperationException(
+                                    "يجب إدخال رقم عملية الفيزا.");
+
+                            if (cardPaymentAmount <= 0 &&
+                                !string.IsNullOrWhiteSpace(cardReference))
+                                throw new InvalidOperationException(
+                                    "لا يمكن إدخال رقم عملية فيزا دون وجود مبلغ فيزا.");
+
+                            cashPaymentAmount = RoundMoney(
+                                netTotal - cardPaymentAmount);
+
+                            paidAmount = RoundMoney(
+                                cashPaymentAmount + cardPaymentAmount);
+                        }
+
+                        if (paidAmount < 0 ||
+                            paidAmount > netTotal + MoneyTolerance)
                             throw new InvalidOperationException(
-                                "أحد مبالغ الدفع يتجاوز صافي الفاتورة.");
+                                "المبلغ المدفوع يجب أن يكون بين صفر وصافي الفاتورة.");
 
-                        cashPaymentAmount = RoundMoney(cashAmount);
-                        cardPaymentAmount = RoundMoney(cardAmount);
-                        instaPayPaymentAmount = RoundMoney(instaPayAmount);
+                        paidAmount = RoundMoney(Math.Min(paidAmount, netTotal));
 
-                        double splitTotal = RoundMoney(
-                            cashPaymentAmount +
-                            cardPaymentAmount +
-                            instaPayPaymentAmount);
+                        double remainingAmount = RoundMoney(netTotal - paidAmount);
 
-                        if (Math.Abs(splitTotal - netTotal) > MoneyTolerance)
+                        if (remainingAmount < MoneyTolerance)
+                            remainingAmount = 0;
+
+                        if (remainingAmount > 0 && !customerId.HasValue)
                             throw new InvalidOperationException(
-                                "مجموع مبالغ النقدي والفيزا وإنستا باي يجب أن يساوي صافي الفاتورة.");
+                                "لا يمكن حفظ فاتورة عليها مبلغ متبقٍ دون اختيار عميل مسجل.\n" +
+                                "اختر العميل لتسجيل المديونية على حسابه.");
 
-                        ValidateSplitPaymentMethod(
-                            paymentMethod,
-                            cashPaymentAmount,
-                            cardPaymentAmount,
-                            instaPayPaymentAmount,
-                            netTotal);
+                        if (paidAmount > 0 &&
+                            !automaticCardSplit &&
+                            !explicitPaymentSplit)
+                            ValidatePaymentMethod(paymentMethod);
 
-                        if (cardPaymentAmount > 0 &&
-                            string.IsNullOrWhiteSpace(cardReference))
-                            throw new InvalidOperationException(
-                                "يجب إدخال رقم عملية الفيزا.");
+                        string paymentStatus;
 
-                        if (cardPaymentAmount <= 0 &&
-                            !string.IsNullOrWhiteSpace(cardReference))
-                            throw new InvalidOperationException(
-                                "لا يمكن إدخال رقم عملية فيزا دون وجود مبلغ فيزا.");
+                        if (remainingAmount == 0)
+                            paymentStatus = "Paid";
+                        else if (paidAmount > 0)
+                            paymentStatus = "Partial";
+                        else
+                            paymentStatus = "Unpaid";
 
-                        paidAmount = netTotal;
-                    }
-                    else if (automaticCardSplit)
-                    {
-                        if (cardAmount > netTotal + MoneyTolerance)
-                            throw new InvalidOperationException(
-                                "مبلغ الفيزا لا يمكن أن يتجاوز صافي الفاتورة.");
+                        foreach (var line in preparedItems)
+                        {
+                            long finalDiscountCents =
+                                line.ItemDiscountCents + line.GeneralDiscountCents;
 
-                        cardPaymentAmount = RoundMoney(
-                            Math.Min(cardAmount, netTotal));
+                            double finalDiscountAmount =
+                                FromMoneyCents(finalDiscountCents);
 
-                        if (cardPaymentAmount > 0 &&
-                            string.IsNullOrWhiteSpace(cardReference))
-                            throw new InvalidOperationException(
-                                "يجب إدخال رقم عملية الفيزا.");
+                            double manualDiscountPercentage =
+                                line.OriginalItem.DiscountPercentage;
 
-                        if (cardPaymentAmount <= 0 &&
-                            !string.IsNullOrWhiteSpace(cardReference))
-                            throw new InvalidOperationException(
-                                "لا يمكن إدخال رقم عملية فيزا دون وجود مبلغ فيزا.");
+                            if (finalDiscountCents > line.MaxDiscountCents)
+                                throw new InvalidOperationException(
+                                    "الخصم النهائي للصنف " + line.Product.Name +
+                                    " تجاوز الحد الأقصى المسموح به.");
 
-                        cashPaymentAmount = RoundMoney(
-                            netTotal - cardPaymentAmount);
+                            long invoiceItemId;
 
-                        paidAmount = RoundMoney(
-                            cashPaymentAmount + cardPaymentAmount);
-
-
-                    }
-
-                    if (paidAmount < 0 ||
-                        paidAmount > netTotal + MoneyTolerance)
-                        throw new InvalidOperationException(
-                            "المبلغ المدفوع يجب أن يكون بين صفر وصافي الفاتورة.");
-
-                    paidAmount = RoundMoney(Math.Min(paidAmount, netTotal));
-
-                    double remainingAmount = RoundMoney(netTotal - paidAmount);
-
-                    if (remainingAmount < MoneyTolerance)
-                        remainingAmount = 0;
-
-                    if (remainingAmount > 0 && !customerId.HasValue)
-                        throw new InvalidOperationException(
-                            "لا يمكن حفظ فاتورة عليها مبلغ متبقٍ دون اختيار عميل مسجل.\n" +
-                            "اختر العميل لتسجيل المديونية على حسابه.");
-
-                    if (paidAmount > 0 &&
-                        !automaticCardSplit &&
-                        !explicitPaymentSplit)
-                        ValidatePaymentMethod(paymentMethod);
-
-                    string paymentStatus;
-
-                    if (remainingAmount == 0)
-                        paymentStatus = "Paid";
-                    else if (paidAmount > 0)
-                        paymentStatus = "Partial";
-                    else
-                        paymentStatus = "Unpaid";
-
-                    foreach (var line in preparedItems)
-                    {
-                        long finalDiscountCents =
-                            line.ItemDiscountCents + line.GeneralDiscountCents;
-
-                        double finalDiscountAmount =
-                            FromMoneyCents(finalDiscountCents);
-
-                        double manualDiscountPercentage =
-                            line.OriginalItem.DiscountPercentage;
-
-                        if (finalDiscountCents > line.MaxDiscountCents)
-                            throw new InvalidOperationException(
-                                "الخصم النهائي للصنف " + line.Product.Name +
-                                " تجاوز الحد الأقصى المسموح به.");
-
-                        long invoiceItemId;
-
-                        using (var command = new SQLiteCommand(
-                            @"INSERT INTO SalesInvoiceItems
+                            using (var command = new SQLiteCommand(
+                                @"INSERT INTO SalesInvoiceItems
                                   (
                                       InvoiceId, ProductId, ItemName, UnitName,
                                       Quantity, UnitPrice, Total, PackageQuantity,
@@ -608,42 +600,42 @@ namespace Ocore.desktop.Services
                                       @quantity, @price, @total, @packageQuantity,
                                       @discountPercentage, @discountAmount
                                   );",
-                            connection, transaction))
-                        {
-                            command.Parameters.AddWithValue("@invoiceId", invoiceId);
-                            command.Parameters.AddWithValue("@productId", line.Product.Id);
-                            command.Parameters.AddWithValue("@name", line.Product.Name);
-                            command.Parameters.AddWithValue("@unitName", line.UnitName);
-                            command.Parameters.AddWithValue("@quantity", line.Quantity);
-                            command.Parameters.AddWithValue("@price", line.UnitPrice);
-                            command.Parameters.AddWithValue("@total", line.LineTotal);
-                            command.Parameters.AddWithValue(
-                                "@packageQuantity", line.PackageQuantity);
-                            command.Parameters.AddWithValue(
-                                "@discountPercentage", manualDiscountPercentage);
-                            command.Parameters.AddWithValue(
-                                "@discountAmount", finalDiscountAmount);
-                            command.ExecuteNonQuery();
+                                connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@invoiceId", invoiceId);
+                                command.Parameters.AddWithValue("@productId", line.Product.Id);
+                                command.Parameters.AddWithValue("@name", line.Product.Name);
+                                command.Parameters.AddWithValue("@unitName", line.UnitName);
+                                command.Parameters.AddWithValue("@quantity", line.Quantity);
+                                command.Parameters.AddWithValue("@price", line.UnitPrice);
+                                command.Parameters.AddWithValue("@total", line.LineTotal);
+                                command.Parameters.AddWithValue(
+                                    "@packageQuantity", line.PackageQuantity);
+                                command.Parameters.AddWithValue(
+                                    "@discountPercentage", manualDiscountPercentage);
+                                command.Parameters.AddWithValue(
+                                    "@discountAmount", finalDiscountAmount);
+                                command.ExecuteNonQuery();
+                            }
+
+                            using (var command = new SQLiteCommand(
+                                "SELECT last_insert_rowid();", connection, transaction))
+                            {
+                                invoiceItemId = Convert.ToInt64(command.ExecuteScalar());
+                            }
+
+                            // الخصم من التشغيلات التي حددها المستخدم فقط.
+                            DeductFromSelectedBatches(
+                                connection,
+                                transaction,
+                                invoiceItemId,
+                                line.Product.Id,
+                                line.PackageQuantity,
+                                line.BatchAllocations);
                         }
 
                         using (var command = new SQLiteCommand(
-                            "SELECT last_insert_rowid();", connection, transaction))
-                        {
-                            invoiceItemId = Convert.ToInt64(command.ExecuteScalar());
-                        }
-
-                        // الخصم من التشغيلات التي حددها المستخدم فقط.
-                        DeductFromSelectedBatches(
-                            connection,
-                            transaction,
-                            invoiceItemId,
-                            line.Product.Id,
-                            line.PackageQuantity,
-                            line.BatchAllocations);
-                    }
-
-                    using (var command = new SQLiteCommand(
-                        @"UPDATE SalesInvoices
+                            @"UPDATE SalesInvoices
                               SET
                                   CustomerId = @customerId,
                                   Subtotal = @subtotal,
@@ -656,68 +648,66 @@ namespace Ocore.desktop.Services
                                   PaymentStatus = @paymentStatus,
                                   Total = @netTotal
                               WHERE Id = @id;",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue(
-                            "@customerId",
-                            customerId.HasValue
-                                ? (object)customerId.Value
-                                : DBNull.Value);
-                        command.Parameters.AddWithValue("@subtotal", subtotal);
-                        command.Parameters.AddWithValue("@discountType", discountType);
-                        command.Parameters.AddWithValue("@discountValue", discountValue);
-                        command.Parameters.AddWithValue("@discountAmount", discountAmount);
-                        command.Parameters.AddWithValue("@netTotal", netTotal);
-                        command.Parameters.AddWithValue("@paidAmount", paidAmount);
-                        command.Parameters.AddWithValue("@remainingAmount", remainingAmount);
-                        command.Parameters.AddWithValue("@paymentStatus", paymentStatus);
-                        command.Parameters.AddWithValue("@id", invoiceId);
-                        command.ExecuteNonQuery();
-                    }
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@customerId",
+                                customerId.HasValue
+                                    ? (object)customerId.Value
+                                    : DBNull.Value);
+                            command.Parameters.AddWithValue("@subtotal", subtotal);
+                            command.Parameters.AddWithValue("@discountType", discountType);
+                            command.Parameters.AddWithValue("@discountValue", discountValue);
+                            command.Parameters.AddWithValue("@discountAmount", discountAmount);
+                            command.Parameters.AddWithValue("@netTotal", netTotal);
+                            command.Parameters.AddWithValue("@paidAmount", paidAmount);
+                            command.Parameters.AddWithValue("@remainingAmount", remainingAmount);
+                            command.Parameters.AddWithValue("@paymentStatus", paymentStatus);
+                            command.Parameters.AddWithValue("@id", invoiceId);
+                            command.ExecuteNonQuery();
+                        }
 
-                    if (explicitPaymentSplit)
-                    {
-                        InsertInvoicePayment(
-                            connection, transaction, invoiceId,
-                            "Cash", cashPaymentAmount, string.Empty,
-                            userId, createdAt);
+                        if (explicitPaymentSplit)
+                        {
+                            InsertInvoicePayment(
+                                connection, transaction, invoiceId,
+                                "Cash", cashPaymentAmount, string.Empty,
+                                userId, createdAt);
 
-                        InsertInvoicePayment(
-                            connection, transaction, invoiceId,
-                            "Card", cardPaymentAmount, cardReference,
-                            userId, createdAt);
+                            InsertInvoicePayment(
+                                connection, transaction, invoiceId,
+                                "Card", cardPaymentAmount, cardReference,
+                                userId, createdAt);
 
-                        InsertInvoicePayment(
-                            connection, transaction, invoiceId,
-                            "InstaPay", instaPayPaymentAmount, string.Empty,
-                            userId, createdAt);
-                    }
-                    else if (automaticCardSplit)
-                    {
-                        InsertInvoicePayment(
-                            connection, transaction, invoiceId,
-                            "Cash", cashPaymentAmount, string.Empty,
-                            userId, createdAt);
+                            InsertInvoicePayment(
+                                connection, transaction, invoiceId,
+                                "InstaPay", instaPayPaymentAmount, string.Empty,
+                                userId, createdAt);
+                        }
+                        else if (automaticCardSplit)
+                        {
+                            InsertInvoicePayment(
+                                connection, transaction, invoiceId,
+                                "Cash", cashPaymentAmount, string.Empty,
+                                userId, createdAt);
 
-                        InsertInvoicePayment(
-                            connection, transaction, invoiceId,
-                            "Card", cardPaymentAmount, cardReference,
-                            userId, createdAt);
-                    }
-                    else if (paidAmount > 0)
-                    {
-                        InsertInvoicePayment(
-                            connection, transaction, invoiceId,
-                            paymentMethod, paidAmount, paymentReference,
-                            userId, createdAt);
-                    }
+                            InsertInvoicePayment(
+                                connection, transaction, invoiceId,
+                                "Card", cardPaymentAmount, cardReference,
+                                userId, createdAt);
+                        }
+                        else if (paidAmount > 0)
+                        {
+                            InsertInvoicePayment(
+                                connection, transaction, invoiceId,
+                                paymentMethod, paidAmount, paymentReference,
+                                userId, createdAt);
+                        }
 
-                    if (customerId.HasValue && remainingAmount > 0)
-                    {
-
-
-                        using (var command = new SQLiteCommand(
-                            @"INSERT INTO CustomerAccountTransactions
+                        if (customerId.HasValue && remainingAmount > 0)
+                        {
+                            using (var command = new SQLiteCommand(
+                                @"INSERT INTO CustomerAccountTransactions
                                   (
                                       CustomerId, TransactionType, Amount,
                                       ReferenceType, ReferenceId, PaymentMethod,
@@ -729,35 +719,35 @@ namespace Ocore.desktop.Services
                                       'SalesInvoice', @invoiceId, '',
                                       '', @notes, @userId, @createdAt
                                   );",
-                            connection, transaction))
-                        {
-                            command.Parameters.AddWithValue("@customerId", customerId.Value);
-                            command.Parameters.AddWithValue("@amount", remainingAmount);
-                            command.Parameters.AddWithValue("@invoiceId", invoiceId);
-                            command.Parameters.AddWithValue(
-                                "@notes", "مديونية فاتورة بيع رقم " + invoiceNumber);
-                            command.Parameters.AddWithValue("@userId", userId);
-                            command.Parameters.AddWithValue("@createdAt", createdAt);
-                            command.ExecuteNonQuery();
+                                connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@customerId", customerId.Value);
+                                command.Parameters.AddWithValue("@amount", remainingAmount);
+                                command.Parameters.AddWithValue("@invoiceId", invoiceId);
+                                command.Parameters.AddWithValue(
+                                    "@notes", "مديونية فاتورة بيع رقم " + invoiceNumber);
+                                command.Parameters.AddWithValue("@userId", userId);
+                                command.Parameters.AddWithValue("@createdAt", createdAt);
+                                command.ExecuteNonQuery();
+                            }
                         }
+
+                        WriteAuditLog(
+                            connection, transaction, userId, username,
+                            invoiceId, invoiceNumber, subtotal,
+                            itemDiscountTotal, generalDiscountAmount,
+                            discountAmount, netTotal, createdAt);
+
+                        transaction.Commit();
+                        return invoiceNumber;
                     }
-
-                    WriteAuditLog(
-                        connection, transaction, userId, username,
-                        invoiceId, invoiceNumber, subtotal,
-                        itemDiscountTotal, generalDiscountAmount,
-                        discountAmount, netTotal, createdAt);
-
-                    transaction.Commit();
-                    return invoiceNumber;
-                }
                     catch
                     {
-                    transaction.Rollback();
-                    throw;
+                        transaction.Rollback();
+                        throw;
+                    }
                 }
             }
-        }
         }
 
         // يتحقق من أن المستخدم وزع كامل الكمية المطلوبة يدويًا.
@@ -886,8 +876,6 @@ namespace Ocore.desktop.Services
                     double.IsNaN(allocation.AllocatedQuantity) ||
                     double.IsInfinity(allocation.AllocatedQuantity) ||
                     allocation.AllocatedQuantity < 0)
-
-
                 {
                     throw new InvalidOperationException(
                         "بيانات إحدى التشغيلات المحددة غير صحيحة.");
@@ -1058,8 +1046,6 @@ namespace Ocore.desktop.Services
 
                 case "CashInstaPay":
                     valid = hasCash && !hasCard && hasInstaPay;
-
-
                     break;
 
                 case "CardInstaPay":
@@ -1231,7 +1217,6 @@ namespace Ocore.desktop.Services
             return Math.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
-
         private void ValidateDiscountPermission(
             SQLiteConnection connection,
             SQLiteTransaction transaction,
@@ -1401,8 +1386,6 @@ namespace Ocore.desktop.Services
                       INNER JOIN SalesInvoiceItems i
                           ON i.Id = a.InvoiceItemId
                       LEFT JOIN Batches b
-
-
                           ON b.Id = a.BatchId
                       WHERE i.InvoiceId = @invoiceId
                       ORDER BY a.Id ASC;",
@@ -1572,7 +1555,6 @@ namespace Ocore.desktop.Services
                 return defaultValue;
 
             double result;
-
 
             if (double.TryParse(
                 Convert.ToString(value, CultureInfo.InvariantCulture),
@@ -1787,43 +1769,43 @@ namespace Ocore.desktop.Services
         }
 
         private class ProductSaleInfo
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string UnitName { get; set; }
-        public string SmallUnitName { get; set; }
-        public int UnitsPerPackage { get; set; }
-        public double SalePrice { get; set; }
-        public bool IsArchived { get; set; }
-        public double MaxDiscountPercentage { get; set; }
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public string UnitName { get; set; }
+            public string SmallUnitName { get; set; }
+            public int UnitsPerPackage { get; set; }
+            public double SalePrice { get; set; }
+            public bool IsArchived { get; set; }
+            public double MaxDiscountPercentage { get; set; }
+        }
+
+        private class PreparedSaleLine
+        {
+            public ProductSaleInfo Product { get; set; }
+            public SaleInvoiceItem OriginalItem { get; set; }
+            public string UnitName { get; set; }
+            public double Quantity { get; set; }
+            public double UnitPrice { get; set; }
+            public double PackageQuantity { get; set; }
+
+            public List<SaleInvoiceBatchAllocation> BatchAllocations
+            { get; set; }
+
+            public double LineTotal { get; set; }
+            public long LineTotalCents { get; set; }
+            public long MaxDiscountCents { get; set; }
+            public long ItemDiscountCents { get; set; }
+            public long GeneralDiscountCapacityCents { get; set; }
+            public long GeneralDiscountCents { get; set; }
+            public long AllocationWeight { get; set; }
+        }
+
+        private class DiscountFraction
+        {
+            public PreparedSaleLine Line { get; set; }
+            public decimal Fraction { get; set; }
+            public int OriginalOrder { get; set; }
+        }
     }
-
-    private class PreparedSaleLine
-    {
-        public ProductSaleInfo Product { get; set; }
-        public SaleInvoiceItem OriginalItem { get; set; }
-        public string UnitName { get; set; }
-        public double Quantity { get; set; }
-        public double UnitPrice { get; set; }
-        public double PackageQuantity { get; set; }
-
-        public List<SaleInvoiceBatchAllocation> BatchAllocations
-        { get; set; }
-
-        public double LineTotal { get; set; }
-        public long LineTotalCents { get; set; }
-        public long MaxDiscountCents { get; set; }
-        public long ItemDiscountCents { get; set; }
-        public long GeneralDiscountCapacityCents { get; set; }
-        public long GeneralDiscountCents { get; set; }
-        public long AllocationWeight { get; set; }
-    }
-
-    private class DiscountFraction
-    {
-        public PreparedSaleLine Line { get; set; }
-        public decimal Fraction { get; set; }
-        public int OriginalOrder { get; set; }
-    }
-}
 }
