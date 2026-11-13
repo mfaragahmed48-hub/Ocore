@@ -41,6 +41,7 @@ namespace Ocore.desktop.Views
             EditProductButton.Click += EditProductButton_Click;
             ManageStockButton.Click += ManageStockButton_Click;
             SetDiscountLimitButton.Click += SetDiscountLimitButton_Click;
+            SetMinimumStockButton.Click += SetMinimumStockButton_Click;
             ArchiveProductButton.Click += ArchiveProductButton_Click;
             DeleteProductButton.Click += DeleteProductButton_Click;
             RefreshButton.Click += RefreshButton_Click;
@@ -49,6 +50,7 @@ namespace Ocore.desktop.Views
             EditProductButton.IsEnabled = false;
             ManageStockButton.IsEnabled = false;
             SetDiscountLimitButton.IsEnabled = false;
+            SetMinimumStockButton.IsEnabled = false;
             ArchiveProductButton.IsEnabled = false;
             DeleteProductButton.IsEnabled = false;
         }
@@ -71,6 +73,9 @@ namespace Ocore.desktop.Views
                     isManager ? Visibility.Visible : Visibility.Collapsed;
 
                 SetDiscountLimitButton.Visibility =
+                    isManager ? Visibility.Visible : Visibility.Collapsed;
+
+                SetMinimumStockButton.Visibility =
                     isManager ? Visibility.Visible : Visibility.Collapsed;
 
                 LoadProducts();
@@ -188,6 +193,9 @@ namespace Ocore.desktop.Views
                 isManager && hasSelection;
 
             SetDiscountLimitButton.IsEnabled =
+                isManager && hasSelection;
+
+            SetMinimumStockButton.IsEnabled =
                 isManager && hasSelection;
 
             ArchiveProductButton.IsEnabled =
@@ -553,6 +561,220 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "حدث خطأ أثناء تحديد حد الخصم:\n" + ex.Message,
+                    "خطأ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void SetMinimumStockButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (!isManager)
+            {
+                MessageBox.Show(
+                    "تحديد الحد الأدنى للمخزون متاح للمدير فقط.",
+                    "الصلاحيات",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            Product selectedProduct = GetSelectedProduct();
+
+            if (selectedProduct == null)
+            {
+                MessageBox.Show(
+                    "يرجى تحديد الصنف أولاً.",
+                    "تنبيه",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            try
+            {
+                double currentMinimum =
+                    selectedProduct.MinimumStockLevel;
+
+                Window dialog = new Window
+                {
+                    Title = "تحديد الحد الأدنى للمخزون",
+                    Width = 410,
+                    SizeToContent = SizeToContent.Height,
+                    ResizeMode = ResizeMode.NoResize,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    FlowDirection = FlowDirection.RightToLeft,
+                    Background = Brushes.White,
+                    ShowInTaskbar = false
+                };
+
+                Grid grid = new Grid
+                {
+                    Margin = new Thickness(18)
+                };
+
+                grid.RowDefinitions.Add(
+                    new RowDefinition { Height = GridLength.Auto });
+
+                grid.RowDefinitions.Add(
+                    new RowDefinition { Height = GridLength.Auto });
+
+                grid.RowDefinitions.Add(
+                    new RowDefinition { Height = GridLength.Auto });
+
+                grid.RowDefinitions.Add(
+                    new RowDefinition { Height = GridLength.Auto });
+
+                TextBlock productText = new TextBlock
+                {
+                    Text = "الصنف: " + selectedProduct.Name +
+                           "\nالكود: " + selectedProduct.ProductCode +
+                           "\nالوحدة: " + selectedProduct.SmallUnitName,
+                    FontSize = 14,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 14),
+                    TextWrapping = TextWrapping.Wrap
+                };
+
+                Grid.SetRow(productText, 0);
+                grid.Children.Add(productText);
+
+                TextBlock instructionText = new TextBlock
+                {
+                    Text = "الحد الأدنى للمخزون (بالوحدة الصغيرة):",
+                    FontSize = 13,
+                    Margin = new Thickness(0, 0, 0, 7)
+                };
+
+                Grid.SetRow(instructionText, 1);
+                grid.Children.Add(instructionText);
+
+                TextBox minimumTextBox = new TextBox
+                {
+                    Text = currentMinimum.ToString(
+                        "0.###",
+                        CultureInfo.CurrentCulture),
+                    FontSize = 16,
+                    Height = 36,
+                    Padding = new Thickness(8),
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 12)
+                };
+
+                Grid.SetRow(minimumTextBox, 2);
+                grid.Children.Add(minimumTextBox);
+
+                StackPanel buttonsPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+
+                Button saveButton = new Button
+                {
+                    Content = "حفظ",
+                    Width = 100,
+                    Height = 36,
+                    Margin = new Thickness(5),
+                    Background = new SolidColorBrush(
+                        Color.FromRgb(22, 134, 93)),
+                    Foreground = Brushes.White,
+                    FontWeight = FontWeights.Bold,
+                    IsDefault = true
+                };
+
+                Button cancelButton = new Button
+                {
+                    Content = "إلغاء",
+                    Width = 100,
+                    Height = 36,
+                    Margin = new Thickness(5),
+                    IsCancel = true
+                };
+
+                saveButton.Click += (s, args) =>
+                {
+                    string input = minimumTextBox.Text.Trim();
+
+                    double newMinimum;
+
+                    bool valid =
+                        double.TryParse(
+                            input,
+                            NumberStyles.Float,
+                            CultureInfo.CurrentCulture,
+                            out newMinimum) ||
+                        double.TryParse(
+                            input,
+                            NumberStyles.Float,
+                            CultureInfo.InvariantCulture,
+                            out newMinimum);
+
+                    if (!valid ||
+                        double.IsNaN(newMinimum) ||
+                        double.IsInfinity(newMinimum) ||
+                        newMinimum < 0)
+                    {
+                        MessageBox.Show(
+                            "أدخل قيمة صحيحة تساوي صفرًا أو أكبر.",
+                            "قيمة غير صحيحة",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+
+                        minimumTextBox.Focus();
+                        minimumTextBox.SelectAll();
+                        return;
+                    }
+
+                    try
+                    {
+                        productService.SetProductMinimumStockLevel(
+                            currentUserId,
+                            selectedProduct.Id,
+                            newMinimum);
+
+                        dialog.DialogResult = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            "تعذر حفظ الحد الأدنى للمخزون:\n" + ex.Message,
+                            "خطأ",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                };
+
+                buttonsPanel.Children.Add(saveButton);
+                buttonsPanel.Children.Add(cancelButton);
+
+                Grid.SetRow(buttonsPanel, 3);
+                grid.Children.Add(buttonsPanel);
+
+                dialog.Content = grid;
+
+                bool? result = dialog.ShowDialog();
+
+                if (result == true)
+                {
+                    MessageBox.Show(
+                        "تم تحديث الحد الأدنى للمخزون بنجاح.",
+                        "نجاح",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    LoadProducts();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "حدث خطأ أثناء تحديد الحد الأدنى للمخزون:\n" + ex.Message,
                     "خطأ",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
