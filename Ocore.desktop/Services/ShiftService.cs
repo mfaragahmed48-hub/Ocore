@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
 using System.Globalization;
@@ -302,6 +303,62 @@ namespace Ocore.desktop.Services
             }
         }
 
+        // جلب سجل جميع الشيفتات المفتوحة والمغلقة.
+        public List<ShiftInfo> GetAllShifts()
+        {
+            var shifts = new List<ShiftInfo>();
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                using (var command = new SQLiteCommand(@"
+                    SELECT
+                        s.Id,
+                        s.ShiftNumber,
+                        s.Status,
+                        s.OpenedByUserId,
+                        COALESCE(opened.FullName, opened.Username, '') AS OpenedByName,
+                        s.OpenedAt,
+                        s.ClosedByUserId,
+                        COALESCE(closed.FullName, closed.Username, '') AS ClosedByName,
+                        s.ClosedAt
+                    FROM Shifts s
+                    LEFT JOIN Users opened
+                        ON opened.Id = s.OpenedByUserId
+                    LEFT JOIN Users closed
+                        ON closed.Id = s.ClosedByUserId
+                    ORDER BY s.Id DESC;",
+                    connection))
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        shifts.Add(ReadShift(reader));
+                    }
+                }
+            }
+
+            return shifts;
+        }
+
+        // جلب الملخص المالي لأي شيفت، مفتوح أو مغلق.
+        public ShiftFinancialSummary GetShiftFinancialSummary(int shiftId)
+        {
+            if (shiftId <= 0)
+                throw new ArgumentOutOfRangeException("shiftId");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                return GetFinancialSummary(
+                    connection,
+                    null,
+                    shiftId);
+            }
+        }
+
         // ملخص الحركات المالية للشيفت المفتوح.
         public ShiftFinancialSummary GetCurrentShiftFinancialSummary()
         {
@@ -485,7 +542,6 @@ namespace Ocore.desktop.Services
             }
 
             // مصروفات الشيفت غير الملغاة، موزعة حسب وسيلة الدفع.
-            // إذا لم يتم إنشاء جدول المصروفات بعد، تكون القيم صفرًا.
             bool expenseTableExists = false;
 
             using (var command = new SQLiteCommand(@"
@@ -847,7 +903,6 @@ namespace Ocore.desktop.Services
         }
 
         // يمنع الإغلاق القديم الذي لا يسجل المبالغ الفعلية.
-        // سيتم ربط زر الإغلاق بالمدخلات الجديدة في تعديل الواجهة التالي.
         public bool CloseCurrentShift(int userId)
         {
             throw new InvalidOperationException(
