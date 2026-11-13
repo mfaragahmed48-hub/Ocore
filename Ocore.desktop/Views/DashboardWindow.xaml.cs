@@ -34,10 +34,7 @@ namespace Ocore.desktop.Views
             productService = new ProductService();
             shiftService = new ShiftService();
 
-            // ربط زر إغلاق الشيفت وتحديث بياناته.
             CloseShiftButton.Click += CloseShiftButton_Click;
-
-            // تحديث البيانات عند العودة إلى لوحة التحكم.
             Activated += DashboardWindow_Activated;
 
             UserNameText.Text = fullName;
@@ -229,6 +226,10 @@ namespace Ocore.desktop.Views
             }
         }
 
+        // ==========================================
+        // إغلاق الشيفت بالمبالغ الفعلية
+        // ==========================================
+
         private void CloseShiftButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -240,37 +241,268 @@ namespace Ocore.desktop.Views
                     "صلاحيات المستخدم",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-
                 return;
             }
 
-            var result = MessageBox.Show(
-                "هل أنت متأكد من إغلاق الشيفت الحالي؟\n"
-                + "سيتم تسجيل اسمك ووقت الإغلاق.",
-                "تأكيد إغلاق الشيفت",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result != MessageBoxResult.Yes)
-                return;
-
             try
             {
-                bool closed =
-                    shiftService.CloseCurrentShift(currentUserId);
+                var shift = shiftService.GetCurrentShift();
 
-                if (!closed)
+                if (shift == null)
                 {
                     MessageBox.Show(
                         "لا يوجد شيفت مفتوح لإغلاقه.",
                         "إغلاق الشيفت",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
+
+                    RefreshShiftSummary();
+                    return;
                 }
-                else
+
+                var summary =
+                    shiftService.GetCurrentShiftFinancialSummary();
+
+                if (summary == null)
                 {
                     MessageBox.Show(
-                        "تم إغلاق الشيفت بنجاح.",
+                        "تعذر تحميل الملخص المالي للشيفت.",
+                        "إغلاق الشيفت",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var cashBox = CreateActualAmountTextBox();
+                var cardBox = CreateActualAmountTextBox();
+                var instaPayBox = CreateActualAmountTextBox();
+                var transferBox = CreateActualAmountTextBox();
+
+                var dialog = new Window
+                {
+                    Title = "إغلاق الشيفت - المبالغ الفعلية",
+                    Width = 620,
+                    Height = 510,
+                    MinWidth = 560,
+                    MinHeight = 470,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    ResizeMode = ResizeMode.NoResize,
+                    FlowDirection = FlowDirection.RightToLeft,
+                    Background = new SolidColorBrush(
+                        Color.FromRgb(243, 246, 248))
+                };
+
+                var root = new StackPanel
+                {
+                    Margin = new Thickness(22)
+                };
+
+                root.Children.Add(new TextBlock
+                {
+                    Text = "أدخل المبالغ الموجودة فعليًا بكل وسيلة دفع",
+                    FontSize = 19,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(24, 63, 54)),
+                    Margin = new Thickness(0, 0, 0, 8)
+                });
+
+                root.Children.Add(new TextBlock
+                {
+                    Text = "راجع المبلغ المتوقع ثم أدخل الموجود الفعلي. اكتب 0 إذا لم يوجد رصيد.",
+                    FontSize = 13,
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(100, 115, 111)),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 16)
+                });
+
+                var table = new Grid
+                {
+                    Margin = new Thickness(0, 0, 0, 12)
+                };
+
+                table.ColumnDefinitions.Add(
+                    new ColumnDefinition
+                    {
+                        Width = new GridLength(1.2, GridUnitType.Star)
+                    });
+
+                table.ColumnDefinitions.Add(
+                    new ColumnDefinition
+                    {
+                        Width = new GridLength(1, GridUnitType.Star)
+                    });
+
+                table.ColumnDefinitions.Add(
+                    new ColumnDefinition
+                    {
+                        Width = new GridLength(1, GridUnitType.Star)
+                    });
+
+                for (int i = 0; i < 5; i++)
+                {
+                    table.RowDefinitions.Add(
+                        new RowDefinition
+                        {
+                            Height = GridLength.Auto
+                        });
+                }
+
+                AddShiftTableCell(
+                    table, "وسيلة الدفع", 0, 0, true);
+
+                AddShiftTableCell(
+                    table, "المتوقع", 0, 1, true);
+
+                AddShiftTableCell(
+                    table, "الموجود فعليًا", 0, 2, true);
+
+                AddShiftPaymentRow(
+                    table, 1, "النقدية",
+                    summary.ExpectedCash, cashBox);
+
+                AddShiftPaymentRow(
+                    table, 2, "الفيزا",
+                    summary.ExpectedCard, cardBox);
+
+                AddShiftPaymentRow(
+                    table, 3, "إنستا باي",
+                    summary.ExpectedInstaPay, instaPayBox);
+
+                AddShiftPaymentRow(
+                    table, 4, "التحويل البنكي",
+                    summary.ExpectedTransfer, transferBox);
+
+                root.Children.Add(table);
+
+                root.Children.Add(new TextBlock
+                {
+                    Text = "إجمالي المتوقع: " +
+                           summary.TotalExpected.ToString("N2") +
+                           " جنيه",
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(24, 63, 54)),
+                    Margin = new Thickness(0, 4, 0, 18)
+                });
+
+                var buttons = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Left
+                };
+
+                var confirmButton = new Button
+                {
+                    Content = "تأكيد إغلاق الشيفت",
+                    Width = 175,
+                    Height = 42,
+                    Margin = new Thickness(0, 0, 10, 0),
+                    Background = new SolidColorBrush(
+                        Color.FromRgb(168, 50, 50)),
+                    Foreground = Brushes.White,
+                    FontWeight = FontWeights.Bold,
+                    BorderThickness = new Thickness(0)
+                };
+
+                var cancelButton = new Button
+                {
+                    Content = "إلغاء",
+                    Width = 105,
+                    Height = 42,
+                    Background = new SolidColorBrush(
+                        Color.FromRgb(225, 231, 228)),
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(24, 63, 54)),
+                    BorderThickness = new Thickness(0)
+                };
+
+                confirmButton.Click += delegate
+                {
+                    double actualCash;
+                    double actualCard;
+                    double actualInstaPay;
+                    double actualTransfer;
+
+                    if (!TryReadActualAmount(
+                            cashBox.Text, out actualCash) ||
+                        !TryReadActualAmount(
+                            cardBox.Text, out actualCard) ||
+                        !TryReadActualAmount(
+                            instaPayBox.Text, out actualInstaPay) ||
+                        !TryReadActualAmount(
+                            transferBox.Text, out actualTransfer))
+                    {
+                        MessageBox.Show(
+                            "أدخل مبلغًا صحيحًا غير سالب في الخانات الأربع. استخدم 0 إذا لم يوجد مبلغ.",
+                            "بيانات غير صحيحة",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    var confirm = MessageBox.Show(
+                        "هل تريد تأكيد إغلاق الشيفت بالمبالغ الفعلية التي أدخلتها؟\n" +
+                        "سيتم تسجيل اسمك ووقت الإغلاق والفروق لكل وسيلة دفع.",
+                        "تأكيد إغلاق الشيفت",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (confirm != MessageBoxResult.Yes)
+                        return;
+
+                    try
+                    {
+                        bool closed =
+                            shiftService.CloseCurrentShift(
+                                currentUserId,
+                                actualCash,
+                                actualCard,
+                                actualInstaPay,
+                                actualTransfer);
+
+                        if (!closed)
+                        {
+                            MessageBox.Show(
+                                "لم يتم العثور على شيفت مفتوح لإغلاقه.",
+                                "إغلاق الشيفت",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                            return;
+                        }
+
+                        dialog.DialogResult = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            "تعذر إغلاق الشيفت:\n\n" + ex.Message,
+                            "O CORE",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                };
+
+                cancelButton.Click += delegate
+                {
+                    dialog.DialogResult = false;
+                };
+
+                buttons.Children.Add(confirmButton);
+                buttons.Children.Add(cancelButton);
+                root.Children.Add(buttons);
+
+                dialog.Content = root;
+
+                bool? result = dialog.ShowDialog();
+
+                if (result == true)
+                {
+                    MessageBox.Show(
+                        "تم إغلاق الشيفت بنجاح وحفظ المبالغ الفعلية والفروق.",
                         "إغلاق الشيفت",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
@@ -291,13 +523,127 @@ namespace Ocore.desktop.Views
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "حدث خطأ أثناء إغلاق الشيفت:\n\n" + ex.Message,
+                    "حدث خطأ أثناء تجهيز شاشة إغلاق الشيفت:\n\n" +
+                    ex.Message,
                     "O CORE",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
 
                 RefreshShiftSummary();
             }
+        }
+
+        // ==========================================
+        // عناصر شاشة إغلاق الشيفت
+        // ==========================================
+
+        private TextBox CreateActualAmountTextBox()
+        {
+            return new TextBox
+            {
+                Height = 34,
+                FontSize = 15,
+                Padding = new Thickness(8),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Right
+            };
+        }
+
+        private void AddShiftPaymentRow(
+            Grid grid,
+            int row,
+            string paymentName,
+            double expectedAmount,
+            TextBox actualTextBox)
+        {
+            AddShiftTableCell(
+                grid, paymentName, row, 0, false);
+
+            AddShiftTableCell(
+                grid,
+                expectedAmount.ToString("N2"),
+                row,
+                1,
+                false);
+
+            Grid.SetRow(actualTextBox, row);
+            Grid.SetColumn(actualTextBox, 2);
+
+            actualTextBox.Margin = new Thickness(5);
+
+            grid.Children.Add(actualTextBox);
+        }
+
+        private void AddShiftTableCell(
+            Grid grid,
+            string value,
+            int row,
+            int column,
+            bool isHeader)
+        {
+            var border = new Border
+            {
+                BorderBrush = new SolidColorBrush(
+                    Color.FromRgb(220, 232, 227)),
+                BorderThickness = new Thickness(1),
+
+                Background = isHeader
+                    ? new SolidColorBrush(
+                        Color.FromRgb(232, 241, 237))
+                    : Brushes.White,
+
+                Padding = new Thickness(8),
+                Margin = new Thickness(1)
+            };
+
+            border.Child = new TextBlock
+            {
+                Text = value,
+                FontSize = isHeader ? 13 : 14,
+
+                FontWeight = isHeader
+                    ? FontWeights.Bold
+                    : FontWeights.Normal,
+
+                Foreground = new SolidColorBrush(
+                    Color.FromRgb(24, 63, 54)),
+
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            Grid.SetRow(border, row);
+            Grid.SetColumn(border, column);
+
+            grid.Children.Add(border);
+        }
+
+        private bool TryReadActualAmount(
+            string text,
+            out double amount)
+        {
+            amount = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            bool parsed =
+                double.TryParse(
+                    text.Trim(),
+                    System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    out amount) ||
+
+                double.TryParse(
+                    text.Trim(),
+                    System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out amount);
+
+            return parsed &&
+                   !double.IsNaN(amount) &&
+                   !double.IsInfinity(amount) &&
+                   amount >= 0;
         }
 
         // ==========================================
@@ -440,14 +786,18 @@ namespace Ocore.desktop.Views
                 {
                     Header = "كود الصنف",
                     Binding = new Binding("ProductCode"),
-                    Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+                    Width = new DataGridLength(
+                        1,
+                        DataGridLengthUnitType.Star)
                 });
 
                 dataGrid.Columns.Add(new DataGridTextColumn
                 {
                     Header = "اسم الصنف",
                     Binding = new Binding("Name"),
-                    Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+                    Width = new DataGridLength(
+                        2,
+                        DataGridLengthUnitType.Star)
                 });
 
                 dataGrid.Columns.Add(new DataGridTextColumn
@@ -457,7 +807,9 @@ namespace Ocore.desktop.Views
                     {
                         StringFormat = "N3"
                     },
-                    Width = new DataGridLength(1.2, DataGridLengthUnitType.Star)
+                    Width = new DataGridLength(
+                        1.2,
+                        DataGridLengthUnitType.Star)
                 });
 
                 dataGrid.Columns.Add(new DataGridTextColumn
@@ -467,14 +819,18 @@ namespace Ocore.desktop.Views
                     {
                         StringFormat = "N3"
                     },
-                    Width = new DataGridLength(1.2, DataGridLengthUnitType.Star)
+                    Width = new DataGridLength(
+                        1.2,
+                        DataGridLengthUnitType.Star)
                 });
 
                 dataGrid.Columns.Add(new DataGridTextColumn
                 {
                     Header = "الوحدة",
                     Binding = new Binding("SmallUnitName"),
-                    Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+                    Width = new DataGridLength(
+                        1,
+                        DataGridLengthUnitType.Star)
                 });
 
                 Grid.SetRow(dataGrid, 1);
