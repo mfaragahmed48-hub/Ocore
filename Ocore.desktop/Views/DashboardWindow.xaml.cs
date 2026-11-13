@@ -129,6 +129,7 @@ namespace Ocore.desktop.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
+            RefreshProductCount();
             RefreshLowStockSummary();
             RefreshShiftSummary();
         }
@@ -141,8 +142,39 @@ namespace Ocore.desktop.Views
             object sender,
             EventArgs e)
         {
+            RefreshProductCount();
             RefreshLowStockSummary();
             RefreshShiftSummary();
+        }
+
+        // ==========================================
+        // عدد الأصناف النشطة
+        // ==========================================
+
+        private void RefreshProductCount()
+        {
+            if (!permissionService.HasPermission(
+                currentRole,
+                "Products.View"))
+            {
+                ProductCountText.Text = "—";
+                return;
+            }
+
+            try
+            {
+                int count = productService.GetActiveProductCount(
+                    currentUserId);
+
+                ProductCountText.Text = count.ToString("N0");
+            }
+            catch (Exception ex)
+            {
+                ProductCountText.Text = "!";
+
+                System.Diagnostics.Debug.WriteLine(
+                    "RefreshProductCount error: " + ex);
+            }
         }
 
         // ==========================================

@@ -271,7 +271,8 @@
                         <TextBlock Text="عدد الأصناف"
                                    Foreground="#64736F"/>
 
-                        <TextBlock Text="0"
+                        <TextBlock x:Name="ProductCountText"
+                                   Text="0"
                                    FontSize="22"
                                    FontWeight="Bold"
                                    Margin="0,8,0,0"/>
