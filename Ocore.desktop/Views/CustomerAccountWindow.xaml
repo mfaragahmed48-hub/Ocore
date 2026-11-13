@@ -1,0 +1,283 @@
+﻿<Window x:Class="Ocore.desktop.Views.CustomerAccountWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - كشف حساب العميل"
+        Height="720"
+        Width="1100"
+        MinHeight="600"
+        MinWidth="900"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="#F3F6F8">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- بيانات العميل -->
+        <Border Grid.Row="0"
+                Background="White"
+                CornerRadius="10"
+                Padding="15"
+                Margin="0,0,0,12">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="كشف حساب العميل"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="#183F36"/>
+
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,10,0,0">
+
+                        <TextBlock Text="العميل:"
+                                   FontWeight="Bold"
+                                   Foreground="#64736F"/>
+
+                        <TextBlock x:Name="CustomerNameTextBlock"
+                                   Margin="8,0,20,0"
+                                   FontWeight="Bold"
+                                   FontSize="15"/>
+
+                        <TextBlock Text="الكود:"
+                                   FontWeight="Bold"
+                                   Foreground="#64736F"/>
+
+                        <TextBlock x:Name="CustomerCodeTextBlock"
+                                   Margin="8,0,0,0"
+                                   FontWeight="Bold"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="CustomerPhoneTextBlock"
+                               Foreground="#64736F"
+                               Margin="0,6,0,0"/>
+                </StackPanel>
+
+                <Border Grid.Column="1"
+                        Background="#E8F3EE"
+                        CornerRadius="8"
+                        Padding="18,12"
+                        MinWidth="190">
+
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="الرصيد المستحق"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"
+                                   HorizontalAlignment="Center"/>
+
+                        <TextBlock x:Name="CustomerBalanceTextBlock"
+                                   Text="0.00"
+                                   FontSize="25"
+                                   FontWeight="Bold"
+                                   Foreground="#16865D"
+                                   Margin="0,7,0,0"
+                                   HorizontalAlignment="Center"/>
+
+                        <TextBlock Text="جنيه"
+                                   FontSize="12"
+                                   Foreground="#64736F"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- عنوان كشف الحساب -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="10"
+                Padding="12"
+                Margin="0,0,0,12">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="حركات حساب العميل"
+                               FontSize="17"
+                               FontWeight="Bold"
+                               Foreground="#183F36"/>
+
+                    <TextBlock Text="عرض المديونيات والتحصيلات المسجلة"
+                               FontSize="12"
+                               Foreground="#64736F"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="تحديث الكشف"
+                        Width="115"
+                        Height="36"
+                        Click="RefreshButton_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- الكشف والتحصيل -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.2*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- جدول الحركات -->
+            <Border Grid.Column="0"
+                    Background="White"
+                    CornerRadius="10"
+                    Padding="10"
+                    Margin="0,0,8,0">
+
+                <DataGrid x:Name="TransactionsGrid"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          SelectionMode="Single"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeight="38"
+                          FontSize="12">
+
+                    <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="التاريخ"
+                                            Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}"
+                                            Width="125"/>
+
+                        <DataGridTextColumn Header="نوع الحركة"
+                                            Binding="{Binding TransactionType}"
+                                            Width="110"/>
+
+                        <DataGridTextColumn Header="المبلغ"
+                                            Binding="{Binding Amount, StringFormat=N2}"
+                                            Width="100"/>
+
+                        <DataGridTextColumn Header="طريقة الدفع"
+                                            Binding="{Binding PaymentMethod}"
+                                            Width="95"/>
+
+                        <DataGridTextColumn Header="رقم المرجع"
+                                            Binding="{Binding ReferenceNumber}"
+                                            Width="100"/>
+
+                        <DataGridTextColumn Header="ملاحظات"
+                                            Binding="{Binding Notes}"
+                                            Width="*"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <!-- تسجيل التحصيل -->
+            <Border Grid.Column="1"
+                    Background="White"
+                    CornerRadius="10"
+                    Padding="15"
+                    Margin="8,0,0,0">
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Text="تسجيل تحصيل"
+                                   FontSize="19"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"
+                                   Margin="0,0,0,18"/>
+
+                        <TextBlock Text="المبلغ المحصل *"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,6"/>
+
+                        <TextBox x:Name="AmountTextBox"
+                                 Height="40"
+                                 FontSize="17"
+                                 Padding="8"
+                                 VerticalContentAlignment="Center"
+                                 TextAlignment="Center"
+                                 Margin="0,0,0,15"/>
+
+                        <TextBlock Text="طريقة التحصيل *"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,6"/>
+
+                        <ComboBox x:Name="PaymentMethodComboBox"
+                                  Height="38"
+                                  FontSize="14"
+                                  SelectedIndex="0"
+                                  Margin="0,0,0,15">
+
+                            <ComboBoxItem Content="نقدي"
+                                          Tag="Cash"/>
+
+                            <ComboBoxItem Content="بطاقة"
+                                          Tag="Card"/>
+
+                            <ComboBoxItem Content="تحويل بنكي"
+                                          Tag="Transfer"/>
+
+                        </ComboBox>
+
+                        <TextBlock Text="رقم مرجع الدفع"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,6"/>
+
+                        <TextBox x:Name="ReferenceNumberTextBox"
+                                 Height="36"
+                                 Padding="8"
+                                 Margin="0,0,0,15"/>
+
+                        <TextBlock Text="ملاحظات"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,6"/>
+
+                        <TextBox x:Name="NotesTextBox"
+                                 Height="75"
+                                 Padding="8"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Margin="0,0,0,18"/>
+
+                        <Button x:Name="CollectPaymentButton"
+                                Content="تأكيد التحصيل"
+                                Height="45"
+                                Background="#16865D"
+                                Foreground="White"
+                                FontSize="15"
+                                FontWeight="Bold"
+                                BorderThickness="0"
+                                Click="CollectPaymentButton_Click"/>
+
+                        <TextBlock Text="سيتم تسجيل التحصيل في دفتر حساب العميل مع الاحتفاظ بسجل المراجعة."
+                                   TextWrapping="Wrap"
+                                   Foreground="#64736F"
+                                   FontSize="11"
+                                   Margin="0,12,0,0"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- إغلاق -->
+        <Button Grid.Row="3"
+                Content="إغلاق"
+                Width="110"
+                Height="38"
+                HorizontalAlignment="Left"
+                Margin="0,12,0,0"
+                Click="CloseButton_Click"/>
+
+    </Grid>
+</Window>

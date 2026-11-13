@@ -1,0 +1,327 @@
+﻿<Window x:Class="Ocore.desktop.Views.SalesReturnsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - مرتجعات البيع"
+        Height="750"
+        Width="1350"
+        MinHeight="620"
+        MinWidth="1050"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="#F3F5F8">
+
+    <Grid Margin="18">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- العنوان -->
+        <Border Grid.Row="0"
+                Background="White"
+                CornerRadius="10"
+                Padding="18"
+                Margin="0,0,0,12">
+
+            <StackPanel>
+                <TextBlock Text="مرتجعات البيع"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="#1E293B"/>
+
+                <TextBlock Text="ابحث عن الصنف بالاسم أو الكود، واختر وحدة وكمية المرتجع لكل صنف"
+                           FontSize="13"
+                           Foreground="#64748B"
+                           Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- البحث -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="10"
+                Padding="15"
+                Margin="0,0,0,12">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+
+                    <TextBlock Text="اسم الصنف أو كود الصنف"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,7"/>
+
+                    <TextBox x:Name="SearchTextBox"
+                             Height="40"
+                             FontSize="15"
+                             Padding="10"
+                             VerticalContentAlignment="Center"
+                             ToolTip="اكتب اسم الصنف أو كوده"
+                             TextChanged="SearchTextBox_TextChanged"/>
+
+                    <TextBlock Text="ستظهر عمليات البيع المتاحة للمرتجع لكل صنف"
+                               FontSize="11"
+                               Foreground="#64748B"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="بحث"
+                        Width="100"
+                        Height="40"
+                        Margin="12,25,0,0"
+                        Click="SearchButton_Click"
+                        Background="#2563EB"
+                        Foreground="White"
+                        BorderThickness="0"
+                        FontWeight="Bold"/>
+            </Grid>
+        </Border>
+
+        <!-- نتائج البحث -->
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="10"
+                Padding="15"
+                Margin="0,0,0,12">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Text="نتائج البحث وعمليات البيع المتاحة للمرتجع"
+                           FontSize="17"
+                           FontWeight="Bold"
+                           Foreground="#1E293B"
+                           Margin="0,0,0,12"/>
+
+                <DataGrid x:Name="ItemsDataGrid"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          IsReadOnly="False"
+                          SelectionMode="Extended"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeight="42"
+                          FontSize="12"
+                          Background="White"
+                          BorderBrush="#E2E8F0"
+                          AlternatingRowBackground="#F8FAFC"
+                          CanUserSortColumns="True"
+                          CellEditEnding="ItemsDataGrid_CellEditEnding">
+
+                    <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="كود الصنف"
+                                            Binding="{Binding ProductCode}"
+                                            Width="*"
+                                            IsReadOnly="True"/>
+
+                        <DataGridTextColumn Header="اسم الصنف"
+                                            Binding="{Binding ItemName}"
+                                            Width="2*"
+                                            IsReadOnly="True"/>
+
+                        <DataGridTextColumn Header="الفاتورة الأصلية"
+                                            Binding="{Binding InvoiceNumber}"
+                                            Width="*"
+                                            IsReadOnly="True"/>
+
+                        <DataGridTextColumn Header="تاريخ البيع"
+                                            Binding="{Binding InvoiceDate}"
+                                            Width="1.3*"
+                                            IsReadOnly="True"/>
+
+                        <DataGridTextColumn Header="الموظف"
+                                            Binding="{Binding EmployeeName}"
+                                            Width="1.2*"
+                                            IsReadOnly="True"/>
+
+                        <!-- وحدة البيع الأصلية -->
+                        <DataGridTextColumn Header="وحدة البيع"
+                                            Binding="{Binding UnitName}"
+                                            Width="0.9*"
+                                            IsReadOnly="True"/>
+
+                        <DataGridTextColumn Header="المباع"
+                                            Binding="{Binding SoldQuantity, StringFormat=N2}"
+                                            Width="0.8*"
+                                            IsReadOnly="True"/>
+
+                        <DataGridTextColumn Header="مرتجع سابقًا"
+                                            Binding="{Binding ReturnedQuantity, StringFormat=N2}"
+                                            Width="0.9*"
+                                            IsReadOnly="True"/>
+
+                        <DataGridTextColumn Header="المتاح"
+                                            Binding="{Binding RemainingQuantity, StringFormat=N2}"
+                                            Width="0.9*"
+                                            IsReadOnly="True"/>
+
+                        <!-- اختيار وحدة المرتجع -->
+                        <DataGridTemplateColumn Header="وحدة المرتجع"
+                                                Width="1.1*"
+                                                IsReadOnly="False">
+
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding ReturnUnitName}"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <ComboBox ItemsSource="{Binding ReturnUnits}"
+                                              SelectedItem="{Binding ReturnUnitName,
+                                                  Mode=TwoWay,
+                                                  UpdateSourceTrigger=PropertyChanged}"
+                                              SelectionChanged="ReturnUnitComboBox_SelectionChanged"
+                                              VerticalContentAlignment="Center"
+                                              Padding="4"
+                                              MinWidth="85"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+
+                        </DataGridTemplateColumn>
+
+                        <!-- كمية الوحدة المختارة -->
+                        <DataGridTemplateColumn Header="كمية المرتجع"
+                                                Width="1.1*"
+                                                IsReadOnly="False">
+
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding ReturnUnitQuantity, StringFormat=N2}"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding ReturnUnitQuantity,
+                                                Mode=TwoWay,
+                                                UpdateSourceTrigger=PropertyChanged,
+                                                ValidatesOnExceptions=True}"
+                                             VerticalContentAlignment="Center"
+                                             HorizontalContentAlignment="Center"
+                                             Padding="4"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+
+                        </DataGridTemplateColumn>
+
+                        <!-- سعر الوحدة -->
+                        <DataGridTextColumn Header="سعر الوحدة"
+                                            Binding="{Binding ReturnUnitPrice, StringFormat=N2}"
+                                            Width="0.9*"
+                                            IsReadOnly="True"/>
+
+                        <!-- إجمالي السطر -->
+                        <DataGridTextColumn Header="الإجمالي"
+                                            Binding="{Binding Total, StringFormat=N2}"
+                                            Width="0.9*"
+                                            IsReadOnly="True"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock x:Name="ItemsStatusText"
+                           Grid.Row="2"
+                           Text="ابحث باسم الصنف أو كوده لعرض عمليات البيع المتاحة للمرتجع."
+                           Foreground="#64748B"
+                           Margin="0,12,0,0"
+                           FontSize="12"/>
+            </Grid>
+        </Border>
+
+        <!-- بيانات المرتجع والحفظ -->
+        <Border Grid.Row="3"
+                Background="White"
+                CornerRadius="10"
+                Padding="15">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+
+                    <TextBlock Text="سبب المرتجع"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,7"/>
+
+                    <TextBox x:Name="ReasonTextBox"
+                             Height="38"
+                             FontSize="13"
+                             Padding="8"
+                             VerticalContentAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Margin="15,0">
+
+                    <TextBlock Text="إجمالي المرتجع"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,7"/>
+
+                    <TextBlock x:Name="ReturnTotalText"
+                               Text="0.00"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="#DC2626"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Bottom">
+
+                    <Button x:Name="SaveReturnButton"
+                            Content="حفظ المرتجع"
+                            Width="125"
+                            Height="40"
+                            Margin="5,0"
+                            Background="#16A34A"
+                            Foreground="White"
+                            FontWeight="Bold"
+                            BorderThickness="0"
+                            Click="SaveReturnButton_Click"/>
+
+                    <Button Content="إغلاق"
+                            Width="85"
+                            Height="40"
+                            Margin="5,0"
+                            Background="#64748B"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Click="CloseButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- توافق مع الكود القديم -->
+        <ComboBox x:Name="InvoicesComboBox"
+                  Visibility="Collapsed"
+                  SelectionChanged="InvoicesComboBox_SelectionChanged"/>
+
+    </Grid>
+</Window>

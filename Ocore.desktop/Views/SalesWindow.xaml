@@ -1,0 +1,651 @@
+﻿<Window x:Class="Ocore.desktop.Views.SalesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - شاشة المبيعات"
+        Height="760"
+        Width="1250"
+        MinHeight="650"
+        MinWidth="1050"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        WindowState="Normal"
+        FlowDirection="RightToLeft"
+        Background="#F3F6F8">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="#123D35"
+                CornerRadius="8"
+                Padding="10"
+                Margin="0,0,0,8">
+            <DockPanel>
+                <TextBlock Text="💊  شاشة المبيعات"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+
+                <TextBlock Text="O CORE"
+                           DockPanel.Dock="Left"
+                           FontSize="14"
+                           Foreground="#B8D8CE"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Search -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="8"
+                Padding="9"
+                Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="115"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="SearchTextBox"
+                         Grid.Column="0"
+                         Height="34"
+                         FontSize="14"
+                         Padding="8"
+                         VerticalContentAlignment="Center"
+                         ToolTip="ابحث باسم الدواء أو الكود أو الباركود"/>
+
+                <Button Grid.Column="1"
+                        Content="بحث عن صنف"
+                        Margin="7,0,0,0"
+                        Background="#246B58"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        BorderThickness="0"/>
+            </Grid>
+        </Border>
+
+        <!-- Selected Product -->
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="8"
+                Padding="9"
+                Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="1.3*"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1.2*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="4">
+                    <TextBlock Text="الصنف المختار"
+                               Foreground="#64736F"
+                               FontWeight="Bold"
+                               Margin="0,0,0,4"/>
+
+                    <TextBlock x:Name="SelectedProductNameText"
+                               Text="لم يتم اختيار صنف"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="4">
+                    <TextBlock Text="وحدة البيع"
+                               Foreground="#64736F"
+                               FontWeight="Bold"
+                               Margin="0,0,0,4"/>
+
+                    <ComboBox x:Name="SaleUnitComboBox"
+                              Height="30"
+                              FontSize="13"
+                              SelectedIndex="0">
+                        <ComboBoxItem Content="العبوة" Tag="Package"/>
+                        <ComboBoxItem Content="الوحدة الصغيرة" Tag="SmallUnit"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Margin="4">
+                    <TextBlock Text="الكمية"
+                               Foreground="#64736F"
+                               FontWeight="Bold"
+                               Margin="0,0,0,4"/>
+
+                    <TextBox x:Name="SaleQuantityTextBox"
+                             Text="1"
+                             Height="30"
+                             FontSize="14"
+                             Padding="6"
+                             VerticalContentAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Margin="4">
+                    <TextBlock Text="سعر الوحدة"
+                               Foreground="#64736F"
+                               FontWeight="Bold"
+                               Margin="0,0,0,4"/>
+
+                    <TextBlock x:Name="SelectedUnitPriceText"
+                               Text="0.00"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#16865D"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Products and Invoice -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.4*"/>
+                <ColumnDefinition Width="4.6*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Available Products -->
+            <Border Grid.Column="0"
+                    Background="White"
+                    CornerRadius="8"
+                    Padding="8"
+                    Margin="0,0,4,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="الأدوية والأصناف المتاحة"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,7"/>
+
+                    <DataGrid x:Name="ItemsDataGrid"
+                              Grid.Row="1"
+                              FlowDirection="LeftToRight"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              SelectionMode="Single"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              FontSize="12"
+                              RowHeight="34"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Drug Name (English)"
+                                                Binding="{Binding Name}"
+                                                Width="*"/>
+
+                            <DataGridTextColumn Header="Price"
+                                                Binding="{Binding DisplayPrice}"
+                                                Width="85"/>
+
+                            <DataGridTextColumn Header="Stock"
+                                                Binding="{Binding Quantity, StringFormat={}{0:N3}}"
+                                                Width="85"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <!-- Current Invoice -->
+            <Border Grid.Column="1"
+                    Background="White"
+                    CornerRadius="8"
+                    Padding="8"
+                    Margin="4,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Invoice Title -->
+                    <TextBlock Grid.Row="0"
+                               Text="الفاتورة الحالية"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,7"/>
+
+                    <!-- Invoice Items -->
+                    <DataGrid x:Name="InvoiceDataGrid"
+                              Grid.Row="1"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="False"
+                              CanUserAddRows="False"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              FontSize="11"
+                              RowHeight="27"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+
+                        <DataGrid.Columns>
+
+                            <DataGridTextColumn Header="الصنف"
+                                                Binding="{Binding ItemName}"
+                                                IsReadOnly="True"
+                                                Width="*"/>
+
+                            <DataGridTemplateColumn Header="الوحدة"
+                                                    Width="85">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding UnitName}"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding UnitOptions}"
+                                                  SelectedItem="{Binding UnitName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="11"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="الكمية"
+                                                Binding="{Binding Quantity, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat={}{0:N3}}"
+                                                IsReadOnly="False"
+                                                Width="65"/>
+
+                            <DataGridTextColumn Header="السعر"
+                                                Binding="{Binding UnitPrice, StringFormat={}{0:N2}}"
+                                                IsReadOnly="True"
+                                                Width="65"/>
+
+                            <DataGridTextColumn Header="الحد %"
+                                                Binding="{Binding MaxDiscountPercentage, StringFormat={}{0:N2}}"
+                                                IsReadOnly="True"
+                                                Width="65"/>
+
+                            <DataGridTextColumn Header="خصم %"
+                                                Binding="{Binding DiscountPercentage, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat={}{0:N2}}"
+                                                IsReadOnly="False"
+                                                Width="65"/>
+
+                            <DataGridTextColumn Header="قيمة الخصم"
+                                                Binding="{Binding DiscountAmount, StringFormat={}{0:N2}}"
+                                                IsReadOnly="True"
+                                                Width="75"/>
+
+                            <DataGridTextColumn Header="الإجمالي"
+                                                Binding="{Binding Total, StringFormat={}{0:N2}}"
+                                                IsReadOnly="True"
+                                                Width="75"/>
+
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Hidden Batch Controls: retained for code-behind compatibility -->
+                    <Border Grid.Row="2"
+                            Visibility="Collapsed">
+                        <Grid>
+                            <TextBlock x:Name="BatchAllocationStatusText"
+                                       Text="اختر صنفًا من الفاتورة"/>
+
+                            <TextBlock x:Name="BatchRequiredText"
+                                       Text="0"/>
+
+                            <TextBlock x:Name="BatchAllocatedText"
+                                       Text="0"/>
+
+                            <TextBlock x:Name="BatchRemainingText"
+                                       Text="0"/>
+
+                            <Button x:Name="BatchSelectionButton"
+                                    Content="اختيار التشغيلات"
+                                    Click="BatchSelectionButton_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Invoice Summary: same position -->
+                    <Border Grid.Row="3"
+                            Background="#F4F8F6"
+                            CornerRadius="6"
+                            Padding="8"
+                            Margin="0,6,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="إجمالي الأصناف"
+                                           Foreground="#64736F"
+                                           FontSize="12"/>
+
+                                <TextBlock x:Name="GrandTotalText"
+                                           Text="0.00"
+                                           FontSize="19"
+                                           FontWeight="Bold"
+                                           Foreground="#183F36"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="إجمالي الخصومات"
+                                           Foreground="#64736F"
+                                           FontSize="12"/>
+
+                                <TextBlock x:Name="DiscountAmountText"
+                                           Text="0.00"
+                                           FontSize="19"
+                                           FontWeight="Bold"
+                                           Foreground="#C07824"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="صافي الفاتورة"
+                                           Foreground="#64736F"
+                                           FontSize="12"/>
+
+                                <TextBlock x:Name="NetTotalText"
+                                           Text="0.00"
+                                           FontSize="21"
+                                           FontWeight="Bold"
+                                           Foreground="#16865D"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Customer and Payment Accounting -->
+        <Border Grid.Row="4"
+                Background="White"
+                CornerRadius="8"
+                Padding="9"
+                Margin="0,8,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.5*"/>
+                    <ColumnDefinition Width="1.2*"/>
+                    <ColumnDefinition Width="1.8*"/>
+                    <ColumnDefinition Width="1.1*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Customer -->
+                <StackPanel Grid.Column="0"
+                            Margin="5">
+                    <TextBlock Text="العميل"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,5"/>
+
+                    <ComboBox x:Name="CustomerComboBox"
+                              Height="32"
+                              FontSize="13"
+                              IsEditable="True"
+                              IsTextSearchEnabled="True"
+                              StaysOpenOnEdit="True"
+                              ToolTip="اختر العميل أو اتركه فارغًا للبيع النقدي"/>
+
+                    <TextBlock Text="اتركه فارغًا عند البيع النقدي دون حساب عميل"
+                               FontSize="10"
+                               Foreground="#7A8581"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <!-- General Discount -->
+                <StackPanel Grid.Column="1"
+                            Margin="5">
+                    <TextBlock Text="الخصم العام على الفاتورة"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,5"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="75"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="DiscountValueTextBox"
+                                 Grid.Column="0"
+                                 Height="32"
+                                 Text="0"
+                                 FontSize="13"
+                                 Padding="6"
+                                 VerticalContentAlignment="Center"/>
+
+                        <ComboBox x:Name="DiscountTypeComboBox"
+                                  Grid.Column="1"
+                                  Height="32"
+                                  Margin="4,0,0,0"
+                                  SelectedIndex="0">
+                            <ComboBoxItem Content="مبلغ" Tag="Amount"/>
+                            <ComboBoxItem Content="نسبة %" Tag="Percentage"/>
+                        </ComboBox>
+                    </Grid>
+
+                    <TextBlock Text="يوزع على الأصناف دون تجاوز حد أي صنف"
+                               FontSize="10"
+                               Foreground="#7A8581"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <!-- Payment -->
+                <StackPanel Grid.Column="2"
+                            Margin="5">
+
+                    <TextBlock Text="طريقة الدفع"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,5"/>
+
+                    <ComboBox x:Name="PaymentMethodComboBox"
+                              Height="32"
+                              FontSize="13"
+                              SelectedIndex="0">
+
+                        <ComboBoxItem Content="نقدي فقط"
+                                       Tag="Cash"/>
+
+                        <ComboBoxItem Content="فيزا فقط"
+                                       Tag="Card"/>
+
+                        <ComboBoxItem Content="إنستا باي فقط"
+                                       Tag="InstaPay"/>
+
+                        <ComboBoxItem Content="نقدي + فيزا"
+                                       Tag="CashCard"/>
+
+                        <ComboBoxItem Content="نقدي + إنستا باي"
+                                       Tag="CashInstaPay"/>
+
+                        <ComboBoxItem Content="فيزا + إنستا باي"
+                                       Tag="CardInstaPay"/>
+
+                        <ComboBoxItem Content="نقدي + فيزا + إنستا باي"
+                                       Tag="CashCardInstaPay"/>
+
+                    </ComboBox>
+
+                    <!-- Cash Amount -->
+                    <StackPanel x:Name="CashAmountPanel"
+                                Margin="0,5,0,0"
+                                Visibility="Collapsed">
+
+                        <TextBlock Text="مبلغ النقدي"
+                                   FontSize="11"
+                                   Foreground="#64736F"
+                                   Margin="0,0,0,2"/>
+
+                        <TextBox x:Name="CashAmountTextBox"
+                                 Height="29"
+                                 Text="0"
+                                 FontSize="12"
+                                 Padding="5"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="المبلغ المدفوع نقدًا"/>
+                    </StackPanel>
+
+                    <!-- Card Amount -->
+                    <StackPanel x:Name="CardAmountPanel"
+                                Margin="0,5,0,0"
+                                Visibility="Collapsed">
+
+                        <TextBlock Text="مبلغ الفيزا"
+                                   FontSize="11"
+                                   Foreground="#64736F"
+                                   Margin="0,0,0,2"/>
+
+                        <TextBox x:Name="CardAmountTextBox"
+                                 Height="29"
+                                 Text="0"
+                                 FontSize="12"
+                                 Padding="5"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="المبلغ المدفوع بالفيزا"/>
+                    </StackPanel>
+
+                    <!-- Card Transaction Reference -->
+                    <StackPanel x:Name="CardReferencePanel"
+                                Margin="0,5,0,0"
+                                Visibility="Collapsed">
+
+                        <TextBlock Text="رقم عملية الفيزا من إيصال الماكينة"
+                                   FontSize="11"
+                                   Foreground="#64736F"
+                                   Margin="0,0,0,2"/>
+
+                        <TextBox x:Name="CardReferenceTextBox"
+                                 Height="29"
+                                 FontSize="12"
+                                 Padding="5"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="رقم العملية الموجود على إيصال ماكينة الفيزا"
+                                 Text=""/>
+                    </StackPanel>
+
+                    <!-- InstaPay Amount -->
+                    <StackPanel x:Name="InstaPayAmountPanel"
+                                Margin="0,5,0,0"
+                                Visibility="Collapsed">
+
+                        <TextBlock Text="مبلغ إنستا باي"
+                                   FontSize="11"
+                                   Foreground="#64736F"
+                                   Margin="0,0,0,2"/>
+
+                        <TextBox x:Name="InstaPayAmountTextBox"
+                                 Height="29"
+                                 Text="0"
+                                 FontSize="12"
+                                 Padding="5"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="المبلغ المدفوع عن طريق إنستا باي"/>
+                    </StackPanel>
+
+                    <!-- Existing controls retained for compatibility -->
+                    <TextBox x:Name="PaidAmountTextBox"
+                             Text="0"
+                             Visibility="Collapsed"/>
+
+                    <TextBox x:Name="PaymentReferenceTextBox"
+                             Text=""
+                             Visibility="Collapsed"/>
+
+                </StackPanel>
+
+                <!-- Remaining -->
+                <StackPanel Grid.Column="3"
+                            Margin="5">
+                    <TextBlock Text="المتبقي على العميل"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,5"/>
+
+                    <TextBlock x:Name="RemainingAmountText"
+                               Text="0.00"
+                               FontSize="23"
+                               FontWeight="Bold"
+                               Foreground="#C07824"
+                               VerticalAlignment="Center"/>
+
+                    <TextBlock Text="يجب اختيار عميل عند وجود متبقي"
+                               FontSize="10"
+                               Foreground="#7A8581"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Action Buttons -->
+        <Border Grid.Row="5"
+                Background="White"
+                CornerRadius="8"
+                Padding="7"
+                Margin="0,8,0,0">
+            <WrapPanel HorizontalAlignment="Center">
+
+                <Button x:Name="AddToInvoiceButton"
+                        Content="إضافة للفاتورة"
+                        Width="125"
+                        Height="36"
+                        Margin="3"
+                        Background="#246B58"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        IsEnabled="False"/>
+
+                <Button x:Name="RemoveInvoiceItemButton"
+                        Content="حذف صنف"
+                        Width="100"
+                        Height="36"
+                        Margin="3"
+                        Background="#E67E22"
+                        Foreground="White"/>
+
+                <Button x:Name="SaveInvoiceButton"
+                        Content="حفظ الفاتورة"
+                        Width="145"
+                        Height="36"
+                        Margin="3"
+                        Background="#16865D"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button x:Name="NewInvoiceButton"
+                        Content="فاتورة جديدة"
+                        Width="105"
+                        Height="36"
+                        Margin="3"/>
+
+                <Button x:Name="CloseWindowButton"
+                        Content="إغلاق"
+                        Width="85"
+                        Height="36"
+                        Margin="3"
+                        Background="#A83232"
+                        Foreground="White"/>
+
+            </WrapPanel>
+        </Border>
+    </Grid>
+</Window>

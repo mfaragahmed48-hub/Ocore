@@ -1,0 +1,272 @@
+﻿<Window x:Class="Ocore.desktop.Views.ProductsManagementWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - إدارة الأصناف والمخزون"
+        Height="650"
+        Width="1250"
+        MinHeight="520"
+        MinWidth="950"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        WindowState="Normal"
+        FlowDirection="RightToLeft"
+        Background="#F3F6F8">
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="#123D35"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,0,0,10">
+            <DockPanel>
+                <TextBlock Text="📦  إدارة الأصناف والمخزون"
+                           FontSize="21"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+
+                <TextBlock Text="O CORE"
+                           DockPanel.Dock="Left"
+                           FontSize="14"
+                           Foreground="#B8D8CE"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="8"
+                Padding="10"
+                Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="180"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="SearchTextBox"
+                         Height="36"
+                         FontSize="14"
+                         Padding="8"
+                         VerticalContentAlignment="Center"
+                         ToolTip="ابحث بكود الصنف أو الاسم أو الباركود"/>
+
+                <ComboBox x:Name="ArchiveFilterComboBox"
+                          Grid.Column="1"
+                          Height="36"
+                          Margin="8,0,0,0"
+                          FontSize="13"
+                          VerticalContentAlignment="Center"
+                          SelectedIndex="0">
+                    <ComboBoxItem Content="الأصناف النشطة"/>
+                    <ComboBoxItem Content="الأصناف المؤرشفة"/>
+                    <ComboBoxItem Content="كل الأصناف"/>
+                </ComboBox>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="8"
+                Padding="10"
+                Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="قائمة الأصناف"
+                           FontSize="17"
+                           FontWeight="Bold"
+                           Foreground="#183F36"
+                           Margin="0,0,0,8"/>
+
+                <DataGrid x:Name="ProductsDataGrid"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeight="34"
+                          FontSize="12"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+
+                    <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="كود الصنف"
+                                            Binding="{Binding ProductCode}"
+                                            Width="90"/>
+
+                        <DataGridTextColumn Header="اسم الصنف"
+                                            Binding="{Binding Name}"
+                                            Width="*"
+                                            MinWidth="150"/>
+
+                        <DataGridTextColumn Header="العبوة"
+                                            Binding="{Binding UnitName}"
+                                            Width="70"/>
+
+                        <DataGridTextColumn Header="الوحدة الصغيرة"
+                                            Binding="{Binding SmallUnitName}"
+                                            Width="95"/>
+
+                        <DataGridTextColumn Header="عدد الوحدات بالعبوة"
+                                            Binding="{Binding UnitsPerPackage}"
+                                            Width="110"/>
+
+                        <DataGridTextColumn Header="سعر البيع"
+                                            Binding="{Binding SalePrice, StringFormat=N2}"
+                                            Width="90"/>
+
+                        <DataGridTextColumn Header="سعر الشراء"
+                                            Binding="{Binding PurchasePrice, StringFormat=N2}"
+                                            Width="90"/>
+
+                        <DataGridTextColumn Header="إجمالي المخزون"
+                                            Binding="{Binding TotalQuantity, StringFormat=N3}"
+                                            Width="105"/>
+
+                        <DataGridTextColumn Header="الصالح للبيع"
+                                            Binding="{Binding Quantity, StringFormat=N3}"
+                                            Width="100"/>
+
+                        <DataGridTextColumn Header="المنتهي"
+                                            Binding="{Binding ExpiredQuantity, StringFormat=N3}"
+                                            Width="90"/>
+
+                        <DataGridTextColumn Header="الباركود"
+                                            Binding="{Binding Barcode}"
+                                            Width="110"/>
+
+                        <DataGridTemplateColumn Header="مصدر الصنف"
+                                                Width="115">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontWeight="Bold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="{x:Type TextBlock}">
+                                                <Setter Property="Text"
+                                                        Value="مرتبط بالدليل"/>
+                                                <Setter Property="Foreground"
+                                                        Value="#16865D"/>
+
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DrugCatalogId}"
+                                                                 Value="{x:Null}">
+                                                        <Setter Property="Text"
+                                                                Value="صنف يدوي"/>
+                                                        <Setter Property="Foreground"
+                                                                Value="#D97706"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="معرّف الدليل"
+                                            Binding="{Binding DrugCatalogId, TargetNullValue='—'}"
+                                            Width="90"/>
+
+                        <DataGridCheckBoxColumn Header="مؤرشف"
+                                                Binding="{Binding IsArchived}"
+                                                Width="65"/>
+
+                        <DataGridTextColumn Header="حد الخصم %"
+                                            Binding="{Binding MaxDiscountPercentage, StringFormat=N2}"
+                                            Width="95"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3"
+                Background="White"
+                CornerRadius="8"
+                Padding="8">
+            <WrapPanel HorizontalAlignment="Center">
+
+                <Button x:Name="AddProductButton"
+                        Content="➕ إضافة صنف"
+                        Width="115"
+                        Height="38"
+                        Margin="3"
+                        Background="#16865D"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button x:Name="EditProductButton"
+                        Content="✏️ تعديل صنف"
+                        Width="115"
+                        Height="38"
+                        Margin="3"
+                        Background="#246B58"
+                        Foreground="White"/>
+
+                <Button x:Name="ManageStockButton"
+                        Content="📦 إدارة الرصيد"
+                        Width="125"
+                        Height="38"
+                        Margin="3"
+                        Background="#2874A6"
+                        Foreground="White"/>
+
+                <Button x:Name="SetDiscountLimitButton"
+                        Content="٪ تحديد حد الخصم"
+                        Width="135"
+                        Height="38"
+                        Margin="3"
+                        Background="#7652A5"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button x:Name="ArchiveProductButton"
+                        Content="🗄️ أرشفة الصنف"
+                        Width="120"
+                        Height="38"
+                        Margin="3"
+                        Background="#E67E22"
+                        Foreground="White"/>
+
+                <Button x:Name="DeleteProductButton"
+                        Content="🗑️ حذف نهائي"
+                        Width="110"
+                        Height="38"
+                        Margin="3"
+                        Background="#A83232"
+                        Foreground="White"/>
+
+                <Button x:Name="RefreshButton"
+                        Content="🔄 تحديث"
+                        Width="90"
+                        Height="38"
+                        Margin="3"/>
+
+                <Button x:Name="CloseButton"
+                        Content="إغلاق"
+                        Width="80"
+                        Height="38"
+                        Margin="3"
+                        Background="#A83232"
+                        Foreground="White"/>
+
+            </WrapPanel>
+        </Border>
+    </Grid>
+</Window>

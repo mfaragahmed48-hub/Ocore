@@ -1,0 +1,299 @@
+﻿<Window x:Class="Ocore.desktop.Views.AddCatalogDrugWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - تسجيل دواء في المخزون"
+        Height="680"
+        Width="750"
+        MinHeight="600"
+        MinWidth="650"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="#F4F6F9">
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- العنوان -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,18">
+            <TextBlock Text="تسجيل دواء جديد في المخزون"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="#1E293B"/>
+
+            <TextBlock Text="راجع بيانات الدواء وحدد التصنيف ووحدات البيع"
+                       FontSize="13"
+                       Foreground="#64748B"
+                       Margin="0,6,0,0"/>
+        </StackPanel>
+
+        <!-- البيانات -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="10"
+                Padding="20">
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <TextBlock Text="بيانات الدواء من الدليل"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#2563EB"
+                               Margin="0,0,0,12"/>
+
+                    <TextBlock Text="اسم الدواء"
+                               FontWeight="SemiBold"/>
+
+                    <TextBox x:Name="DrugNameTextBox"
+                             IsReadOnly="True"
+                             Height="38"
+                             Padding="8"
+                             Margin="0,5,0,12"
+                             Background="#F1F5F9"/>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,7,0">
+                            <TextBlock Text="الاسم العلمي"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="GenericNameTextBox"
+                                     IsReadOnly="True"
+                                     Height="36"
+                                     Padding="8"
+                                     Margin="0,5,0,0"
+                                     Background="#F1F5F9"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                            <TextBlock Text="التركيز"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="StrengthTextBox"
+                                     IsReadOnly="True"
+                                     Height="36"
+                                     Padding="8"
+                                     Margin="0,5,0,0"
+                                     Background="#F1F5F9"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,7,0">
+                            <TextBlock Text="الشكل الدوائي"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="DosageFormTextBox"
+                                     IsReadOnly="True"
+                                     Height="36"
+                                     Padding="8"
+                                     Margin="0,5,0,0"
+                                     Background="#F1F5F9"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                            <TextBlock Text="الشركة المصنعة"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="ManufacturerTextBox"
+                                     IsReadOnly="True"
+                                     Height="36"
+                                     Padding="8"
+                                     Margin="0,5,0,0"
+                                     Background="#F1F5F9"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator Margin="0,5,0,15"/>
+
+                    <TextBlock Text="بيانات الصنف داخل المخزون"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#2563EB"
+                               Margin="0,0,0,12"/>
+
+                    <TextBlock Text="تصنيف الصنف *"
+                               FontWeight="SemiBold"/>
+
+                    <ComboBox x:Name="CategoryComboBox"
+                              Height="40"
+                              FontSize="14"
+                              Padding="7"
+                              Margin="0,5,0,14"
+                              DisplayMemberPath="Value"
+                              SelectedValuePath="Key"
+                              ToolTip="اختر تصنيف الدواء"/>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,7,0">
+                            <TextBlock Text="كود الصنف *"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="ProductCodeTextBox"
+                                     Height="38"
+                                     Padding="8"
+                                     Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                            <TextBlock Text="الوحدة الكبيرة *"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="UnitNameTextBox"
+                                     Text="علبة"
+                                     Height="38"
+                                     Padding="8"
+                                     Margin="0,5,0,0"
+                                     ToolTip="مثال: علبة، زجاجة، عبوة"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,7,0">
+                            <TextBlock Text="أقل وحدة يمكن بيعها *"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="SmallUnitNameTextBox"
+                                     Text=""
+                                     Height="38"
+                                     Padding="8"
+                                     Margin="0,5,0,0"
+                                     ToolTip="مثال: شريط، أمبول، قرص"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                            <TextBlock Text="عدد الوحدات الصغيرة داخل الوحدة الكبيرة *"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"/>
+
+                            <TextBox x:Name="UnitsPerPackageTextBox"
+                                     Text="1"
+                                     Height="38"
+                                     Padding="8"
+                                     Margin="0,5,0,0"
+                                     ToolTip="مثال: العلبة تحتوي على 3 شرائط"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Background="#EFF6FF"
+                            CornerRadius="7"
+                            Padding="12"
+                            Margin="0,0,0,12">
+
+                        <StackPanel>
+                            <TextBlock Text="مثال على وحدات البيع"
+                                       FontWeight="Bold"
+                                       Foreground="#1D4ED8"/>
+
+                            <TextBlock Text="الوحدة الكبيرة: علبة"
+                                       Margin="0,5,0,0"/>
+
+                            <TextBlock Text="أقل وحدة للبيع: شريط"/>
+
+                            <TextBlock Text="عدد الشرائط داخل العلبة: 3"
+                                       Margin="0,0,0,5"/>
+
+                            <TextBlock Text="يمكن بيع علبة كاملة أو شريط واحد، حسب الوحدات التي تحددها للصنف."
+                                       TextWrapping="Wrap"
+                                       Foreground="#475569"
+                                       FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,7,0">
+                            <TextBlock Text="سعر البيع"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="SalePriceTextBox"
+                                     Text="0"
+                                     Height="38"
+                                     Padding="8"
+                                     Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                            <TextBlock Text="سعر الشراء"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBox x:Name="PurchasePriceTextBox"
+                                     Text="0"
+                                     Height="38"
+                                     Padding="8"
+                                     Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="سيتم إنشاء الصنف برصيد صفر، وتُضاف الكمية عند تسجيل فاتورة الشراء."
+                               TextWrapping="Wrap"
+                               Foreground="#64748B"
+                               FontSize="12"
+                               Margin="0,10,0,0"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- الأزرار -->
+        <Grid Grid.Row="2" Margin="0,15,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="130"/>
+                <ColumnDefinition Width="110"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="* الحقول المطلوبة"
+                       VerticalAlignment="Center"
+                       Foreground="#64748B"/>
+
+            <Button x:Name="SaveProductButton"
+                    Grid.Column="1"
+                    Content="حفظ الصنف"
+                    Height="43"
+                    Margin="5,0"
+                    Background="#16A34A"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    BorderThickness="0"
+                    Click="SaveButton_Click"/>
+
+            <Button Grid.Column="2"
+                    Content="إلغاء"
+                    Height="43"
+                    Margin="5,0"
+                    Background="#64748B"
+                    Foreground="White"
+                    BorderThickness="0"
+                    Click="CancelButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>

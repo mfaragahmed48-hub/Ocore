@@ -1,0 +1,299 @@
+﻿<Window x:Class="Ocore.desktop.Views.ManageStockWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - إدارة دفعات الصنف"
+        Height="760"
+        Width="1100"
+        MinHeight="680"
+        MinWidth="950"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Background="#F3F6FA">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- عنوان الشاشة -->
+        <Border Grid.Row="0"
+                Background="#17365D"
+                CornerRadius="10"
+                Padding="18"
+                Margin="0,0,0,15">
+            <StackPanel>
+                <TextBlock Text="إدارة دفعات الصنف"
+                           FontSize="23"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+
+                <TextBlock x:Name="ProductNameTextBlock"
+                           Text="اسم الصنف"
+                           FontSize="15"
+                           Foreground="#DCE6F1"
+                           Margin="0,7,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- إضافة دفعة جديدة -->
+        <Border Grid.Row="1"
+                Background="White"
+                BorderBrush="#DCE3EC"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="15"
+                Margin="0,0,0,15">
+
+            <StackPanel>
+                <TextBlock Text="إضافة دفعة جديدة"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="#17365D"
+                           Margin="0,0,0,15"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="15"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="15"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="15"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="رقم التشغيلة"/>
+                        <TextBox x:Name="BatchNumberTextBox"
+                                 Height="38"
+                                 Margin="0,6,0,0"
+                                 Padding="8"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="تاريخ الصلاحية"/>
+                        <DatePicker x:Name="ExpiryDatePicker"
+                                    Height="38"
+                                    Margin="0,6,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="سعر الشراء"/>
+                        <TextBox x:Name="PurchasePriceTextBox"
+                                 Height="38"
+                                 Margin="0,6,0,0"
+                                 Padding="8"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="6">
+                        <TextBlock Text="الكمية (بالعبوة)"/>
+                        <TextBox x:Name="QuantityTextBox"
+                                 Height="38"
+                                 Margin="0,6,0,0"
+                                 Padding="8"/>
+                    </StackPanel>
+                </Grid>
+
+                <Button x:Name="SaveBatchButton"
+                        Content="➕ إضافة الدفعة"
+                        Width="160"
+                        Height="42"
+                        HorizontalAlignment="Left"
+                        Margin="0,18,0,0"
+                        Background="#198754"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Click="SaveBatchButton_Click"/>
+            </StackPanel>
+        </Border>
+
+        <!-- جدول الدفعات والملخص -->
+        <Border Grid.Row="2"
+                Background="White"
+                BorderBrush="#DCE3EC"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="12">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- العنوان والفلتر -->
+                <Grid Grid.Row="0"
+                      Margin="0,0,0,12">
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="220"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="الدفعات المسجلة"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#17365D"
+                               VerticalAlignment="Center"/>
+
+                    <ComboBox x:Name="BatchFilterComboBox"
+                              Grid.Column="1"
+                              Height="36"
+                              FontSize="13"
+                              SelectedIndex="0"
+                              SelectionChanged="BatchFilterComboBox_SelectionChanged">
+
+                        <ComboBoxItem Content="الدفعات المتبقية فقط"/>
+                        <ComboBoxItem Content="كل الدفعات"/>
+                    </ComboBox>
+                </Grid>
+
+                <!-- ملخص الرصيد -->
+                <Border Grid.Row="1"
+                        Background="#EDF3F8"
+                        CornerRadius="7"
+                        Padding="12"
+                        Margin="0,0,0,12">
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="إجمالي الرصيد المتبقي"
+                                       Foreground="#526477"
+                                       FontSize="13"/>
+
+                            <TextBlock x:Name="TotalQuantityTextBlock"
+                                       Text="0.0000"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#17365D"
+                                       Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="عدد الدفعات"
+                                       Foreground="#526477"
+                                       FontSize="13"/>
+
+                            <TextBlock x:Name="BatchCountTextBlock"
+                                       Text="0"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#17365D"
+                                       Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="دفعات منتهية الصلاحية"
+                                       Foreground="#526477"
+                                       FontSize="13"/>
+
+                            <TextBlock x:Name="ExpiredBatchCountTextBlock"
+                                       Text="0"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#DC3545"
+                                       Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- جدول الدفعات -->
+                <DataGrid x:Name="BatchesDataGrid"
+                          Grid.Row="2"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          SelectionMode="Single"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeight="40"
+                          FontSize="14">
+
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+
+                            <Style.Triggers>
+
+                                <DataTrigger Binding="{Binding IsExpired}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#F8D7DA"/>
+                                    <Setter Property="Foreground"
+                                            Value="#842029"/>
+                                </DataTrigger>
+
+                                <DataTrigger Binding="{Binding IsNearExpiry}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#FFF3CD"/>
+                                    <Setter Property="Foreground"
+                                            Value="#664D03"/>
+                                </DataTrigger>
+
+                                <DataTrigger Binding="{Binding IsDepleted}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#E9ECEF"/>
+                                    <Setter Property="Foreground"
+                                            Value="#6C757D"/>
+                                </DataTrigger>
+
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+
+                    <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="رقم التشغيلة"
+                                            Binding="{Binding BatchNumber}"
+                                            Width="*"/>
+
+                        <DataGridTextColumn Header="تاريخ الصلاحية"
+                                            Binding="{Binding ExpiryDate, StringFormat=dd/MM/yyyy}"
+                                            Width="*"/>
+
+                        <DataGridTextColumn Header="سعر الشراء"
+                                            Binding="{Binding PurchasePrice, StringFormat=N2}"
+                                            Width="*"/>
+
+                        <DataGridTextColumn Header="الكمية المتبقية"
+                                            Binding="{Binding Quantity, StringFormat=N4}"
+                                            Width="*"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- أزرار أسفل الشاشة -->
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Left"
+                    Margin="0,15,0,0">
+
+            <Button x:Name="RefreshButton"
+                    Content="🔄 تحديث"
+                    Width="120"
+                    Height="42"
+                    Margin="0,0,10,0"
+                    Click="RefreshButton_Click"/>
+
+            <Button x:Name="CloseButton"
+                    Content="إغلاق"
+                    Width="120"
+                    Height="42"
+                    Click="CloseButton_Click"/>
+        </StackPanel>
+
+    </Grid>
+</Window>

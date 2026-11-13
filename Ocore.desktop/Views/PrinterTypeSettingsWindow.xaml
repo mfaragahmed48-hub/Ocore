@@ -1,0 +1,294 @@
+﻿<Window x:Class="Ocore.desktop.Views.PrinterTypeSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="إعدادات الطابعة"
+        Width="650"
+        Height="720"
+        MinWidth="540"
+        MinHeight="550"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="#F3F5F8">
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,18">
+            <TextBlock x:Name="PageTitle"
+                       Text="إعدادات الطابعة"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="#243247"/>
+
+            <TextBlock Text="اختر الطابعة واضبط الإعدادات الخاصة بهذا النوع"
+                       FontSize="13"
+                       Foreground="#718096"
+                       Margin="0,7,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <Border Background="White"
+                        BorderBrush="#DCE3EC"
+                        BorderThickness="1"
+                        CornerRadius="7"
+                        Padding="16"
+                        Margin="0,0,0,12">
+
+                    <StackPanel>
+                        <TextBlock Text="اختيار الطابعة"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="#243247"
+                                   Margin="0,0,0,14"/>
+
+                        <TextBlock Text="طابعة Windows"
+                                   Foreground="#536176"
+                                   Margin="0,0,0,6"/>
+
+                        <ComboBox x:Name="PrinterComboBox"
+                                  Height="36"
+                                  FontSize="13"
+                                  Padding="6"/>
+
+                        <TextBlock Text="طريقة الطباعة"
+                                   Foreground="#536176"
+                                   Margin="0,14,0,6"/>
+
+                        <ComboBox x:Name="PrintModeComboBox"
+                                  Height="36"
+                                  FontSize="13"
+                                  Padding="6"/>
+
+                        <TextBlock Text="مقياس الخط"
+                                   Foreground="#536176"
+                                   Margin="0,14,0,6"/>
+
+                        <TextBox x:Name="FontScaleTextBox"
+                                 Height="34"
+                                 Padding="8"
+                                 Text="1.0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Cashier settings -->
+                <Border x:Name="CashierPanel"
+                        Background="White"
+                        BorderBrush="#DCE3EC"
+                        BorderThickness="1"
+                        CornerRadius="7"
+                        Padding="16"
+                        Margin="0,0,0,12">
+
+                    <StackPanel>
+                        <TextBlock Text="إعدادات طابعة الكاشير"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="#243247"
+                                   Margin="0,0,0,14"/>
+
+                        <TextBlock Text="عرض الورق بالملليمتر (0 = تلقائي)"
+                                   Foreground="#536176"
+                                   Margin="0,0,0,6"/>
+
+                        <TextBox x:Name="CashierPaperWidthTextBox"
+                                 Height="34"
+                                 Padding="8"
+                                 Text="0"/>
+
+                        <TextBlock Text="عرض الطباعة بالنقاط (0 = تلقائي)"
+                                   Foreground="#536176"
+                                   Margin="0,12,0,6"/>
+
+                        <TextBox x:Name="PrintWidthDotsTextBox"
+                                 Height="34"
+                                 Padding="8"
+                                 Text="0"/>
+
+                        <CheckBox x:Name="AutoCutCheckBox"
+                                  Content="قص الورق تلقائيًا"
+                                  Margin="0,16,0,0"/>
+
+                        <CheckBox x:Name="OpenCashDrawerCheckBox"
+                                  Content="فتح درج النقود بعد الطباعة"
+                                  Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Normal printer settings -->
+                <Border x:Name="NormalPanel"
+                        Background="White"
+                        BorderBrush="#DCE3EC"
+                        BorderThickness="1"
+                        CornerRadius="7"
+                        Padding="16"
+                        Margin="0,0,0,12">
+
+                    <StackPanel>
+                        <TextBlock Text="إعدادات الطابعة العادية"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="#243247"
+                                   Margin="0,0,0,14"/>
+
+                        <TextBlock Text="مقاس الورق"
+                                   Foreground="#536176"
+                                   Margin="0,0,0,6"/>
+
+                        <ComboBox x:Name="NormalPaperSizeComboBox"
+                                  Height="36"
+                                  Padding="6"/>
+
+                        <TextBlock Text="اتجاه الورق"
+                                   Foreground="#536176"
+                                   Margin="0,12,0,6"/>
+
+                        <ComboBox x:Name="OrientationComboBox"
+                                  Height="36"
+                                  Padding="6"/>
+
+                        <TextBlock Text="الهوامش بالملليمتر"
+                                   FontWeight="SemiBold"
+                                   Foreground="#536176"
+                                   Margin="0,18,0,10"/>
+
+                        <UniformGrid Columns="2">
+                            <StackPanel Margin="4">
+                                <TextBlock Text="يمين"/>
+                                <TextBox x:Name="MarginRightTextBox"
+                                         Height="32"
+                                         Padding="6"
+                                         Text="0"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="4">
+                                <TextBlock Text="يسار"/>
+                                <TextBox x:Name="MarginLeftTextBox"
+                                         Height="32"
+                                         Padding="6"
+                                         Text="0"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="4">
+                                <TextBlock Text="أعلى"/>
+                                <TextBox x:Name="MarginTopTextBox"
+                                         Height="32"
+                                         Padding="6"
+                                         Text="0"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="4">
+                                <TextBlock Text="أسفل"/>
+                                <TextBox x:Name="MarginBottomTextBox"
+                                         Height="32"
+                                         Padding="6"
+                                         Text="0"/>
+                            </StackPanel>
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Barcode Roll settings -->
+                <Border x:Name="BarcodePanel"
+                        Background="White"
+                        BorderBrush="#DCE3EC"
+                        BorderThickness="1"
+                        CornerRadius="7"
+                        Padding="16"
+                        Margin="0,0,0,12">
+
+                    <StackPanel>
+                        <TextBlock Text="إعدادات ملصقات الباركود Roll"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="#243247"
+                                   Margin="0,0,0,14"/>
+
+                        <UniformGrid Columns="2">
+                            <StackPanel Margin="4">
+                                <TextBlock Text="عرض الملصق (مم)"/>
+                                <TextBox x:Name="BarcodeWidthTextBox"
+                                         Height="34"
+                                         Padding="7"
+                                         Text="35"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="4">
+                                <TextBlock Text="ارتفاع الملصق (مم)"/>
+                                <TextBox x:Name="BarcodeHeightTextBox"
+                                         Height="34"
+                                         Padding="7"
+                                         Text="12"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="4">
+                                <TextBlock Text="المسافة بين الملصقات (مم)"/>
+                                <TextBox x:Name="BarcodeGapTextBox"
+                                         Height="34"
+                                         Padding="7"
+                                         Text="3"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="4">
+                                <TextBlock Text="الإزاحة الأفقية (مم)"/>
+                                <TextBox x:Name="BarcodeOffsetXTextBox"
+                                         Height="34"
+                                         Padding="7"
+                                         Text="2"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="4">
+                                <TextBlock Text="الإزاحة الرأسية (مم)"/>
+                                <TextBox x:Name="BarcodeOffsetYTextBox"
+                                         Height="34"
+                                         Padding="7"
+                                         Text="2"/>
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <CheckBox x:Name="BarcodeShowPriceCheckBox"
+                                  Content="إظهار السعر على الملصق"
+                                  Margin="4,14,4,0"/>
+
+                        <CheckBox x:Name="BarcodeShowProductCodeCheckBox"
+                                  Content="إظهار كود الصنف على الملصق"
+                                  Margin="4,10,4,0"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="100"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="1"
+                    Content="حفظ"
+                    Height="40"
+                    Background="#2674C8"
+                    Foreground="White"
+                    BorderThickness="0"
+                    FontWeight="SemiBold"
+                    Click="SaveButton_Click"/>
+
+            <Button Grid.Column="3"
+                    Content="إغلاق"
+                    Height="40"
+                    Background="#E5EAF0"
+                    Foreground="#35445A"
+                    BorderThickness="0"
+                    Click="CloseButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,530 @@
+﻿<Window x:Class="Ocore.desktop.Views.PrinterSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - إعدادات الطباعة"
+        Height="820"
+        Width="720"
+        MinHeight="700"
+        MinWidth="600"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="#F3F6F8">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="#123D35"
+                CornerRadius="10"
+                Padding="18"
+                Margin="0,0,0,15">
+
+            <StackPanel>
+                <TextBlock Text="إعدادات الطباعة"
+                           FontSize="23"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+
+                <TextBlock Text="إدارة الطابعات وإعدادات الطباعة لكل وظيفة داخل الصيدلية"
+                           FontSize="13"
+                           Foreground="#C5DED6"
+                           Margin="0,7,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Settings -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="10"
+                Padding="18">
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+
+                <StackPanel>
+
+                    <!-- Function -->
+                    <TextBlock Text="وظيفة الطباعة"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,8"/>
+
+                    <ComboBox x:Name="FunctionComboBox"
+                              Height="42"
+                              FontSize="14"
+                              Padding="8"
+                              Margin="0,0,0,18">
+
+                        <ComboBoxItem Content="فواتير البيع - طابعة الكاشير"
+                                      Tag="CashierSales"/>
+
+                        <ComboBoxItem Content="مرتجعات البيع - طابعة الكاشير"
+                                      Tag="CashierReturns"/>
+
+                        <ComboBoxItem Content="طباعة الباركود"
+                                      Tag="Barcode"/>
+
+                        <ComboBoxItem Content="فواتير الشراء"
+                                      Tag="PurchaseInvoices"/>
+
+                        <ComboBoxItem Content="التقارير"
+                                      Tag="Reports"/>
+
+                        <ComboBoxItem Content="المستندات"
+                                      Tag="Documents"/>
+
+                    </ComboBox>
+
+                    <Border Height="1"
+                            Background="#E4EBE7"
+                            Margin="0,0,0,18"/>
+
+                    <!-- Common Printer -->
+                    <TextBlock x:Name="PrinterSectionTitle"
+                               Text="الطابعة"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,8"/>
+
+                    <ComboBox x:Name="PrinterComboBox"
+                              Height="40"
+                              FontSize="14"
+                              Padding="8"
+                              Margin="0,0,0,8"/>
+
+                    <Button x:Name="RefreshPrintersButton"
+                            Content="تحديث قائمة الطابعات"
+                            Height="34"
+                            Width="155"
+                            HorizontalAlignment="Left"
+                            Background="#EAF2EE"
+                            Foreground="#183F36"
+                            BorderThickness="0"
+                            Margin="0,0,0,18"/>
+
+                    <!-- Cashier Settings -->
+                    <StackPanel x:Name="CashierSettingsPanel"
+                                Visibility="Collapsed">
+
+                        <Border Background="#F3F7F5"
+                                CornerRadius="8"
+                                Padding="14"
+                                Margin="0,0,0,15">
+
+                            <StackPanel>
+                                <TextBlock Text="إعدادات الإيصال الحراري"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="#183F36"
+                                           Margin="0,0,0,14"/>
+
+                                <TextBlock Text="طريقة الطباعة"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <ComboBox x:Name="PrintModeComboBox"
+                                          Height="38"
+                                          Padding="7"
+                                          Margin="0,0,0,15">
+
+                                    <ComboBoxItem Content="Windows Driver"
+                                                  Tag="WindowsDriver"/>
+
+                                    <ComboBoxItem Content="ESC/POS RAW"
+                                                  Tag="EscPos"/>
+                                </ComboBox>
+
+                                <TextBlock Text="عرض رول الورق"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <ComboBox x:Name="PaperSizeComboBox"
+                                          Height="38"
+                                          Padding="7"
+                                          Margin="0,0,0,15">
+
+                                    <ComboBoxItem Content="58 مم"
+                                                  Tag="58"/>
+
+                                    <ComboBoxItem Content="80 مم"
+                                                  Tag="80"/>
+                                </ComboBox>
+
+                                <TextBlock Text="عرض الطباعة الفعلي"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <ComboBox x:Name="PrintWidthModeComboBox"
+                                          Height="38"
+                                          Padding="7"
+                                          Margin="0,0,0,10">
+
+                                    <ComboBoxItem Content="تلقائي حسب عرض الرول"
+                                                  Tag="Auto"/>
+
+                                    <ComboBoxItem Content="تحديد يدوي بالنقاط"
+                                                  Tag="Manual"/>
+                                </ComboBox>
+
+                                <TextBlock Text="عدد النقاط الفعلي (Dots)"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <TextBox x:Name="PrintWidthDotsTextBox"
+                                         Height="38"
+                                         Padding="8"
+                                         IsEnabled="False"
+                                         MaxLength="4"
+                                         Margin="0,0,0,15"/>
+
+                                <TextBlock Text="حجم خط الفاتورة"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <ComboBox x:Name="FontScaleComboBox"
+                                          Height="38"
+                                          Padding="7"
+                                          Margin="0,0,0,15">
+
+                                    <ComboBoxItem Content="صغير جداً"
+                                                  Tag="0.7"/>
+
+                                    <ComboBoxItem Content="صغير"
+                                                  Tag="0.8"/>
+
+                                    <ComboBoxItem Content="متوسط"
+                                                  Tag="1.0"/>
+
+                                    <ComboBoxItem Content="كبير"
+                                                  Tag="1.15"/>
+
+                                    <ComboBoxItem Content="كبير جداً"
+                                                  Tag="1.3"/>
+
+                                    <ComboBoxItem Content="مخصص - 1.5"
+                                                  Tag="1.5"/>
+                                </ComboBox>
+
+                                <CheckBox x:Name="AutoCutCheckBox"
+                                          Content="القص التلقائي للورق بعد الطباعة"
+                                          Margin="0,0,0,12"/>
+
+                                <CheckBox x:Name="OpenCashDrawerCheckBox"
+                                          Content="فتح درج النقود بعد الطباعة"/>
+
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Barcode Settings -->
+                    <StackPanel x:Name="BarcodeSettingsPanel"
+                                Visibility="Collapsed">
+
+                        <Border Background="#F3F7F5"
+                                CornerRadius="8"
+                                Padding="14"
+                                Margin="0,0,0,15">
+
+                            <StackPanel>
+                                <TextBlock Text="إعدادات الباركود"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="#183F36"
+                                           Margin="0,0,0,14"/>
+
+                                <TextBlock Text="نوع طباعة الباركود"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <ComboBox x:Name="BarcodePrintTypeComboBox"
+                                          Height="38"
+                                          Padding="7"
+                                          Margin="0,0,0,15">
+
+                                    <ComboBoxItem Content="ورق A4"
+                                                  Tag="A4"/>
+
+                                    <ComboBoxItem Content="رول ملصقات"
+                                                  Tag="Roll"/>
+                                </ComboBox>
+
+                                <CheckBox x:Name="BarcodeShowPriceCheckBox"
+                                          Content="إظهار سعر الصنف"
+                                          Margin="0,0,0,12"/>
+
+                                <CheckBox x:Name="BarcodeShowProductCodeCheckBox"
+                                          Content="إظهار كود الصنف"
+                                          Margin="0,0,0,18"/>
+
+                                <Border Height="1"
+                                        Background="#DCE6E0"
+                                        Margin="0,0,0,15"/>
+
+                                <!-- A4 -->
+                                <StackPanel x:Name="BarcodeA4Panel">
+
+                                    <TextBlock Text="إعدادات ملصقات A4"
+                                               FontWeight="Bold"
+                                               FontSize="14"
+                                               Foreground="#183F36"
+                                               Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="طابعة A4"
+                                               Margin="0,0,0,6"/>
+
+                                    <ComboBox x:Name="BarcodeA4PrinterComboBox"
+                                              Height="38"
+                                              Padding="7"
+                                              Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="عرض الملصق (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeA4LabelWidthTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="ارتفاع الملصق (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeA4LabelHeightTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="الهامش (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeA4MarginTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="المسافة بين الملصقات (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeA4GapTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,15"/>
+
+                                </StackPanel>
+
+                                <!-- Roll -->
+                                <StackPanel x:Name="BarcodeRollPanel"
+                                            Visibility="Collapsed">
+
+                                    <TextBlock Text="إعدادات رول الملصقات"
+                                               FontWeight="Bold"
+                                               FontSize="14"
+                                               Foreground="#183F36"
+                                               Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="طابعة الرول"
+                                               Margin="0,0,0,6"/>
+
+                                    <ComboBox x:Name="BarcodeRollPrinterComboBox"
+                                              Height="38"
+                                              Padding="7"
+                                              Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="عرض الملصق (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeRollLabelWidthTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="ارتفاع الملصق (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeRollLabelHeightTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="المسافة بين الملصقات (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeRollGapTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="الإزاحة الأفقية (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeRollOffsetXTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="الإزاحة الرأسية (مم)"
+                                               Margin="0,0,0,6"/>
+
+                                    <TextBox x:Name="BarcodeRollOffsetYTextBox"
+                                             Height="36"
+                                             Padding="7"
+                                             Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="اتجاه الطباعة"
+                                               Margin="0,0,0,6"/>
+
+                                    <ComboBox x:Name="BarcodeRollOrientationComboBox"
+                                              Height="38"
+                                              Padding="7"
+                                              Margin="0,0,0,12">
+
+                                        <ComboBoxItem Content="رأسي"
+                                                      Tag="Portrait"/>
+
+                                        <ComboBoxItem Content="أفقي"
+                                                      Tag="Landscape"/>
+                                    </ComboBox>
+
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Normal Printer Settings -->
+                    <StackPanel x:Name="NormalSettingsPanel"
+                                Visibility="Collapsed">
+
+                        <Border Background="#F3F7F5"
+                                CornerRadius="8"
+                                Padding="14"
+                                Margin="0,0,0,15">
+
+                            <StackPanel>
+                                <TextBlock Text="إعدادات الطباعة العادية"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="#183F36"
+                                           Margin="0,0,0,14"/>
+
+                                <TextBlock Text="مقاس الورق"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <ComboBox x:Name="NormalPaperSizeComboBox"
+                                          Height="38"
+                                          Padding="7"
+                                          Margin="0,0,0,15">
+
+                                    <ComboBoxItem Content="A4"
+                                                  Tag="A4"/>
+
+                                    <ComboBoxItem Content="A5"
+                                                  Tag="A5"/>
+
+                                    <ComboBoxItem Content="Letter"
+                                                  Tag="Letter"/>
+                                </ComboBox>
+
+                                <TextBlock Text="اتجاه الورق"
+                                           FontWeight="Bold"
+                                           Margin="0,0,0,7"/>
+
+                                <ComboBox x:Name="NormalOrientationComboBox"
+                                          Height="38"
+                                          Padding="7"
+                                          Margin="0,0,0,15">
+
+                                    <ComboBoxItem Content="رأسي"
+                                                  Tag="Portrait"/>
+
+                                    <ComboBoxItem Content="أفقي"
+                                                  Tag="Landscape"/>
+                                </ComboBox>
+
+                                <TextBlock Text="الهامش الأيسر (مم)"
+                                           Margin="0,0,0,6"/>
+
+                                <TextBox x:Name="MarginLeftTextBox"
+                                         Height="36"
+                                         Padding="7"
+                                         Margin="0,0,0,12"/>
+
+                                <TextBlock Text="الهامش الأيمن (مم)"
+                                           Margin="0,0,0,6"/>
+
+                                <TextBox x:Name="MarginRightTextBox"
+                                         Height="36"
+                                         Padding="7"
+                                         Margin="0,0,0,12"/>
+
+                                <TextBlock Text="الهامش العلوي (مم)"
+                                           Margin="0,0,0,6"/>
+
+                                <TextBox x:Name="MarginTopTextBox"
+                                         Height="36"
+                                         Padding="7"
+                                         Margin="0,0,0,12"/>
+
+                                <TextBlock Text="الهامش السفلي (مم)"
+                                           Margin="0,0,0,6"/>
+
+                                <TextBox x:Name="MarginBottomTextBox"
+                                         Height="36"
+                                         Padding="7"
+                                         Margin="0,0,0,12"/>
+
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Printer Status -->
+                    <Border Background="#FFF8E8"
+                            CornerRadius="7"
+                            Padding="12"
+                            Margin="0,0,0,5">
+
+                        <TextBlock x:Name="PrinterStatusTextBlock"
+                                   Text="يتم التحقق من الطابعة على هذا الجهاز عند تنفيذ الطباعة."
+                                   FontSize="12"
+                                   Foreground="#80612B"
+                                   TextWrapping="Wrap"/>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Left"
+                    Margin="0,15,0,0">
+
+            <Button x:Name="SaveButton"
+                    Content="حفظ الإعدادات"
+                    Width="145"
+                    Height="42"
+                    Margin="5"
+                    Background="#16865D"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    BorderThickness="0"/>
+
+            <Button x:Name="CancelButton"
+                    Content="إغلاق"
+                    Width="100"
+                    Height="42"
+                    Margin="5"
+                    Background="#64736F"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    BorderThickness="0"/>
+
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,155 @@
+﻿<Window x:Class="Ocore.desktop.Views.DrugCatalogSearchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - البحث في دليل الأدوية"
+        Height="650"
+        Width="1100"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="#F4F6F9">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- العنوان -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="دليل الأدوية"
+                       FontSize="25"
+                       FontWeight="Bold"
+                       Foreground="#1E293B"/>
+
+            <TextBlock Text="ابحث عن الدواء واختره لإضافته إلى المخزون"
+                       FontSize="13"
+                       Foreground="#64748B"
+                       Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- البحث -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,0,0,12">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="110"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="SearchTextBox"
+                         Height="40"
+                         FontSize="15"
+                         Padding="10"
+                         VerticalContentAlignment="Center"
+                         TextChanged="SearchTextBox_TextChanged"
+                         ToolTip="الاسم التجاري أو العلمي أو الشركة"/>
+
+                <Button Grid.Column="1"
+                        Content="بحث"
+                        Margin="10,0,0,0"
+                        Height="40"
+                        Background="#2563EB"
+                        Foreground="White"
+                        FontSize="14"
+                        FontWeight="Bold"
+                        BorderThickness="0"
+                        Click="SearchButton_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- جدول النتائج -->
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="8"
+                Padding="8">
+
+            <DataGrid x:Name="DrugsDataGrid"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal"
+                      RowHeight="42"
+                      FontSize="13"
+                      MouseDoubleClick="DrugsDataGrid_MouseDoubleClick">
+
+                <DataGrid.Columns>
+
+                    <DataGridTextColumn Header="الاسم التجاري"
+                                        Binding="{Binding TradeNameArabic}"
+                                        Width="2*"/>
+
+                    <DataGridTextColumn Header="الاسم الإنجليزي"
+                                        Binding="{Binding TradeName}"
+                                        Width="2*"/>
+
+                    <DataGridTextColumn Header="الاسم العلمي"
+                                        Binding="{Binding GenericName}"
+                                        Width="2*"/>
+
+                    <DataGridTextColumn Header="التركيز"
+                                        Binding="{Binding Strength}"
+                                        Width="*"/>
+
+                    <DataGridTextColumn Header="الشكل"
+                                        Binding="{Binding DosageForm}"
+                                        Width="*"/>
+
+                    <DataGridTextColumn Header="الشركة المصنعة"
+                                        Binding="{Binding Manufacturer}"
+                                        Width="2*"/>
+
+                    <DataGridTextColumn Header="السعر المرجعي"
+                                        Binding="{Binding ReferencePrice, StringFormat=N2}"
+                                        Width="*"/>
+
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- الأزرار -->
+        <Grid Grid.Row="3" Margin="0,15,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="130"/>
+                <ColumnDefinition Width="110"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="ResultsCountTextBlock"
+                       Text="عدد النتائج: 0"
+                       VerticalAlignment="Center"
+                       Foreground="#64748B"
+                       FontSize="13"/>
+
+            <Button Grid.Column="1"
+                    Content="اختيار الدواء"
+                    Height="42"
+                    Margin="5,0"
+                    Background="#16A34A"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    BorderThickness="0"
+                    Click="SelectDrugButton_Click"/>
+
+            <Button Grid.Column="2"
+                    Content="إغلاق"
+                    Height="42"
+                    Margin="5,0"
+                    Background="#64748B"
+                    Foreground="White"
+                    BorderThickness="0"
+                    Click="CloseButton_Click"/>
+
+        </Grid>
+    </Grid>
+</Window>

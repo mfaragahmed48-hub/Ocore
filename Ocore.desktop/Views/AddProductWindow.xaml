@@ -1,0 +1,534 @@
+﻿<Window x:Class="Ocore.desktop.Views.AddProductWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - إضافة صنف جديد"
+        Height="820"
+        Width="900"
+        MinHeight="680"
+        MinWidth="750"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="#F3F6F8">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- العنوان -->
+        <Border Grid.Row="0"
+                Background="#123D35"
+                CornerRadius="8"
+                Padding="18"
+                Margin="0,0,0,15">
+
+            <TextBlock x:Name="WindowHeaderTextBlock"
+                       Text="➕  إضافة صنف جديد"
+                       FontSize="23"
+                       FontWeight="Bold"
+                       Foreground="White"/>
+        </Border>
+
+        <!-- المحتوى -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="8"
+                Padding="22">
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+
+                <StackPanel>
+
+                    <!-- دليل الأدوية -->
+                    <StackPanel x:Name="CatalogPanel">
+
+                        <TextBlock Text="🔎 البحث في دليل الأدوية"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock Text="ابحث بالاسم التجاري الإنجليزي أو المادة الفعالة أو الشركة المصنعة."
+                                   FontSize="12"
+                                   Foreground="#666666"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBox x:Name="CatalogSearchTextBox"
+                                 Height="40"
+                                 Padding="10"
+                                 FontSize="14"
+                                 ToolTip="اكتب اسم الدواء أو المادة الفعالة أو الشركة"/>
+
+                        <DataGrid x:Name="CatalogDrugsDataGrid"
+                                  Height="190"
+                                  Margin="0,10,0,8"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  RowHeight="30"
+                                  FontSize="11">
+
+                            <DataGrid.Columns>
+
+                                <DataGridTextColumn Header="Drug Name"
+                                                    Binding="{Binding Name}"
+                                                    Width="180"/>
+
+                                <DataGridTextColumn Header="Generic Name"
+                                                    Binding="{Binding GenericName}"
+                                                    Width="150"/>
+
+                                <DataGridTextColumn Header="Strength"
+                                                    Binding="{Binding Strength}"
+                                                    Width="85"/>
+
+                                <DataGridTextColumn Header="Form"
+                                                    Binding="{Binding DosageForm}"
+                                                    Width="90"/>
+
+                                <DataGridTextColumn Header="Manufacturer"
+                                                    Binding="{Binding Manufacturer}"
+                                                    Width="150"/>
+
+                                <DataGridTextColumn Header="كود المخزون"
+                                                    Binding="{Binding ProductCode}"
+                                                    Width="90"/>
+
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <Button x:Name="UseCatalogDrugButton"
+                                Content="✔ استخدام الدواء المحدد"
+                                Height="38"
+                                HorizontalAlignment="Stretch"
+                                Background="#2874A6"
+                                Foreground="White"
+                                FontWeight="Bold"/>
+
+                        <TextBlock x:Name="CatalogSelectionStatusText"
+                                   Text="اختر دواءً من الدليل لملء اسم الصنف."
+                                   Foreground="#246B58"
+                                   TextWrapping="Wrap"
+                                   Margin="3,8,3,12"/>
+
+                        <Separator Margin="0,8,0,15"/>
+
+                    </StackPanel>
+
+                    <!-- البيانات الأساسية -->
+                    <TextBlock Text="البيانات الأساسية"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,15"/>
+
+                    <Grid>
+
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- كود الصنف -->
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="0"
+                                    Margin="5">
+
+                            <TextBlock Text="كود الصنف (تلقائي)"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBox x:Name="ProductCodeTextBox"
+                                     Height="38"
+                                     Padding="8"
+                                     FontSize="14"
+                                     IsReadOnly="True"
+                                     ToolTip="يتم إنشاء كود الصنف تلقائيًا عند الحفظ"/>
+                        </StackPanel>
+
+                        <!-- اسم الصنف -->
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="1"
+                                    Margin="5">
+
+                            <TextBlock Text="اسم الصنف *"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBox x:Name="ProductNameTextBox"
+                                     Height="38"
+                                     Padding="8"
+                                     FontSize="14"/>
+                        </StackPanel>
+
+                        <!-- الباركود -->
+                        <StackPanel Grid.Row="1"
+                                    Grid.Column="0"
+                                    Margin="5">
+
+                            <TextBlock Text="الباركود (تلقائي)"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBox x:Name="BarcodeTextBox"
+                                     Height="38"
+                                     Padding="8"
+                                     FontSize="14"
+                                     IsReadOnly="True"
+                                     ToolTip="يتم إنشاء الباركود تلقائيًا عند الحفظ"/>
+                        </StackPanel>
+
+                        <!-- العبوة الأساسية -->
+                        <StackPanel Grid.Row="1"
+                                    Grid.Column="1"
+                                    Margin="5">
+
+                            <TextBlock Text="العبوة الأساسية"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <ComboBox x:Name="UnitComboBox"
+                                      Height="38"
+                                      FontSize="14"
+                                      SelectedIndex="0"
+                                      VerticalContentAlignment="Center">
+
+                                <ComboBoxItem Content="علبة"/>
+                                <ComboBoxItem Content="زجاجة"/>
+                                <ComboBoxItem Content="كيس"/>
+                                <ComboBoxItem Content="أنبوبة"/>
+                                <ComboBoxItem Content="أمبول"/>
+                                <ComboBoxItem Content="قطعة"/>
+
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- الوحدة الصغيرة -->
+                        <StackPanel Grid.Row="2"
+                                    Grid.Column="0"
+                                    Margin="5">
+
+                            <TextBlock Text="اسم الوحدة الصغيرة"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <ComboBox x:Name="SmallUnitComboBox"
+                                      Height="38"
+                                      FontSize="14"
+                                      IsEditable="True"
+                                      Text="شريط"
+                                      VerticalContentAlignment="Center">
+
+                                <ComboBoxItem Content="شريط"/>
+                                <ComboBoxItem Content="قرص"/>
+                                <ComboBoxItem Content="كبسولة"/>
+                                <ComboBoxItem Content="قطعة"/>
+                                <ComboBoxItem Content="أمبول"/>
+
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- عدد الوحدات -->
+                        <StackPanel Grid.Row="2"
+                                    Grid.Column="1"
+                                    Margin="5">
+
+                            <TextBlock Text="عدد الوحدات داخل العبوة *"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBox x:Name="UnitsPerPackageTextBox"
+                                     Height="38"
+                                     Padding="8"
+                                     FontSize="14"
+                                     Text="1"/>
+                        </StackPanel>
+
+                        <!-- التصنيف -->
+                        <StackPanel Grid.Row="3"
+                                    Grid.Column="0"
+                                    Margin="5">
+
+                            <TextBlock Text="التصنيف"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <ComboBox x:Name="CategoryComboBox"
+                                      Height="38"
+                                      FontSize="14"
+                                      IsEditable="False"
+                                      VerticalContentAlignment="Center"/>
+
+                            <Button x:Name="ManageCategoriesButton"
+                                    Content="⚙ إدارة التصنيفات"
+                                    Height="30"
+                                    Margin="0,6,0,0"
+                                    Background="#E8F0ED"
+                                    Foreground="#183F36"
+                                    FontWeight="SemiBold"/>
+                        </StackPanel>
+
+                        <!-- سعر البيع -->
+                        <StackPanel Grid.Row="3"
+                                    Grid.Column="1"
+                                    Margin="5">
+
+                            <TextBlock Text="سعر البيع *"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBox x:Name="SalePriceTextBox"
+                                     Height="38"
+                                     Padding="8"
+                                     FontSize="14"/>
+                        </StackPanel>
+
+                        <!-- سعر الشراء -->
+                        <StackPanel Grid.Row="4"
+                                    Grid.Column="0"
+                                    Margin="5">
+
+                            <TextBlock Text="سعر الشراء *"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBox x:Name="PurchasePriceTextBox"
+                                     Height="38"
+                                     Padding="8"
+                                     FontSize="14"/>
+                        </StackPanel>
+
+                    </Grid>
+
+                    <!-- لوحة إدارة التصنيفات -->
+                    <Border x:Name="CategoryManagementPanel"
+                            Background="#F3F6F8"
+                            BorderBrush="#C8D8D1"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12"
+                            Margin="5,8,5,5"
+                            Visibility="Collapsed">
+
+                        <StackPanel>
+
+                            <TextBlock Text="إدارة التصنيفات"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="#183F36"
+                                       Margin="0,0,0,10"/>
+
+                            <TextBlock Text="اسم التصنيف"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,5"/>
+
+                            <TextBox x:Name="CategoryNameTextBox"
+                                     Height="36"
+                                     Padding="8"
+                                     FontSize="14"/>
+
+                            <WrapPanel Margin="0,8,0,10">
+
+                                <Button x:Name="AddCategoryButton"
+                                        Content="➕ إضافة"
+                                        Width="95"
+                                        Height="34"
+                                        Margin="3"
+                                        Background="#16865D"
+                                        Foreground="White"/>
+
+                                <Button x:Name="UpdateCategoryButton"
+                                        Content="✏ تعديل"
+                                        Width="95"
+                                        Height="34"
+                                        Margin="3"
+                                        Background="#2874A6"
+                                        Foreground="White"
+                                        IsEnabled="False"/>
+
+                                <Button x:Name="DeactivateCategoryButton"
+                                        Content="إيقاف التصنيف"
+                                        Width="120"
+                                        Height="34"
+                                        Margin="3"
+                                        Background="#A83232"
+                                        Foreground="White"
+                                        IsEnabled="False"/>
+
+                                <Button x:Name="CancelCategoryEditButton"
+                                        Content="مسح التحديد"
+                                        Width="110"
+                                        Height="34"
+                                        Margin="3"/>
+
+                            </WrapPanel>
+
+                            <DataGrid x:Name="CategoriesDataGrid"
+                                      Height="145"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      CanUserAddRows="False"
+                                      SelectionMode="Single"
+                                      SelectionUnit="FullRow"
+                                      HeadersVisibility="Column"
+                                      RowHeight="30">
+
+                                <DataGrid.Columns>
+
+                                    <DataGridTextColumn Header="اسم التصنيف"
+                                                        Binding="{Binding Value}"
+                                                        Width="*"/>
+
+                                    <DataGridTextColumn Header="رقم التصنيف"
+                                                        Binding="{Binding Key}"
+                                                        Width="100"/>
+
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <TextBlock Text="إيقاف التصنيف يمنع اختياره للأصناف الجديدة، ولا يحذف الأصناف المرتبطة به."
+                                       Foreground="#666666"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0"/>
+
+                        </StackPanel>
+                    </Border>
+
+                    <!-- مثال توضيحي -->
+                    <Border Background="#EDF6F2"
+                            CornerRadius="6"
+                            Padding="12"
+                            Margin="5,12,5,5">
+
+                        <TextBlock Text="مثال: إذا كانت العبوة علبة والوحدة الصغيرة شريط، وعدد الوحدات 3، فهذا يعني أن كل علبة تحتوي على 3 أشرطة."
+                                   TextWrapping="Wrap"
+                                   Foreground="#246B58"
+                                   FontSize="13"/>
+                    </Border>
+
+                    <!-- بيانات أول تشغيلة -->
+                    <StackPanel x:Name="InitialBatchPanel">
+
+                        <Separator Margin="0,20,0,15"/>
+
+                        <TextBlock Text="بيانات أول تشغيلة للمخزون"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"
+                                   Margin="0,0,0,12"/>
+
+                        <Grid>
+
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- الكمية الافتتاحية -->
+                            <StackPanel Grid.Row="0"
+                                        Grid.Column="0"
+                                        Margin="5">
+
+                                <TextBlock Text="الكمية الافتتاحية"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6"/>
+
+                                <TextBox x:Name="InitialQuantityTextBox"
+                                         Height="38"
+                                         Padding="8"
+                                         Text="0"/>
+                            </StackPanel>
+
+                            <!-- رقم التشغيلة -->
+                            <StackPanel Grid.Row="0"
+                                        Grid.Column="1"
+                                        Margin="5">
+
+                                <TextBlock Text="رقم التشغيلة"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6"/>
+
+                                <TextBox x:Name="BatchNumberTextBox"
+                                         Height="38"
+                                         Padding="8"/>
+                            </StackPanel>
+
+                            <!-- الصلاحية -->
+                            <StackPanel Grid.Row="1"
+                                        Grid.Column="0"
+                                        Margin="5">
+
+                                <TextBlock Text="تاريخ الصلاحية"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6"/>
+
+                                <DatePicker x:Name="ExpiryDatePicker"
+                                            Height="38"
+                                            SelectedDateFormat="Short"/>
+                            </StackPanel>
+
+                        </Grid>
+
+                        <TextBlock Text="* الحقول الإلزامية"
+                                   Foreground="#A83232"
+                                   Margin="5,15,5,0"/>
+
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- أزرار الحفظ والإلغاء -->
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,15,0,0">
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center">
+
+                <Button x:Name="SaveButton"
+                        Content="💾 حفظ الصنف"
+                        Width="155"
+                        Height="43"
+                        Margin="5"
+                        Background="#16865D"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button x:Name="CancelButton"
+                        Content="إلغاء"
+                        Width="120"
+                        Height="43"
+                        Margin="5"
+                        Background="#A83232"
+                        Foreground="White"/>
+
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</Window>

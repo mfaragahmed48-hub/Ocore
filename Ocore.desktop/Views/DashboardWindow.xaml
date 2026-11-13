@@ -1,0 +1,320 @@
+﻿<Window x:Class="Ocore.desktop.Views.DashboardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - لوحة التحكم"
+        Height="650"
+        Width="1050"
+        MinHeight="500"
+        MinWidth="800"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        WindowState="Normal"
+        FlowDirection="RightToLeft"
+        Background="#F3F6F8">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="#123D35">
+            <DockPanel LastChildFill="True">
+
+                <Button Content="🚪   تسجيل الخروج"
+                        DockPanel.Dock="Bottom"
+                        Margin="10,10,10,15"
+                        Padding="12"
+                        Background="#A83232"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        BorderThickness="0"
+                        Click="LogoutButton_Click"/>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+
+                        <Border Padding="18" Background="#0D302A">
+                            <StackPanel>
+                                <TextBlock Text="O CORE"
+                                           FontSize="26"
+                                           FontWeight="Bold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"/>
+
+                                <TextBlock Text="PHARMACY SYSTEM"
+                                           FontSize="11"
+                                           Foreground="#B8D8CE"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="القائمة الرئيسية"
+                                   Foreground="#A9C8BE"
+                                   Margin="15,20,15,10"
+                                   FontSize="13"/>
+
+                        <Button Content="🏠   لوحة التحكم"
+                                Margin="10,3"
+                                Padding="10"
+                                Background="#246B58"
+                                Foreground="White"
+                                BorderThickness="0"/>
+
+                        <Button x:Name="ManagerAccountButton"
+                                Content="👤   بيانات حسابي"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="ManagerAccountButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button Content="💊   المبيعات"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="SalesButton_Click"/>
+
+                        <Button x:Name="SalesInvoicesButton"
+                                Content="📋   سجل فواتير البيع"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="SalesInvoicesButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="SalesReturnsButton"
+                                Content="↩   مرتجعات البيع"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="SalesReturnsButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="SalesReturnsHistoryButton"
+                                Content="📋   سجل مرتجعات البيع"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="SalesReturnsHistoryButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="ProductsManagementButton"
+                                Content="📦   الأصناف والمخزون"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="ProductsManagementButton_Click"/>
+
+                        <Button x:Name="BarcodePrintingButton"
+                                Content="🏷   طباعة الباركود"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="BarcodePrintingButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="PurchasesButton"
+                                Content="🛒   المشتريات"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="PurchasesButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="PurchaseInvoicesButton"
+                                Content="📋   سجل فواتير الشراء"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="PurchaseInvoicesButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="SuppliersManagementButton"
+                                Content="🚚   الموردون"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="SuppliersManagementButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="CustomersManagementButton"
+                                Content="👥   العملاء"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="CustomersManagementButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="SalesReportsButton"
+                                Content="📊   تقارير المبيعات"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="SalesReportsButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="SettingsButton"
+                                Content="⚙️   إعدادات الصيدلية"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="SettingsButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="PrinterSettingsButton"
+                                Content="🖨   إعدادات الطباعة"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="PrinterSettingsButton_Click"/>
+
+                        <Button x:Name="UsersManagementButton"
+                                Content="👤   إدارة المستخدمين"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="UsersManagementButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="PermissionsManagementButton"
+                                Content="🔐   إدارة الصلاحيات"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="PermissionsManagementButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="AuditLogsButton"
+                                Content="📋   سجل النشاطات"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="AuditLogsButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <Button x:Name="BackupManagementButton"
+                                Content="💾   النسخ الاحتياطي والاستعادة"
+                                Margin="10,3"
+                                Padding="10"
+                                Visibility="Collapsed"
+                                Click="BackupManagementButton_Click"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="15">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="White"
+                    CornerRadius="10"
+                    Padding="15">
+
+                <DockPanel>
+                    <TextBlock Text="لوحة التحكم الرئيسية"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="#183F36"/>
+
+                    <StackPanel DockPanel.Dock="Left">
+                        <TextBlock Text="مرحباً بك"
+                                   Foreground="#60746F"/>
+
+                        <TextBlock x:Name="UserNameText"
+                                   Text="اسم المستخدم"
+                                   FontWeight="Bold"
+                                   Foreground="#183F36"/>
+
+                        <TextBlock x:Name="UserRoleText"
+                                   Text="الدور الوظيفي"
+                                   FontSize="12"
+                                   Foreground="#16865D"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <UniformGrid Grid.Row="1"
+                         Columns="4"
+                         Margin="0,12,0,12">
+
+                <Border Background="White"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="4">
+                    <StackPanel>
+                        <TextBlock Text="إجمالي المبيعات"
+                                   Foreground="#64736F"/>
+
+                        <TextBlock Text="0.00"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   Foreground="#16865D"
+                                   Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="White"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="4">
+                    <StackPanel>
+                        <TextBlock Text="عدد الأصناف"
+                                   Foreground="#64736F"/>
+
+                        <TextBlock Text="0"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="White"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="4">
+                    <StackPanel>
+                        <TextBlock Text="فواتير اليوم"
+                                   Foreground="#64736F"/>
+
+                        <TextBlock Text="0"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="White"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="4">
+                    <StackPanel>
+                        <TextBlock Text="نواقص المخزون"
+                                   Foreground="#64736F"/>
+
+                        <TextBlock Text="0"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+            </UniformGrid>
+
+            <Border Grid.Row="2"
+                    Background="White"
+                    CornerRadius="10"
+                    Padding="20">
+
+                <StackPanel>
+                    <TextBlock Text="مرحباً بك في نظام O CORE"
+                               FontSize="23"
+                               FontWeight="Bold"
+                               Foreground="#183F36"
+                               Margin="0,0,0,12"/>
+
+                    <TextBlock Text="نظام إدارة الصيدلية"
+                               FontSize="16"
+                               Foreground="#64736F"/>
+
+                    <TextBlock Text="هذه لوحة التحكم الرئيسية، وسيتم ربط وحدات المبيعات والمخزون والمشتريات والتقارير بها خلال مراحل التطوير."
+                               TextWrapping="Wrap"
+                               FontSize="14"
+                               Foreground="#64736F"
+                               Margin="0,12,0,0"/>
+                </StackPanel>
+
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
