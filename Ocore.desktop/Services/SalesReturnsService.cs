@@ -817,7 +817,7 @@ namespace Ocore.desktop.Services
         }
 
         // ==========================================
-        // حفظ مرتجع البيع
+        // حفظ مرتجع البيع - توافق مع الاستدعاءات القديمة
         // ==========================================
 
         public int SaveReturn(
@@ -825,6 +825,27 @@ namespace Ocore.desktop.Services
             int invoiceId,
             string reason,
             List<SalesReturnItem> items)
+        {
+            return SaveReturn(
+                userId,
+                invoiceId,
+                reason,
+                items,
+                0,
+                "");
+        }
+
+        // ==========================================
+        // حفظ مرتجع البيع مع مبلغ الرد الفعلي ووسيلته
+        // ==========================================
+
+        public int SaveReturn(
+            int userId,
+            int invoiceId,
+            string reason,
+            List<SalesReturnItem> items,
+            double refundAmount,
+            string refundPaymentMethod)
         {
             if (userId <= 0)
                 throw new Exception("رقم المستخدم غير صحيح.");
@@ -834,6 +855,21 @@ namespace Ocore.desktop.Services
 
             if (items == null || items.Count == 0)
                 throw new Exception("يجب اختيار صنف واحد على الأقل.");
+
+            if (double.IsNaN(refundAmount) ||
+                double.IsInfinity(refundAmount) ||
+                refundAmount < 0)
+            {
+                throw new Exception("مبلغ الرد الفعلي غير صحيح.");
+            }
+
+            refundAmount = Math.Round(
+                refundAmount,
+                2,
+                MidpointRounding.AwayFromZero);
+
+            refundPaymentMethod =
+                (refundPaymentMethod ?? "").Trim();
 
             using (var connection = new SQLiteConnection(connectionString))
             {
@@ -927,6 +963,30 @@ namespace Ocore.desktop.Services
                                 "إجمالي المرتجع غير صحيح.");
                         }
 
+                        // التحقق من أن مبلغ الرد لا يتجاوز إجمالي المرتجع.
+                        if (refundAmount > returnTotal + Epsilon)
+                        {
+                            throw new Exception(
+                                "مبلغ الرد الفعلي لا يمكن أن يكون أكبر من إجمالي المرتجع.");
+                        }
+
+                        // لا تُسجل وسيلة رد إذا لم يتم صرف أي مبلغ.
+                        if (refundAmount <= Epsilon)
+                        {
+                            refundAmount = 0;
+                            refundPaymentMethod = "";
+                        }
+                        else
+                        {
+                            if (refundPaymentMethod != "Cash" &&
+                                refundPaymentMethod != "Card" &&
+                                refundPaymentMethod != "InstaPay")
+                            {
+                                throw new Exception(
+                                    "اختر وسيلة رد صحيحة: نقدي أو فيزا أو إنستا باي.");
+                            }
+                        }
+
                         string returnNumber =
                             "RET-" +
                             DateTime.Now.ToString("yyyyMMddHHmmss") +
@@ -958,6 +1018,8 @@ namespace Ocore.desktop.Services
                                 UserId,
                                 ShiftId,
                                 Total,
+                                RefundAmount,
+                                RefundPaymentMethod,
                                 Reason,
                                 Status,
                                 CreatedAt
@@ -969,6 +1031,8 @@ namespace Ocore.desktop.Services
                                 @UserId,
                                 @ShiftId,
                                 @Total,
+                                @RefundAmount,
+                                @RefundPaymentMethod,
                                 @Reason,
                                 'Completed',
                                 @CreatedAt
@@ -991,6 +1055,13 @@ namespace Ocore.desktop.Services
 
                             command.Parameters.AddWithValue(
                                 "@Total", returnTotal);
+
+                            command.Parameters.AddWithValue(
+                                "@RefundAmount", refundAmount);
+
+                            command.Parameters.AddWithValue(
+                                "@RefundPaymentMethod",
+                                refundPaymentMethod);
 
                             command.Parameters.AddWithValue(
                                 "@Reason", (reason ?? "").Trim());
@@ -1090,7 +1161,7 @@ namespace Ocore.desktop.Services
                                 item.PackageQuantity);
                         }
 
-                        // تسجيل العملية في سجل المراجعة
+                        // تسجيل العملية ومبلغ الرد ووسيلته في سجل المراجعة.
                         using (var command = new SQLiteCommand(@"
                             INSERT INTO AuditLogs
                             (
@@ -1131,6 +1202,16 @@ namespace Ocore.desktop.Services
                             command.Parameters.AddWithValue(
                                 "@EntityId", returnId);
 
+                            string refundDetails =
+                                refundAmount > 0
+                                    ? "، المبلغ المصروف فعليًا " +
+                                      refundAmount.ToString(
+                                          "0.00",
+                                          CultureInfo.InvariantCulture) +
+                                      "، وسيلة الرد " +
+                                      refundPaymentMethod
+                                    : "، لم يتم صرف مبلغ للعميل";
+
                             command.Parameters.AddWithValue(
                                 "@Details",
                                 "إنشاء مرتجع رقم " + returnNumber +
@@ -1138,7 +1219,8 @@ namespace Ocore.desktop.Services
                                 " بإجمالي " +
                                 returnTotal.ToString(
                                     "0.00",
-                                    CultureInfo.InvariantCulture));
+                                    CultureInfo.InvariantCulture) +
+                                refundDetails);
 
                             command.Parameters.AddWithValue(
                                 "@DeviceName", Environment.MachineName);
