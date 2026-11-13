@@ -50,6 +50,15 @@ namespace Ocore.desktop.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
+            // سجل الشيفتات والإغلاقات - المدير فقط
+            ShiftHistoryButton.Visibility =
+                string.Equals(
+                    currentRole,
+                    "Manager",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
             UsersManagementButton.Visibility =
                 CanManageUsers()
                     ? Visibility.Visible
@@ -962,6 +971,44 @@ namespace Ocore.desktop.Views
                 MessageBox.Show(
                     "حدث خطأ أثناء فتح شاشة النسخ الاحتياطي والاستعادة:\n\n"
                     + ex.Message,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        // ==========================================
+        // سجل الشيفتات والإغلاقات
+        // ==========================================
+
+        private void ShiftHistoryButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (!string.Equals(
+                currentRole,
+                "Manager",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    "سجل الشيفتات والإغلاقات مخصص لمدير النظام فقط.",
+                    "صلاحيات المستخدم",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            try
+            {
+                var window = new ShiftHistoryWindow(currentRole);
+
+                OpenIndependentWindow(window);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "حدث خطأ أثناء فتح سجل الشيفتات:\n\n" + ex.Message,
                     "O CORE",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
