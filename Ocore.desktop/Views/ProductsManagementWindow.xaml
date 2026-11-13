@@ -191,6 +191,10 @@
                                             Binding="{Binding MaxDiscountPercentage, StringFormat=N2}"
                                             Width="95"/>
 
+                        <DataGridTextColumn Header="الحد الأدنى للمخزون"
+                                            Binding="{Binding MinimumStockLevel, StringFormat=N3}"
+                                            Width="125"/>
+
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
@@ -233,6 +237,15 @@
                         Height="38"
                         Margin="3"
                         Background="#7652A5"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button x:Name="SetMinimumStockButton"
+                        Content="📉 تحديد الحد الأدنى"
+                        Width="145"
+                        Height="38"
+                        Margin="3"
+                        Background="#B7791F"
                         Foreground="White"
                         FontWeight="Bold"/>
 
