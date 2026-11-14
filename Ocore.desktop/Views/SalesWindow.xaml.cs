@@ -2503,19 +2503,39 @@ namespace Ocore.desktop.Views
 
                 bool? result = window.ShowDialog();
 
+
                 if (result == true &&
                     window.ConfirmedAllocations != null)
-                    // إذا كان الصنف جديدًا وألغى المستخدم اختيار التشغيلة، نحذفه من الفاتورة.
-                    if (result != true && removeItemOnCancel)
+                {
+                    if (window.ConfirmedAllocations.Count != 1)
                     {
-                        item.PropertyChanged -= InvoiceItem_PropertyChanged;
+                        MessageBox.Show(
+                            "يجب اختيار تشغيلة واحدة فقط لكل صف.",
+                            "اختيار التشغيلات",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
 
-                        invoiceItems.Remove(item);
-
-                        RefreshInvoice();
-
+                        UpdateBatchAllocationSummary(item);
+                        UpdateGrandTotal();
                         return;
                     }
+
+                    // اترك هنا باقي كود التأكيد الموجود عندك كما هو.
+                }
+
+                // إذا كان الصنف جديدًا وألغى المستخدم اختيار التشغيلة، نحذفه من الفاتورة.
+                if (result != true && removeItemOnCancel)
+                {
+                    item.PropertyChanged -= InvoiceItem_PropertyChanged;
+
+                    invoiceItems.Remove(item);
+
+                    RefreshInvoice();
+
+                    return;
+                }
+
+
                 {
                     if (window.ConfirmedAllocations.Count != 1)
                     {
