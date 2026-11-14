@@ -53,6 +53,7 @@ namespace Ocore.desktop.Views
             }
         }
 
+
         public AddProductWindow(int userId)
         {
             InitializeComponent();
@@ -102,7 +103,6 @@ namespace Ocore.desktop.Views
             Loaded += AddProductWindow_Loaded;
         }
 
-        // Constructor خاص بتعديل صنف موجود.
         public AddProductWindow(int userId, Product product)
             : this(userId)
         {
@@ -594,6 +594,7 @@ ORDER BY TradeName;";
                 CatalogDrugsDataGrid.SelectedItem is CatalogDrugItem;
         }
 
+
         private void UseCatalogDrugButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -607,22 +608,6 @@ ORDER BY TradeName;";
                 return;
             }
 
-            var existing = FindExistingProduct(drug.Name);
-
-            if (existing != null)
-            {
-                MessageBox.Show(
-                    "هذا الدواء موجود بالفعل في المخزون.\n\n" +
-                    "كود الصنف: " + existing.ProductCode +
-                    "\nاسم الصنف: " + existing.Name +
-                    "\n\nلا يمكن إنشاء صنف مكرر.",
-                    "الصنف موجود",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-
-                return;
-            }
-
             selectedCatalogDrug = drug;
 
             ProductNameTextBox.Text = drug.Name;
@@ -632,24 +617,14 @@ ORDER BY TradeName;";
                 "\nالمادة الفعالة: " + SafeText(drug.GenericName) +
                 "\nالتركيز: " + SafeText(drug.Strength) +
                 "\nالشركة: " + SafeText(drug.Manufacturer) +
-                "\n\nسيتم ربط الصنف بهذا السجل من دليل الأدوية عند الحفظ.";
+                "\n\nسيتم ربط الكارت الجديد بهذا السجل من دليل الأدوية عند الحفظ.";
 
             ProductNameTextBox.Focus();
         }
 
-        private Product FindExistingProduct(string drugName)
-        {
-            if (string.IsNullOrWhiteSpace(drugName))
-                return null;
 
-            var products =
-                productService.GetActiveProducts(currentUserId);
 
-            string normalizedName = Normalize(drugName);
-
-            return products.FirstOrDefault(p =>
-                Normalize(p.Name) == normalizedName);
-        }
+       
 
         private string Normalize(string value)
         {
@@ -837,21 +812,7 @@ ORDER BY TradeName;";
                     }
                 }
 
-                var existing = FindExistingProduct(name);
-
-                if (existing != null &&
-                    (!isEditMode ||
-                     existing.Id != productBeingEdited.Id))
-                {
-                    MessageBox.Show(
-                        "لا يمكن حفظ الصنف؛ يوجد صنف بنفس الاسم بالفعل.\n" +
-                        "كود الصنف الموجود: " + existing.ProductCode,
-                        "صنف مكرر",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-
-                    return;
-                }
+               
 
                 var product = new Product
                 {
