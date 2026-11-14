@@ -2415,9 +2415,10 @@ namespace Ocore.desktop.Views
             OpenBatchSelectionWindow(item);
         }
 
+
         private void OpenBatchSelectionWindow(
-     SaleInvoiceItem item,
-     bool removeItemOnCancel = false)
+            SaleInvoiceItem item,
+            bool removeItemOnCancel = false)
         {
             if (item == null)
                 return;
@@ -2503,95 +2504,101 @@ namespace Ocore.desktop.Views
 
                 bool? result = window.ShowDialog();
 
-
-                if (result == true &&
-                    window.ConfirmedAllocations != null)
+                // معالجة الإلغاء أولًا قبل قراءة ConfirmedAllocations.
+                if (result != true)
                 {
-                    if (window.ConfirmedAllocations.Count != 1)
+                    // إذا كان الصنف جديدًا، نحذفه عند إلغاء اختيار التشغيلة.
+                    if (removeItemOnCancel)
                     {
-                        MessageBox.Show(
-                            "يجب اختيار تشغيلة واحدة فقط لكل صف.",
-                            "اختيار التشغيلات",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
+                        item.PropertyChanged -= InvoiceItem_PropertyChanged;
 
-                        UpdateBatchAllocationSummary(item);
-                        UpdateGrandTotal();
+                        invoiceItems.Remove(item);
+
+                        RefreshInvoice();
+
                         return;
                     }
 
-                    // اترك هنا باقي كود التأكيد الموجود عندك كما هو.
-                }
-
-                // إذا كان الصنف جديدًا وألغى المستخدم اختيار التشغيلة، نحذفه من الفاتورة.
-                if (result != true && removeItemOnCancel)
-                {
-                    item.PropertyChanged -= InvoiceItem_PropertyChanged;
-
-                    invoiceItems.Remove(item);
-
-                    RefreshInvoice();
+                    // إذا كان الصنف موجودًا بالفعل، نحتفظ به
+                    // وبأي تخصيص سابق دون تغييره.
+                    UpdateBatchAllocationSummary(item);
+                    UpdateGrandTotal();
 
                     return;
                 }
 
-
+                // التأكيد دون بيانات تخصيص حالة غير صحيحة.
+                if (window.ConfirmedAllocations == null)
                 {
-                    if (window.ConfirmedAllocations.Count != 1)
-                    {
-                        MessageBox.Show(
-                            "يجب اختيار تشغيلة واحدة فقط لكل صف.",
-                            "اختيار التشغيلات",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
+                    MessageBox.Show(
+                        "لم يتم استلام بيانات التشغيلة المختارة.\n\n" +
+                        "أعد فتح نافذة اختيار التشغيلة وحاول مرة أخرى.",
+                        "بيانات تخصيص غير صحيحة",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
 
-                        UpdateBatchAllocationSummary(item);
-                        UpdateGrandTotal();
-                        return;
-                    }
+                    UpdateBatchAllocationSummary(item);
+                    UpdateGrandTotal();
 
-                    SaleInvoiceBatchAllocation confirmed =
-                        window.ConfirmedAllocations[0];
-
-                    if (confirmed == null ||
-                        confirmed.BatchId <= 0 ||
-                        !IsFinite(confirmed.AllocatedQuantity) ||
-                        Math.Abs(
-                            confirmed.AllocatedQuantity -
-                            item.PackageQuantity) > BatchQuantityEpsilon)
-                    {
-                        MessageBox.Show(
-                            "بيانات التشغيلة المختارة لا تطابق كمية الصف.\n\n" +
-                            "أعد اختيار التشغيلة.",
-                            "بيانات تخصيص غير صحيحة",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-
-                        UpdateBatchAllocationSummary(item);
-                        UpdateGrandTotal();
-                        return;
-                    }
-
-                    if (item.BatchAllocations == null)
-                    {
-                        item.BatchAllocations =
-                            new ObservableCollection<SaleInvoiceBatchAllocation>();
-                    }
-
-                    item.BatchAllocations.Clear();
-
-                    item.BatchAllocations.Add(
-                        new SaleInvoiceBatchAllocation
-                        {
-                            BatchId = confirmed.BatchId,
-                            BatchNumber = confirmed.BatchNumber,
-                            ExpiryDate = confirmed.ExpiryDate,
-                            AvailableQuantity = confirmed.AvailableQuantity,
-                            AllocatedQuantity = item.PackageQuantity
-                        });
+                    return;
                 }
 
-                // في حالة الإلغاء نحتفظ بأي تخصيص سابق للصف.
+                // كل صف يجب أن يحتوي على تشغيلة واحدة فقط.
+                if (window.ConfirmedAllocations.Count != 1)
+                {
+                    MessageBox.Show(
+                        "يجب اختيار تشغيلة واحدة فقط لكل صف.",
+                        "اختيار التشغيلات",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    UpdateBatchAllocationSummary(item);
+                    UpdateGrandTotal();
+
+                    return;
+                }
+
+                SaleInvoiceBatchAllocation confirmed =
+                    window.ConfirmedAllocations[0];
+
+                if (confirmed == null ||
+                    confirmed.BatchId <= 0 ||
+                    !IsFinite(confirmed.AllocatedQuantity) ||
+                    Math.Abs(
+                        confirmed.AllocatedQuantity -
+                        item.PackageQuantity) > BatchQuantityEpsilon)
+                {
+                    MessageBox.Show(
+                        "بيانات التشغيلة المختارة لا تطابق كمية الصف.\n\n" +
+                        "أعد اختيار التشغيلة.",
+                        "بيانات تخصيص غير صحيحة",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    UpdateBatchAllocationSummary(item);
+                    UpdateGrandTotal();
+
+                    return;
+                }
+
+                if (item.BatchAllocations == null)
+                {
+                    item.BatchAllocations =
+                        new ObservableCollection<SaleInvoiceBatchAllocation>();
+                }
+
+                item.BatchAllocations.Clear();
+
+                item.BatchAllocations.Add(
+                    new SaleInvoiceBatchAllocation
+                    {
+                        BatchId = confirmed.BatchId,
+                        BatchNumber = confirmed.BatchNumber,
+                        ExpiryDate = confirmed.ExpiryDate,
+                        AvailableQuantity = confirmed.AvailableQuantity,
+                        AllocatedQuantity = item.PackageQuantity
+                    });
+
                 UpdateBatchAllocationSummary(item);
                 UpdateGrandTotal();
             }
