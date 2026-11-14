@@ -1373,6 +1373,7 @@ namespace Ocore.desktop.Views
 
         #region Product Search
 
+
         private void EnterToAddProduct_PreviewKeyDown(
             object sender,
             KeyEventArgs e)
@@ -1394,12 +1395,48 @@ namespace Ocore.desktop.Views
                     allSearchResults.Count == 0)
                     return;
 
-                ApplySearchFilter();
+                string searchText =
+                    (SearchTextBox.Text ?? string.Empty).Trim();
 
-                if (ItemsDataGrid.SelectedItem == null &&
-                    ItemsDataGrid.Items.Count > 0)
+                // إعطاء الأولوية للتطابق الكامل مع كود الكارت أو الباركود.
+                List<SalesProductSearchResult> exactMatches =
+                    allSearchResults
+                        .Where(p =>
+                            p != null &&
+                            (
+                                string.Equals(
+                                    (p.ProductCode ?? string.Empty).Trim(),
+                                    searchText,
+                                    StringComparison.OrdinalIgnoreCase)
+                                ||
+                                string.Equals(
+                                    (p.Barcode ?? string.Empty).Trim(),
+                                    searchText,
+                                    StringComparison.OrdinalIgnoreCase)
+                            ))
+                        .GroupBy(p =>
+                            p.Product == null ? 0 : p.Product.Id)
+                        .Select(g => g.First())
+                        .ToList();
+
+                if (exactMatches.Count == 1)
                 {
+                    // نتيجة واحدة مطابقة تمامًا:
+                    // نعرض الكارت المقصود وحده ونحدده مباشرة.
+                    ItemsDataGrid.ItemsSource = exactMatches;
                     ItemsDataGrid.SelectedIndex = 0;
+                }
+                else
+                {
+                    // لا يوجد تطابق كامل أو توجد أكثر من نتيجة مطابقة:
+                    // نحتفظ بسلوك البحث المعتاد دون اختيار عشوائي.
+                    ApplySearchFilter();
+
+                    if (ItemsDataGrid.SelectedItem == null &&
+                        ItemsDataGrid.Items.Count > 0)
+                    {
+                        ItemsDataGrid.SelectedIndex = 0;
+                    }
                 }
             }
 
