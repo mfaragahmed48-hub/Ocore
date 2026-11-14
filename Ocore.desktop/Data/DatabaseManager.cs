@@ -12,8 +12,8 @@ namespace Ocore.desktop.Data
         private readonly string databasePath;
         private readonly string backupFolder;
 
-        // الإصدار 7: إضافة جداول نظام الطباعة المركزي.
-        private const int CurrentDatabaseVersion = 7;
+        // الإصدار 8: السماح بتعدد كروت الأسعار للدواء الأساسي نفسه.
+        private const int CurrentDatabaseVersion = 8;
         private const int MaximumBackupCount = 30;
 
         public static string GetStorageRootPath()
@@ -149,14 +149,11 @@ namespace Ocore.desktop.Data
 
                 DatabaseSchema.CreateCoreTables(connection);
 
-                if (!ColumnExists(
-                    connection,
-                    "SalesInvoices",
-                    "CustomerId"))
+                // ترحيل قاعدة البيانات إلى الإصدار 8:
+                // السماح بوجود عدة كروت أسعار مرتبطة بالدواء الأساسي نفسه.
+                if (currentVersion < 8)
                 {
-                    throw new InvalidOperationException(
-                        "تعذر إكمال تهيئة قاعدة البيانات: " +
-                        "العمود CustomerId غير موجود في SalesInvoices.");
+                    MigrateProductPriceCardsV8(connection);
                 }
 
                 if (!ColumnExists(
@@ -251,6 +248,43 @@ namespace Ocore.desktop.Data
                 }
 
                 CreateDailyBackup(connection);
+            }
+        }
+
+        private void MigrateProductPriceCardsV8(
+            SQLiteConnection connection)
+        {
+            using (var transaction = connection.BeginTransaction())
+            {
+                try
+                {
+                    // إزالة الفهرس القديم الذي كان يمنع تعدد كروت الأسعار.
+                    using (var command = new SQLiteCommand(
+                        "DROP INDEX IF EXISTS UX_Products_DrugCatalogId;",
+                        connection,
+                        transaction))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+
+                    // التأكد من وجود فهرس غير فريد يسمح بتعدد الكروت.
+                    using (var command = new SQLiteCommand(@"
+                CREATE INDEX IF NOT EXISTS
+                IX_Products_DrugCatalogId
+                ON Products(DrugCatalogId)
+                WHERE DrugCatalogId IS NOT NULL;
+            ", connection, transaction))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
             }
         }
 
