@@ -947,7 +947,8 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
             }
         }
 
-        // ربط الأصناف بدليل الأدوية دون التأثير على الأصناف القديمة
+        // ربط كروت الأسعار بدليل الأدوية.
+        // يسمح بوجود أكثر من كارت سعر مرتبط بالدواء الأساسي نفسه.
         private static void EnsureProductDrugCatalogIdColumn(
             SQLiteConnection connection)
         {
@@ -974,23 +975,25 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
             {
                 using (var command = new SQLiteCommand(
                     @"ALTER TABLE Products
-                      ADD COLUMN DrugCatalogId INTEGER NULL;",
+              ADD COLUMN DrugCatalogId INTEGER NULL;",
                     connection))
                 {
                     command.ExecuteNonQuery();
                 }
             }
 
+            // فهرس عادي يسمح بتكرار DrugCatalogId بين كروت الأسعار.
             using (var command = new SQLiteCommand(@"
-                CREATE UNIQUE INDEX IF NOT EXISTS
-                UX_Products_DrugCatalogId
-                ON Products(DrugCatalogId)
-                WHERE DrugCatalogId IS NOT NULL;
-            ", connection))
+        CREATE INDEX IF NOT EXISTS
+        IX_Products_DrugCatalogId
+        ON Products(DrugCatalogId)
+        WHERE DrugCatalogId IS NOT NULL;
+    ", connection))
             {
                 command.ExecuteNonQuery();
             }
         }
+
         private static void EnsurePurchaseInvoiceDateColumn(
     SQLiteConnection connection)
         {
