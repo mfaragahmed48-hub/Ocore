@@ -1,3 +1,4 @@
+﻿
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -144,6 +145,11 @@ namespace Ocore.desktop.Views
         private static bool IsExpiredOrInvalid(
             string expiryDate)
         {
+            // عدم وجود تاريخ صلاحية يعني أن الصنف بلا صلاحية،
+            // وبالتالي لا يمنع بيعه.
+            if (string.IsNullOrWhiteSpace(expiryDate))
+                return false;
+
             DateTime parsedDate;
 
             if (!TryGetExpiryDate(expiryDate, out parsedDate))
