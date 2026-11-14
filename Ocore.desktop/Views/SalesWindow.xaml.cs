@@ -1929,7 +1929,7 @@ namespace Ocore.desktop.Views
             RefreshInvoice(invoiceItem);
 
             // اختيار تشغيلة واحدة لهذا الصف الجديد.
-            OpenBatchSelectionWindow(invoiceItem);
+            OpenBatchSelectionWindow(invoiceItem, true);
 
             SaleQuantityTextBox.Text = "1";
         }
@@ -2415,7 +2415,9 @@ namespace Ocore.desktop.Views
             OpenBatchSelectionWindow(item);
         }
 
-        private void OpenBatchSelectionWindow(SaleInvoiceItem item)
+        private void OpenBatchSelectionWindow(
+     SaleInvoiceItem item,
+     bool removeItemOnCancel = false)
         {
             if (item == null)
                 return;
@@ -2503,6 +2505,17 @@ namespace Ocore.desktop.Views
 
                 if (result == true &&
                     window.ConfirmedAllocations != null)
+                    // إذا كان الصنف جديدًا وألغى المستخدم اختيار التشغيلة، نحذفه من الفاتورة.
+                    if (result != true && removeItemOnCancel)
+                    {
+                        item.PropertyChanged -= InvoiceItem_PropertyChanged;
+
+                        invoiceItems.Remove(item);
+
+                        RefreshInvoice();
+
+                        return;
+                    }
                 {
                     if (window.ConfirmedAllocations.Count != 1)
                     {
