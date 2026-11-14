@@ -268,22 +268,8 @@ namespace Ocore.desktop.Services
                 }
             }
 
-            using (var command = new SQLiteCommand(
-                @"SELECT COUNT(*)
-                  FROM Products
-                  WHERE DrugCatalogId = @DrugCatalogId;",
-                connection,
-                transaction))
-            {
-                command.Parameters.AddWithValue(
-                    "@DrugCatalogId", drugCatalogId);
-
-                if (Convert.ToInt32(command.ExecuteScalar()) > 0)
-                {
-                    throw new InvalidOperationException(
-                        "هذا الدواء مرتبط بصنف آخر بالفعل.");
-                }
-            }
+            // يسمح بربط أكثر من كارت سعر بالدواء الأساسي نفسه.
+            // يظل التحقق من وجود الدواء وأنه نشط قائمًا.
         }
 
         #endregion
@@ -319,7 +305,7 @@ SELECT
     p.SalePrice,
     p.PurchasePrice,
     p.MaxDiscountPercentage,
-p.MinimumStockLevel,
+    p.MinimumStockLevel,
     p.IsArchived,
 
     COALESCE(
@@ -398,8 +384,9 @@ ORDER BY p.Name;";
 
                                 MaxDiscountPercentage = Convert.ToDouble(
                                     reader["MaxDiscountPercentage"]),
+
                                 MinimumStockLevel = Convert.ToDouble(
-    reader["MinimumStockLevel"]),
+                                    reader["MinimumStockLevel"]),
 
                                 Quantity = Convert.ToDouble(reader["Quantity"]),
                                 TotalQuantity = Convert.ToDouble(reader["TotalQuantity"]),
@@ -1480,8 +1467,6 @@ ORDER BY Name;";
                 {
                     try
                     {
-                        // تحقق مباشر من دور المستخدم النشط.
-                        // لا نعتمد على صلاحية يمكن منحها لمستخدم آخر.
                         CheckManagerPermission(connection, currentUserId);
 
                         string productName;
@@ -1513,7 +1498,6 @@ ORDER BY Name;";
                             }
                         }
 
-                        // لا نسجل عملية تعديل إذا لم تتغير القيمة.
                         if (Math.Abs(
                             oldMaxDiscountPercentage -
                             maxDiscountPercentage) < 0.00000001)
@@ -1612,8 +1596,8 @@ ORDER BY Name;";
 
                         using (var command = new SQLiteCommand(
                             @"SELECT Name, MinimumStockLevel
-                      FROM Products
-                      WHERE Id = @ProductId;",
+                              FROM Products
+                              WHERE Id = @ProductId;",
                             connection,
                             transaction))
                         {
@@ -1646,8 +1630,8 @@ ORDER BY Name;";
 
                         using (var command = new SQLiteCommand(
                             @"UPDATE Products
-                      SET MinimumStockLevel = @MinimumStockLevel
-                      WHERE Id = @ProductId;",
+                              SET MinimumStockLevel = @MinimumStockLevel
+                              WHERE Id = @ProductId;",
                             connection,
                             transaction))
                         {
