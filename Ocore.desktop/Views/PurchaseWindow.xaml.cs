@@ -180,6 +180,7 @@ namespace Ocore.desktop.Views
             }
         }
 
+
         private bool FilterProducts(object item)
         {
             var product = item as Product;
@@ -187,16 +188,27 @@ namespace Ocore.desktop.Views
             if (product == null)
                 return false;
 
-            string searchText = ProductComboBox.Text;
+            string searchText =
+                (ProductComboBox.Text ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(searchText))
                 return true;
 
-            return !string.IsNullOrWhiteSpace(product.Name)
-                && product.Name.IndexOf(
-                    searchText.Trim(),
+            bool nameMatches =
+                !string.IsNullOrWhiteSpace(product.Name) &&
+                product.Name.IndexOf(
+                    searchText,
                     StringComparison.CurrentCultureIgnoreCase) >= 0;
+
+            bool codeMatches =
+                !string.IsNullOrWhiteSpace(product.ProductCode) &&
+                product.ProductCode.IndexOf(
+                    searchText,
+                    StringComparison.CurrentCultureIgnoreCase) >= 0;
+
+            return nameMatches || codeMatches;
         }
+
 
         private void ProductComboBox_Loaded(
             object sender,

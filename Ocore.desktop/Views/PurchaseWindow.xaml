@@ -238,15 +238,50 @@
                                 <ColumnDefinition Width="95"/>
                             </Grid.ColumnDefinitions>
 
+
                             <ComboBox x:Name="ProductComboBox"
-                                      Grid.Column="0"
-                                      DisplayMemberPath="Name"
-                                      SelectedValuePath="Id"
-                                      IsEditable="True"
-                                      IsReadOnly="False"
-                                      IsTextSearchEnabled="True"
-                                      StaysOpenOnEdit="True"
-                                      TextSearch.TextPath="Name"/>
+          Grid.Column="0"
+          IsEditable="True"
+          IsReadOnly="False"
+          IsTextSearchEnabled="False"
+          StaysOpenOnEdit="True"
+          TextSearch.TextPath="Name"
+          SelectedValuePath="Id"
+          MaxDropDownHeight="280">
+
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="4,3">
+                                            <TextBlock Text="{Binding Name}"
+                           FontWeight="Bold"
+                           FontSize="12"/>
+
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="الكود: "
+                               FontSize="10"
+                               Foreground="Gray"/>
+                                                <TextBlock Text="{Binding ProductCode}"
+                               FontSize="10"
+                               Margin="0,0,12,0"/>
+
+                                                <TextBlock Text="سعر البيع: "
+                               FontSize="10"
+                               Foreground="Gray"/>
+                                                <TextBlock Text="{Binding SalePrice, StringFormat={}{0:N2}}"
+                               FontSize="10"
+                               Margin="0,0,12,0"/>
+
+                                                <TextBlock Text="سعر الشراء: "
+                               FontSize="10"
+                               Foreground="Gray"/>
+                                                <TextBlock Text="{Binding PurchasePrice, StringFormat={}{0:N2}}"
+                               FontSize="10"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
 
                             <Button Grid.Column="1"
                                     Content="+ صنف جديد"
