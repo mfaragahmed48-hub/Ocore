@@ -24,14 +24,13 @@ namespace Ocore.desktop.Views
         }
 
         // ==========================================
-        // تحديث أزرار التسليم والاستلام
+        // تحديث أزرار التسليم والاستلام ومراجعة الشيفت
         // ==========================================
 
         private void DashboardWindow_ShiftHandover_Loaded(
             object sender,
             RoutedEventArgs e)
         {
-            // تحديث الأزرار كلما عادت لوحة التحكم للنشاط.
             Activated -= DashboardWindow_ShiftHandover_Activated;
             Activated += DashboardWindow_ShiftHandover_Activated;
 
@@ -58,6 +57,22 @@ namespace Ocore.desktop.Views
                         currentRole,
                         "Manager",
                         StringComparison.OrdinalIgnoreCase);
+
+                // تحديد صلاحية المدير وإظهار زر مراجعة الشيفت
+                bool isManager = string.Equals(
+                    currentRole,
+                    "Manager",
+                    StringComparison.OrdinalIgnoreCase);
+
+                var currentShift = shiftService.GetCurrentShift();
+
+                ReviewCurrentShiftButton.Visibility =
+                    isManager
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+
+                ReviewCurrentShiftButton.IsEnabled =
+                    isManager && currentShift != null;
 
                 var info = HandoverService.GetCurrentHandoverInfo();
 
@@ -91,6 +106,10 @@ namespace Ocore.desktop.Views
             {
                 HandoverShiftButton.IsEnabled = false;
                 TakeOverShiftButton.IsEnabled = false;
+
+                ReviewCurrentShiftButton.IsEnabled = false;
+                ReviewCurrentShiftButton.Visibility =
+                    Visibility.Collapsed;
 
                 System.Diagnostics.Debug.WriteLine(
                     "RefreshShiftHandoverButtons error: " + ex.Message);

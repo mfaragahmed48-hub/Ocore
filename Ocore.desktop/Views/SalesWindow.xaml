@@ -243,24 +243,19 @@
                                                 IsReadOnly="True"
                                                 Width="*"/>
 
+
                             <DataGridTemplateColumn Header="الوحدة"
-                                                    Width="85">
+                        Width="95">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding UnitName}"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"/>
+                                        <ComboBox ItemsSource="{Binding UnitOptions}"
+                      SelectedItem="{Binding UnitName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      VerticalContentAlignment="Center"
+                      HorizontalContentAlignment="Center"
+                      FontSize="11"
+                      MinWidth="75"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
-
-                                <DataGridTemplateColumn.CellEditingTemplate>
-                                    <DataTemplate>
-                                        <ComboBox ItemsSource="{Binding UnitOptions}"
-                                                  SelectedItem="{Binding UnitName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  VerticalContentAlignment="Center"
-                                                  FontSize="11"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="الكمية"

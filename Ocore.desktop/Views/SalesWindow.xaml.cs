@@ -1936,9 +1936,29 @@ namespace Ocore.desktop.Views
                 return;
             }
 
+            string packageUnitName =
+                string.IsNullOrWhiteSpace(selectedProduct.UnitName)
+                    ? "العبوة"
+                    : selectedProduct.UnitName;
+
+            List<string> unitOptions = new List<string>
+{
+    packageUnitName
+};
+
+            if (!string.IsNullOrWhiteSpace(selectedProduct.SmallUnitName) &&
+                !string.Equals(
+                    packageUnitName,
+                    selectedProduct.SmallUnitName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                unitOptions.Add(selectedProduct.SmallUnitName);
+            }
+
             SaleInvoiceItem invoiceItem =
                 new SaleInvoiceItem
                 {
+                    UnitOptions = unitOptions,
                     ProductId = selectedProduct.Id,
                     ItemName = selectedProduct.Name,
                     UnitName = unitName,
@@ -1948,7 +1968,7 @@ namespace Ocore.desktop.Views
                     PackageQuantity = packageQuantity,
 
                     UnitsPerPackage = unitsPerPackage,
-                    PackageUnitName = selectedProduct.UnitName,
+                    PackageUnitName = packageUnitName,
                     SmallUnitName = selectedProduct.SmallUnitName,
                     IsSmallUnit = isSmallUnit,
                     MaxDiscountPercentage =

@@ -144,18 +144,28 @@
     <Compile Include="Services\Printing\PrinterSettingsNavigationService.cs" />
     <Compile Include="Services\Printing\PrintingDeviceService.cs" />
     <Compile Include="Services\Printing\PrintingProfileService.cs" />
+    <Compile Include="Services\ShiftClosurePrintingService.cs" />
     <Compile Include="Services\ShiftHandoverService.cs" />
     <Compile Include="Services\ShiftService.cs" />
     <Compile Include="Services\ThermalReceiptDocumentBuilder.cs" />
     <Compile Include="Views\BatchSelectionWindow.xaml.cs">
       <DependentUpon>BatchSelectionWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\DashboardWindow.Expenses.cs" />
+    <Compile Include="Views\DashboardWindow.Expenses.xaml.cs" />
     <Compile Include="Views\DashboardWindow.ShiftHandover.cs" />
+    <Compile Include="Views\DashboardWindow.ShiftReview.cs" />
+    <Compile Include="Views\ExpensesWindow.xaml.cs">
+      <DependentUpon>ExpensesWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\PrinterSettingsHubWindow.xaml.cs">
       <DependentUpon>PrinterSettingsHubWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\PrinterTypeSettingsWindow.xaml.cs">
       <DependentUpon>PrinterTypeSettingsWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ShiftHistoryWindow.xaml.cs">
+      <DependentUpon>ShiftHistoryWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\ThermalReceiptPreviewWindow.xaml.cs">
       <DependentUpon>ThermalReceiptPreviewWindow.xaml</DependentUpon>
@@ -295,11 +305,19 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Views\ExpensesWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Views\PrinterSettingsHubWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\PrinterTypeSettingsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ShiftHistoryWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

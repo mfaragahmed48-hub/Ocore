@@ -1,5 +1,4 @@
-﻿
-<Window x:Class="Ocore.desktop.Views.SalesReturnsWindow"
+﻿<Window x:Class="Ocore.desktop.Views.SalesReturnsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="O CORE - مرتجعات البيع"

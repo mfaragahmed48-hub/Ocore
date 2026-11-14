@@ -1,5 +1,4 @@
-﻿
-<Window x:Class="Ocore.desktop.Views.DashboardWindow"
+﻿<Window x:Class="Ocore.desktop.Views.DashboardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="O CORE - لوحة التحكم"
