@@ -156,13 +156,14 @@ namespace Ocore.desktop.Services
 
                 var printData = new List<byte>(rasterData);
 
-                // تغذية الورق ثم قصه بعد تقرير إغلاق الشيفت دائماً.
-                // هذا التعديل خاص بتقرير إغلاق الشيفت فقط.
-                printData.AddRange(
-                    thermalPrinterService.CreateFeedCommand(3));
-
-                printData.AddRange(
-                    thermalPrinterService.CreateCutCommand());
+                // POS-80C:
+                // تغذية الورق 5 أسطر ثم تنفيذ القص الجزئي.
+                // هذا الأمر خاص بتقرير إغلاق الشيفت فقط.
+                printData.AddRange(new byte[]
+                {
+                    0x1B, 0x64, 0x05,
+                    0x1D, 0x56, 0x01
+                });
 
                 await thermalPrinterService.SendRawAsync(
                     printerName,
