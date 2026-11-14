@@ -1,9 +1,8 @@
 ﻿
 using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Media;
 using Ocore.desktop.Services;
 
@@ -11,432 +10,507 @@ namespace Ocore.desktop.Views
 {
     public partial class DashboardWindow : Window
     {
-        private void ReviewCurrentShiftButton_Click(
+        private ShiftHandoverService shiftHandoverService;
+
+        private ShiftHandoverService HandoverService
+        {
+            get
+            {
+                if (shiftHandoverService == null)
+                    shiftHandoverService = new ShiftHandoverService();
+
+                return shiftHandoverService;
+            }
+        }
+
+        // ==========================================
+        // تحديث أزرار التسليم والاستلام ومراجعة الشيفت
+        // ==========================================
+
+        private void DashboardWindow_ShiftHandover_Loaded(
             object sender,
             RoutedEventArgs e)
         {
-            if (!string.Equals(
-                currentRole,
-                "Manager",
-                StringComparison.OrdinalIgnoreCase))
+            Activated -= DashboardWindow_ShiftHandover_Activated;
+            Activated += DashboardWindow_ShiftHandover_Activated;
+
+            RefreshShiftHandoverButtons();
+        }
+
+        private void DashboardWindow_ShiftHandover_Activated(
+            object sender,
+            EventArgs e)
+        {
+            RefreshShiftHandoverButtons();
+        }
+
+        private void RefreshShiftHandoverButtons()
+        {
+            try
+            {
+                bool canOperate =
+                    string.Equals(
+                        currentRole,
+                        "Pharmacist",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(
+                        currentRole,
+                        "Manager",
+                        StringComparison.OrdinalIgnoreCase);
+
+                // تحديد صلاحية المدير وإظهار زر مراجعة الشيفت
+                bool isManager = string.Equals(
+                    currentRole,
+                    "Manager",
+                    StringComparison.OrdinalIgnoreCase);
+
+                var currentShift = shiftService.GetCurrentShift();
+
+                ReviewCurrentShiftButton.Visibility =
+                    isManager
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+
+                ReviewCurrentShiftButton.IsEnabled =
+                    isManager && currentShift != null;
+
+                var info = HandoverService.GetCurrentHandoverInfo();
+
+                if (info == null)
+                {
+                    HandoverShiftButton.IsEnabled = false;
+                    TakeOverShiftButton.IsEnabled = false;
+                    return;
+                }
+
+                bool isCurrentResponsible =
+                    info.CurrentResponsibleUserId == currentUserId;
+
+                HandoverShiftButton.IsEnabled =
+                    canOperate && isCurrentResponsible;
+
+                TakeOverShiftButton.IsEnabled =
+                    canOperate && !isCurrentResponsible;
+
+                HandoverShiftButton.ToolTip =
+                    isCurrentResponsible
+                        ? "تسليم مسؤولية الشيفت إلى صيدلي آخر"
+                        : "التسليم متاح للمسؤول الحالي عن الشيفت فقط";
+
+                TakeOverShiftButton.ToolTip =
+                    !isCurrentResponsible
+                        ? "استلام مسؤولية الشيفت من المسؤول السابق"
+                        : "أنت المسؤول الحالي عن الشيفت";
+            }
+            catch (Exception ex)
+            {
+                HandoverShiftButton.IsEnabled = false;
+                TakeOverShiftButton.IsEnabled = false;
+
+                ReviewCurrentShiftButton.IsEnabled = false;
+                ReviewCurrentShiftButton.Visibility =
+                    Visibility.Collapsed;
+
+                System.Diagnostics.Debug.WriteLine(
+                    "RefreshShiftHandoverButtons error: " + ex.Message);
+            }
+        }
+
+        // ==========================================
+        // تسليم الشيفت إلى صيدلي آخر
+        // ==========================================
+
+        private void HandoverShiftButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            try
+            {
+                var info = HandoverService.GetCurrentHandoverInfo();
+
+                if (info == null)
+                {
+                    MessageBox.Show(
+                        "لا يوجد شيفت مفتوح لتسليمه.",
+                        "تسليم الشيفت",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    RefreshShiftHandoverButtons();
+                    return;
+                }
+
+                if (info.CurrentResponsibleUserId != currentUserId)
+                {
+                    MessageBox.Show(
+                        "لا يمكنك تسليم الشيفت لأنك لست المسؤول الحالي عنه.",
+                        "تسليم الشيفت",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    RefreshShiftHandoverButtons();
+                    return;
+                }
+
+                ShowShiftTransferDialog(false);
+            }
+            catch (Exception ex)
             {
                 MessageBox.Show(
-                    "هذه الشاشة متاحة للمدير فقط.",
-                    "صلاحيات غير كافية",
+                    "تعذر تجهيز عملية تسليم الشيفت:\n\n" + ex.Message,
+                    "O CORE",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    MessageBoxImage.Error);
+            }
+        }
+
+        // ==========================================
+        // استلام الشيفت اضطراريًا
+        // ==========================================
+
+        private void TakeOverShiftButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            try
+            {
+                var info = HandoverService.GetCurrentHandoverInfo();
+
+                if (info == null)
+                {
+                    MessageBox.Show(
+                        "لا يوجد شيفت مفتوح لاستلامه.",
+                        "استلام الشيفت",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    RefreshShiftHandoverButtons();
+                    return;
+                }
+
+                if (info.CurrentResponsibleUserId == currentUserId)
+                {
+                    MessageBox.Show(
+                        "أنت المسؤول الحالي عن الشيفت بالفعل.",
+                        "استلام الشيفت",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    RefreshShiftHandoverButtons();
+                    return;
+                }
+
+                ShowShiftTransferDialog(true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "تعذر تجهيز عملية استلام الشيفت:\n\n" + ex.Message,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        // ==========================================
+        // نافذة التسليم أو الاستلام
+        // ==========================================
+
+        private void ShowShiftTransferDialog(bool emergencyTakeover)
+        {
+            var info = HandoverService.GetCurrentHandoverInfo();
+
+            if (info == null)
+                throw new InvalidOperationException(
+                    "لا يوجد شيفت مفتوح.");
+
+            var users = HandoverService.GetEligibleReceivers()
+                .Where(u => u.Id != currentUserId)
+                .ToList();
+
+            ComboBox receiverCombo = null;
+
+            if (!emergencyTakeover && users.Count == 0)
+            {
+                MessageBox.Show(
+                    "لا يوجد مستخدم آخر نشط ومصرح له باستلام الشيفت.",
+                    "تسليم الشيفت",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
 
                 return;
             }
 
-            try
+            Window dialog = new Window
             {
-                var window = new CurrentShiftReviewWindow(
-                    shiftService,
-                    new ExpenseService());
+                Title = emergencyTakeover
+                    ? "استلام الشيفت"
+                    : "تسليم الشيفت",
 
-                window.Owner = this;
-                window.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "تعذر فتح مراجعة الشيفت:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-    }
-
-    public class CurrentShiftReviewWindow : Window
-    {
-        private readonly ShiftService shiftService;
-        private readonly ExpenseService expenseService;
-
-        private TextBlock shiftInfoText;
-        private TextBlock lastUpdateText;
-        private DataGrid financialGrid;
-        private DataGrid expensesGrid;
-
-        public CurrentShiftReviewWindow(
-            ShiftService shiftService,
-            ExpenseService expenseService)
-        {
-            this.shiftService = shiftService;
-            this.expenseService = expenseService;
-
-            Title = "O CORE - مراجعة الشيفت الحالي";
-            Width = 1100;
-            Height = 760;
-            MinWidth = 850;
-            MinHeight = 600;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            FlowDirection = FlowDirection.RightToLeft;
-            Background = new SolidColorBrush(
-                Color.FromRgb(243, 246, 248));
-
-            BuildInterface();
-            LoadShiftData();
-        }
-
-        private void BuildInterface()
-        {
-            var root = new Grid
-            {
-                Margin = new Thickness(18)
+                Width = 500,
+                Height = emergencyTakeover ? 360 : 410,
+                MinWidth = 450,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                FlowDirection = FlowDirection.RightToLeft,
+                Background = new SolidColorBrush(
+                    Color.FromRgb(243, 246, 248))
             };
 
-            root.RowDefinitions.Add(
-                new RowDefinition { Height = GridLength.Auto });
-
-            root.RowDefinitions.Add(
-                new RowDefinition { Height = GridLength.Auto });
-
-            root.RowDefinitions.Add(
-                new RowDefinition { Height = new GridLength(230) });
-
-            root.RowDefinitions.Add(
-                new RowDefinition { Height = GridLength.Auto });
-
-            root.RowDefinitions.Add(
-                new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-            root.RowDefinitions.Add(
-                new RowDefinition { Height = GridLength.Auto });
-
-            var header = new TextBlock
+            StackPanel root = new StackPanel
             {
-                Text = "مراجعة الشيفت الحالي",
-                FontSize = 23,
+                Margin = new Thickness(22)
+            };
+
+            root.Children.Add(new TextBlock
+            {
+                Text = emergencyTakeover
+                    ? "استلام مسؤولية الشيفت الحالي"
+                    : "تسليم مسؤولية الشيفت إلى صيدلي آخر",
+
+                FontSize = 19,
                 FontWeight = FontWeights.Bold,
                 Foreground = new SolidColorBrush(
-                    Color.FromRgb(31, 76, 65)),
-                Margin = new Thickness(0, 0, 0, 12)
-            };
+                    Color.FromRgb(24, 63, 54)),
 
-            Grid.SetRow(header, 0);
-            root.Children.Add(header);
-
-            shiftInfoText = new TextBlock
-            {
-                FontSize = 14,
-                Padding = new Thickness(12),
-                Background = Brushes.White,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 12)
-            };
-
-            Grid.SetRow(shiftInfoText, 1);
-            root.Children.Add(shiftInfoText);
-
-            financialGrid = new DataGrid
-            {
-                AutoGenerateColumns = false,
-                IsReadOnly = true,
-                CanUserAddRows = false,
-                CanUserDeleteRows = false,
-                CanUserReorderColumns = false,
-                CanUserResizeRows = false,
-                HeadersVisibility = DataGridHeadersVisibility.Column,
-                FlowDirection = FlowDirection.RightToLeft,
-                Background = Brushes.White,
-                Margin = new Thickness(0, 0, 0, 12),
-                ItemsSource = new List<PaymentSummaryRow>()
-            };
-
-            AddColumn(financialGrid, "وسيلة الدفع", "PaymentMethod", 1.2);
-            AddColumn(financialGrid, "المبيعات", "Sales", 1);
-            AddColumn(financialGrid, "التحصيلات", "Collections", 1);
-            AddColumn(financialGrid, "المرتجعات", "Refunds", 1);
-            AddColumn(financialGrid, "المصروفات", "Expenses", 1);
-            AddColumn(financialGrid, "المتوقع", "Expected", 1);
-
-            Grid.SetRow(financialGrid, 2);
-            root.Children.Add(financialGrid);
-
-            var expensesHeader = new TextBlock
-            {
-                Text = "تفاصيل المصروفات",
-                FontSize = 18,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
-
-            Grid.SetRow(expensesHeader, 3);
-            root.Children.Add(expensesHeader);
-
-            expensesGrid = new DataGrid
-            {
-                AutoGenerateColumns = false,
-                IsReadOnly = true,
-                CanUserAddRows = false,
-                CanUserDeleteRows = false,
-                CanUserReorderColumns = false,
-                CanUserResizeRows = false,
-                HeadersVisibility = DataGridHeadersVisibility.Column,
-                FlowDirection = FlowDirection.RightToLeft,
-                Background = Brushes.White,
-                Margin = new Thickness(0, 0, 0, 12)
-            };
-
-            AddColumn(expensesGrid, "التاريخ", "CreatedAt", 1.1);
-            AddColumn(expensesGrid, "التصنيف", "Category", 1);
-            AddColumn(expensesGrid, "الوصف", "Description", 1.5);
-            AddColumn(expensesGrid, "وسيلة الدفع", "PaymentMethod", 1);
-            AddColumn(expensesGrid, "المبلغ", "Amount", 0.8);
-            AddColumn(expensesGrid, "الحالة", "Status", 0.8);
-            AddColumn(expensesGrid, "ألغاه", "VoidedByName", 1);
-            AddColumn(expensesGrid, "وقت الإلغاء", "VoidedAt", 1);
-            AddColumn(expensesGrid, "سبب الإلغاء", "VoidReason", 1.5);
-
-            Grid.SetRow(expensesGrid, 4);
-            root.Children.Add(expensesGrid);
-
-            var footer = new DockPanel
-            {
-                LastChildFill = false,
-                Margin = new Thickness(0, 5, 0, 0)
-            };
-
-            lastUpdateText = new TextBlock
-            {
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = Brushes.DimGray
-            };
-
-            DockPanel.SetDock(lastUpdateText, Dock.Right);
-            footer.Children.Add(lastUpdateText);
-
-            var closeButton = new Button
-            {
-                Content = "إغلاق",
-                Width = 100,
-                Height = 35,
-                Margin = new Thickness(5, 0, 0, 0),
-                Padding = new Thickness(8),
-                IsCancel = true
-            };
-
-            DockPanel.SetDock(closeButton, Dock.Left);
-            footer.Children.Add(closeButton);
-
-            var refreshButton = new Button
-            {
-                Content = "تحديث البيانات",
-                Width = 125,
-                Height = 35,
-                Margin = new Thickness(5, 0, 0, 0),
-                Padding = new Thickness(8),
-                Background = new SolidColorBrush(
-                    Color.FromRgb(36, 107, 88)),
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.Bold
-            };
-
-            refreshButton.Click += (s, e) => LoadShiftData();
-
-            DockPanel.SetDock(refreshButton, Dock.Left);
-            footer.Children.Add(refreshButton);
-
-            Grid.SetRow(footer, 5);
-            root.Children.Add(footer);
-
-            Content = root;
-        }
-
-        private void AddColumn(
-            DataGrid grid,
-            string header,
-            string property,
-            double width)
-        {
-            grid.Columns.Add(new DataGridTextColumn
-            {
-                Header = header,
-                Binding = new Binding(property),
-                Width = new DataGridLength(
-                    width,
-                    DataGridLengthUnitType.Star)
+                Margin = new Thickness(0, 0, 0, 14)
             });
-        }
 
-        private void LoadShiftData()
-        {
-            try
+            root.Children.Add(new TextBlock
             {
-                var shift = shiftService.GetCurrentShift();
+                Text = "المسؤول الحالي: " +
+                       info.CurrentResponsibleName,
 
-                if (shift == null)
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(
+                    Color.FromRgb(70, 90, 83)),
+
+                Margin = new Thickness(0, 0, 0, 12)
+            });
+
+            if (!emergencyTakeover)
+            {
+                root.Children.Add(new TextBlock
                 {
-                    shiftInfoText.Text =
-                        "لا يوجد شيفت مفتوح حاليًا.";
+                    Text = "اختر الصيدلي المستلم",
+                    FontSize = 13,
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(100, 115, 111)),
+                    Margin = new Thickness(0, 0, 0, 6)
+                });
 
-                    financialGrid.ItemsSource =
-                        new List<PaymentSummaryRow>();
-
-                    expensesGrid.ItemsSource =
-                        new List<ExpenseReviewRow>();
-
-                    lastUpdateText.Text = string.Empty;
-                    return;
-                }
-
-                var summary =
-                    shiftService.GetShiftFinancialSummary(shift.Id);
-
-                if (summary == null)
-                    throw new InvalidOperationException(
-                        "تعذر قراءة الملخص المالي للشيفت.");
-
-                shiftInfoText.Text =
-                    "رقم الشيفت: " + shift.ShiftNumber +
-                    "    |    الحالة: مفتوح" +
-                    "\nفتح الشيفت بواسطة: " + shift.OpenedByName +
-                    "    |    وقت الفتح: " + shift.OpenedAt;
-
-                var rows = new List<PaymentSummaryRow>();
-
-                rows.Add(CreatePaymentRow(
-                    "نقدي",
-                    summary.SalesCash,
-                    summary.CollectionsCash,
-                    summary.RefundsCash,
-                    summary.ExpensesCash,
-                    summary.ExpectedCash));
-
-                rows.Add(CreatePaymentRow(
-                    "بطاقة",
-                    summary.SalesCard,
-                    summary.CollectionsCard,
-                    summary.RefundsCard,
-                    summary.ExpensesCard,
-                    summary.ExpectedCard));
-
-                rows.Add(CreatePaymentRow(
-                    "InstaPay",
-                    summary.SalesInstaPay,
-                    summary.CollectionsInstaPay,
-                    summary.RefundsInstaPay,
-                    summary.ExpensesInstaPay,
-                    summary.ExpectedInstaPay));
-
-                rows.Add(CreatePaymentRow(
-                    "تحويل بنكي",
-                    summary.SalesTransfer,
-                    summary.CollectionsTransfer,
-                    summary.RefundsTransfer,
-                    summary.ExpensesTransfer,
-                    summary.ExpectedTransfer));
-
-                rows.Add(CreatePaymentRow(
-                    "الإجمالي",
-                    summary.SalesCash +
-                    summary.SalesCard +
-                    summary.SalesInstaPay +
-                    summary.SalesTransfer,
-                    summary.CollectionsCash +
-                    summary.CollectionsCard +
-                    summary.CollectionsInstaPay +
-                    summary.CollectionsTransfer,
-                    summary.RefundsCash +
-                    summary.RefundsCard +
-                    summary.RefundsInstaPay +
-                    summary.RefundsTransfer,
-                    summary.ExpensesCash +
-                    summary.ExpensesCard +
-                    summary.ExpensesInstaPay +
-                    summary.ExpensesTransfer,
-                    summary.TotalExpected));
-
-                financialGrid.ItemsSource = rows;
-
-                var expenses =
-                    expenseService.GetExpensesByShift(shift.Id);
-
-                var expenseRows = new List<ExpenseReviewRow>();
-
-                foreach (var expense in expenses)
+                receiverCombo = new ComboBox
                 {
-                    expenseRows.Add(new ExpenseReviewRow
-                    {
-                        CreatedAt = expense.CreatedAt,
-                        Category = expense.Category,
-                        Description = expense.Description,
-                        PaymentMethod = expense.PaymentMethod,
-                        Amount = expense.Amount.ToString("N2"),
-                        Status = expense.IsVoided
-                            ? "ملغي"
-                            : "فعال",
-                        VoidedByName = expense.IsVoided
-                            ? expense.VoidedByName
-                            : string.Empty,
-                        VoidedAt = expense.IsVoided
-                            ? expense.VoidedAt
-                            : string.Empty,
-                        VoidReason = expense.IsVoided
-                            ? expense.VoidReason
-                            : string.Empty
-                    });
-                }
+                    Height = 36,
+                    FontSize = 14,
+                    Padding = new Thickness(6),
+                    DisplayMemberPath = "FullName",
+                    ItemsSource = users,
+                    SelectedIndex = 0
+                };
 
-                expensesGrid.ItemsSource = expenseRows;
-
-                lastUpdateText.Text =
-                    "آخر تحديث: " +
-                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                root.Children.Add(receiverCombo);
             }
-            catch (Exception ex)
+            else
+            {
+                root.Children.Add(new TextBlock
+                {
+                    Text =
+                        "سيتم تسجيل أنك استلمت الشيفت من المسؤول السابق " +
+                        "دون إغلاق الشيفت أو تصفير حساباته.",
+
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 13,
+                    Foreground = new SolidColorBrush(
+                        Color.FromRgb(100, 115, 111)),
+                    Margin = new Thickness(0, 0, 0, 12)
+                });
+            }
+
+            root.Children.Add(new TextBlock
+            {
+                Text = "ملاحظات",
+                FontSize = 13,
+                Foreground = new SolidColorBrush(
+                    Color.FromRgb(100, 115, 111)),
+                Margin = new Thickness(0, 14, 0, 6)
+            });
+
+            TextBox notesBox = new TextBox
+            {
+                Height = emergencyTakeover ? 65 : 75,
+                FontSize = 13,
+                Padding = new Thickness(8),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+
+                Text = emergencyTakeover
+                    ? "استلام اضطراري بسبب انقطاع الكهرباء أو مغادرة المسؤول السابق."
+                    : string.Empty
+            };
+
+            root.Children.Add(notesBox);
+
+            StackPanel buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 18, 0, 0)
+            };
+
+            Button confirmButton = new Button
+            {
+                Content = emergencyTakeover
+                    ? "تأكيد الاستلام"
+                    : "تأكيد التسليم",
+
+                Width = 145,
+                Height = 40,
+                Margin = new Thickness(0, 0, 10, 0),
+
+                Background = new SolidColorBrush(
+                    emergencyTakeover
+                        ? Color.FromRgb(217, 164, 65)
+                        : Color.FromRgb(36, 107, 88)),
+
+                Foreground = emergencyTakeover
+                    ? new SolidColorBrush(
+                        Color.FromRgb(24, 63, 54))
+                    : Brushes.White,
+
+                FontWeight = FontWeights.Bold,
+                BorderThickness = new Thickness(0)
+            };
+
+            Button cancelButton = new Button
+            {
+                Content = "إلغاء",
+                Width = 95,
+                Height = 40,
+
+                Background = new SolidColorBrush(
+                    Color.FromRgb(225, 231, 228)),
+
+                Foreground = new SolidColorBrush(
+                    Color.FromRgb(24, 63, 54)),
+
+                BorderThickness = new Thickness(0)
+            };
+
+            confirmButton.Click += delegate
+            {
+                try
+                {
+                    bool success;
+
+                    if (emergencyTakeover)
+                    {
+                        var confirm = MessageBox.Show(
+                            "هل تؤكد استلام مسؤولية الشيفت من " +
+                            info.CurrentResponsibleName +
+                            "؟\n\nسيتم تسجيل اسمك ووقت الاستلام.",
+                            "تأكيد الاستلام",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question);
+
+                        if (confirm != MessageBoxResult.Yes)
+                            return;
+
+                        success = HandoverService.TakeOverCurrentShift(
+                            currentUserId,
+                            notesBox.Text);
+                    }
+                    else
+                    {
+                        var selectedUser =
+                            receiverCombo.SelectedItem as
+                                ShiftHandoverService.ShiftUserInfo;
+
+                        if (selectedUser == null)
+                        {
+                            MessageBox.Show(
+                                "اختر الصيدلي الذي سيستلم الشيفت.",
+                                "بيانات ناقصة",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+
+                            return;
+                        }
+
+                        var confirm = MessageBox.Show(
+                            "هل تريد تسليم الشيفت إلى " +
+                            selectedUser.FullName +
+                            "؟\n\nسيظل الشيفت مفتوحًا وتنتقل إليه المسؤولية.",
+                            "تأكيد التسليم",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question);
+
+                        if (confirm != MessageBoxResult.Yes)
+                            return;
+
+                        success = HandoverService.HandoverCurrentShift(
+                            currentUserId,
+                            selectedUser.Id,
+                            notesBox.Text);
+                    }
+
+                    if (!success)
+                    {
+                        MessageBox.Show(
+                            "لم تكتمل العملية.",
+                            "O CORE",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+
+                        return;
+                    }
+
+                    dialog.DialogResult = true;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        "تعذر تنفيذ العملية:\n\n" + ex.Message,
+                        "O CORE",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            };
+
+            cancelButton.Click += delegate
+            {
+                dialog.DialogResult = false;
+            };
+
+            buttons.Children.Add(confirmButton);
+            buttons.Children.Add(cancelButton);
+
+            root.Children.Add(buttons);
+
+            dialog.Content = root;
+
+            bool? result = dialog.ShowDialog();
+
+            if (result == true)
             {
                 MessageBox.Show(
-                    "حدث خطأ أثناء تحديث بيانات الشيفت:\n" +
-                    ex.Message,
-                    "مراجعة الشيفت",
+                    emergencyTakeover
+                        ? "تم استلام الشيفت بنجاح. الشيفت ما زال مفتوحًا."
+                        : "تم تسليم الشيفت بنجاح. الشيفت ما زال مفتوحًا.",
+
+                    emergencyTakeover
+                        ? "استلام الشيفت"
+                        : "تسليم الشيفت",
+
                     MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                    MessageBoxImage.Information);
             }
-        }
 
-        private PaymentSummaryRow CreatePaymentRow(
-            string method,
-            double sales,
-            double collections,
-            double refunds,
-            double expenses,
-            double expected)
-        {
-            return new PaymentSummaryRow
-            {
-                PaymentMethod = method,
-                Sales = sales.ToString("N2"),
-                Collections = collections.ToString("N2"),
-                Refunds = refunds.ToString("N2"),
-                Expenses = expenses.ToString("N2"),
-                Expected = expected.ToString("N2")
-            };
-        }
-
-        private class PaymentSummaryRow
-        {
-            public string PaymentMethod { get; set; }
-            public string Sales { get; set; }
-            public string Collections { get; set; }
-            public string Refunds { get; set; }
-            public string Expenses { get; set; }
-            public string Expected { get; set; }
-        }
-
-        private class ExpenseReviewRow
-        {
-            public string CreatedAt { get; set; }
-            public string Category { get; set; }
-            public string Description { get; set; }
-            public string PaymentMethod { get; set; }
-            public string Amount { get; set; }
-            public string Status { get; set; }
-            public string VoidedByName { get; set; }
-            public string VoidedAt { get; set; }
-            public string VoidReason { get; set; }
+            RefreshShiftHandoverButtons();
+            RefreshShiftSummary();
         }
     }
 }
