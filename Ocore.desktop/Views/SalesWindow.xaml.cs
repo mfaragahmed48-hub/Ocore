@@ -2607,15 +2607,23 @@ namespace Ocore.desktop.Views
                 out parsedDate);
         }
 
+
         private static bool IsBatchExpiredOrInvalid(string expiryDate)
         {
+            // السماح ببيع التشغيلات التي ليس لها تاريخ صلاحية.
+            if (string.IsNullOrWhiteSpace(expiryDate))
+                return false;
+
             DateTime parsedDate;
 
+            // رفض التاريخ المكتوب بصيغة غير صحيحة.
             if (!TryGetBatchExpiryDate(expiryDate, out parsedDate))
                 return true;
 
+            // السماح بالبيع في يوم انتهاء الصلاحية نفسه.
             return parsedDate.Date < DateTime.Today;
         }
+
 
         private bool AreBatchAllocationsValid(
             SaleInvoiceItem item,
