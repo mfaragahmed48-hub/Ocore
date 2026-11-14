@@ -401,6 +401,21 @@
                                 Margin="15,0,0,0"
                                 VerticalAlignment="Center">
 
+                        <!-- مراجعة الشيفت للمدير فقط -->
+                        <Button x:Name="ReviewCurrentShiftButton"
+                                Content="👁   مراجعة الشيفت"
+                                Width="155"
+                                Height="38"
+                                Margin="0,0,0,6"
+                                Padding="8"
+                                Background="#246B58"
+                                Foreground="White"
+                                FontWeight="Bold"
+                                BorderThickness="0"
+                                Visibility="Collapsed"
+                                IsEnabled="False"
+                                Click="ReviewCurrentShiftButton_Click"/>
+
                         <Button x:Name="HandoverShiftButton"
                                 Content="⇄   تسليم الشيفت"
                                 Width="155"
