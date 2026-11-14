@@ -157,11 +157,11 @@ namespace Ocore.desktop.Services
                 var printData = new List<byte>(rasterData);
 
                 // POS-80C:
-                // تغذية الورق 5 أسطر ثم تنفيذ القص الجزئي.
+                // تنفيذ القص الجزئي مباشرة بعد آخر بيانات التقرير
+                // دون تغذية ورق إضافية.
                 // هذا الأمر خاص بتقرير إغلاق الشيفت فقط.
                 printData.AddRange(new byte[]
                 {
-                    0x1B, 0x64, 0x05,
                     0x1D, 0x56, 0x01
                 });
 
