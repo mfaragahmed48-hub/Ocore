@@ -115,6 +115,13 @@ namespace Ocore.desktop.Services
                 paperWidth,
                 PrintDpi);
 
+            // قص المساحة البيضاء الزائدة من أسفل التقرير.
+            // نترك هامشاً صغيراً جداً بعد آخر سطر مطبوع.
+            image = receiptRenderer.CropBottomWhitespace(
+                image,
+                whiteThreshold: 250,
+                bottomPaddingPixels: 4);
+
             if (image == null || !image.IsFrozen)
             {
                 throw new InvalidOperationException(
@@ -157,7 +164,7 @@ namespace Ocore.desktop.Services
                 var printData = new List<byte>(rasterData);
 
                 // POS-80C:
-                // تنفيذ القص الجزئي مباشرة بعد آخر بيانات التقرير
+                // تنفيذ القص الجزئي مباشرة بعد بيانات التقرير
                 // دون تغذية ورق إضافية.
                 // هذا الأمر خاص بتقرير إغلاق الشيفت فقط.
                 printData.AddRange(new byte[]
