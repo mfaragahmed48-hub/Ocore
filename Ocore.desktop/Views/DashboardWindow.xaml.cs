@@ -271,7 +271,7 @@ namespace Ocore.desktop.Views
         // إغلاق الشيفت بالمبالغ الفعلية
         // ==========================================
 
-        private void CloseShiftButton_Click(
+        private async void CloseShiftButton_Click(
             object sender,
             RoutedEventArgs e)
         {
@@ -298,19 +298,6 @@ namespace Ocore.desktop.Views
                         MessageBoxImage.Information);
 
                     RefreshShiftSummary();
-                    return;
-                }
-
-                var summary =
-                    shiftService.GetCurrentShiftFinancialSummary();
-
-                if (summary == null)
-                {
-                    MessageBox.Show(
-                        "تعذر تحميل الملخص المالي للشيفت.",
-                        "إغلاق الشيفت",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
                     return;
                 }
 
@@ -351,7 +338,7 @@ namespace Ocore.desktop.Views
 
                 root.Children.Add(new TextBlock
                 {
-                    Text = "راجع المبلغ المتوقع ثم أدخل الموجود الفعلي. اكتب 0 إذا لم يوجد رصيد.",
+                    Text = "أدخل الموجود الفعلي فقط لكل وسيلة دفع. اكتب 0 إذا لم يوجد رصيد.",
                     FontSize = 13,
                     Foreground = new SolidColorBrush(
                         Color.FromRgb(100, 115, 111)),
@@ -376,12 +363,6 @@ namespace Ocore.desktop.Views
                         Width = new GridLength(1, GridUnitType.Star)
                     });
 
-                table.ColumnDefinitions.Add(
-                    new ColumnDefinition
-                    {
-                        Width = new GridLength(1, GridUnitType.Star)
-                    });
-
                 for (int i = 0; i < 5; i++)
                 {
                     table.RowDefinitions.Add(
@@ -395,40 +376,21 @@ namespace Ocore.desktop.Views
                     table, "وسيلة الدفع", 0, 0, true);
 
                 AddShiftTableCell(
-                    table, "المتوقع", 0, 1, true);
+                    table, "الموجود فعليًا", 0, 1, true);
 
-                AddShiftTableCell(
-                    table, "الموجود فعليًا", 0, 2, true);
+                AddShiftActualPaymentRow(
+                    table, 1, "النقدية", cashBox);
 
-                AddShiftPaymentRow(
-                    table, 1, "النقدية",
-                    summary.ExpectedCash, cashBox);
+                AddShiftActualPaymentRow(
+                    table, 2, "الفيزا", cardBox);
 
-                AddShiftPaymentRow(
-                    table, 2, "الفيزا",
-                    summary.ExpectedCard, cardBox);
+                AddShiftActualPaymentRow(
+                    table, 3, "إنستا باي", instaPayBox);
 
-                AddShiftPaymentRow(
-                    table, 3, "إنستا باي",
-                    summary.ExpectedInstaPay, instaPayBox);
-
-                AddShiftPaymentRow(
-                    table, 4, "التحويل البنكي",
-                    summary.ExpectedTransfer, transferBox);
+                AddShiftActualPaymentRow(
+                    table, 4, "التحويل البنكي", transferBox);
 
                 root.Children.Add(table);
-
-                root.Children.Add(new TextBlock
-                {
-                    Text = "إجمالي المتوقع: " +
-                           summary.TotalExpected.ToString("N2") +
-                           " جنيه",
-                    FontSize = 16,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = new SolidColorBrush(
-                        Color.FromRgb(24, 63, 54)),
-                    Margin = new Thickness(0, 4, 0, 18)
-                });
 
                 var buttons = new StackPanel
                 {
@@ -460,6 +422,8 @@ namespace Ocore.desktop.Views
                         Color.FromRgb(24, 63, 54)),
                     BorderThickness = new Thickness(0)
                 };
+
+                int closedShiftId = 0;
 
                 confirmButton.Click += delegate
                 {
@@ -515,6 +479,7 @@ namespace Ocore.desktop.Views
                             return;
                         }
 
+                        closedShiftId = shift.Id;
                         dialog.DialogResult = true;
                     }
                     catch (Exception ex)
@@ -542,11 +507,27 @@ namespace Ocore.desktop.Views
 
                 if (result == true)
                 {
-                    MessageBox.Show(
-                        "تم إغلاق الشيفت بنجاح وحفظ المبالغ الفعلية والفروق.",
-                        "إغلاق الشيفت",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    try
+                    {
+                        await new ShiftClosurePrintingService()
+                            .PrintClosureAsync(closedShiftId);
+
+                        MessageBox.Show(
+                            "تم إغلاق الشيفت بنجاح وحفظ المبالغ الفعلية والفروق.",
+                            "إغلاق الشيفت",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    catch (Exception printException)
+                    {
+                        MessageBox.Show(
+                            "تم إغلاق الشيفت بنجاح وحفظ المبالغ الفعلية والفروق، " +
+                            "لكن تعذرت طباعة تقرير الإغلاق على طابعة الكاشير.\n\n" +
+                            printException.Message,
+                            "تعذر طباعة تقرير الإغلاق",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
                 }
 
                 RefreshShiftSummary();
@@ -590,25 +571,17 @@ namespace Ocore.desktop.Views
             };
         }
 
-        private void AddShiftPaymentRow(
+        private void AddShiftActualPaymentRow(
             Grid grid,
             int row,
             string paymentName,
-            double expectedAmount,
             TextBox actualTextBox)
         {
             AddShiftTableCell(
                 grid, paymentName, row, 0, false);
 
-            AddShiftTableCell(
-                grid,
-                expectedAmount.ToString("N2"),
-                row,
-                1,
-                false);
-
             Grid.SetRow(actualTextBox, row);
-            Grid.SetColumn(actualTextBox, 2);
+            Grid.SetColumn(actualTextBox, 1);
 
             actualTextBox.Margin = new Thickness(5);
 
