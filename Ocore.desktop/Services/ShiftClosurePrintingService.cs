@@ -156,14 +156,13 @@ namespace Ocore.desktop.Services
 
                 var printData = new List<byte>(rasterData);
 
-                if (configuration.AutoCut)
-                {
-                    printData.AddRange(
-                        thermalPrinterService.CreateFeedCommand(3));
+                // تغذية الورق ثم قصه بعد تقرير إغلاق الشيفت دائماً.
+                // هذا التعديل خاص بتقرير إغلاق الشيفت فقط.
+                printData.AddRange(
+                    thermalPrinterService.CreateFeedCommand(3));
 
-                    printData.AddRange(
-                        thermalPrinterService.CreateCutCommand());
-                }
+                printData.AddRange(
+                    thermalPrinterService.CreateCutCommand());
 
                 await thermalPrinterService.SendRawAsync(
                     printerName,
