@@ -11,6 +11,7 @@ namespace Ocore.desktop.Services
     public class SalesProductSearchService
     {
         private readonly ProductService productService;
+        private readonly PermissionService permissionService;
         private readonly string connectionString;
 
         private class CatalogDrug
@@ -29,6 +30,7 @@ namespace Ocore.desktop.Services
         public SalesProductSearchService()
         {
             productService = new ProductService();
+            permissionService = new PermissionService();
 
             var database = new DatabaseManager();
 
@@ -39,15 +41,13 @@ namespace Ocore.desktop.Services
         public List<SalesProductSearchResult> GetSearchResults(
             int currentUserId)
         {
-            // تحميل الأصناف المتاحة للبيع فعليًا
-            // واستبعاد الأصناف التي ليس لها رصيد صالح.
-            var products =
-                productService.GetProductsAvailableForSale(currentUserId)
-                .Where(p => p != null && p.Quantity > 0)
-                .ToList();
+            // جلب جميع الكروت النشطة المسموح بالبحث عنها للبيع،
+            // بما فيها الكروت التي رصيدها صفر.
+            var products = GetActiveProductsForSalesSearch(currentUserId);
 
-            var results = products.Select(p =>
-                new SalesProductSearchResult
+            var results = products
+                .Where(p => p != null)
+                .Select(p => new SalesProductSearchResult
                 {
                     Product = p,
                     ProductCode = p.ProductCode,
@@ -59,10 +59,10 @@ namespace Ocore.desktop.Services
                     SalePrice = p.SalePrice,
                     Quantity = p.Quantity,
                     Barcode = p.Barcode
-                }).ToList();
+                })
+                .ToList();
 
-            // تحميل دليل الأدوية لاستخدامه في إثراء بيانات
-            // الأصناف الموجودة بالفعل في المخزون فقط.
+            // تحميل بيانات دليل الأدوية.
             var catalogDrugs = new List<CatalogDrug>();
 
             using (var connection =
@@ -118,20 +118,12 @@ WHERE IsActive = 1
                 }
             }
 
-            // إزالة السجلات المتطابقة
-            catalogDrugs = catalogDrugs
-                .GroupBy(d => string.Join("|",
-                    Normalize(d.TradeName),
-                    Normalize(d.TradeNameArabic),
-                    Normalize(d.GenericName),
-                    Normalize(d.Strength),
-                    Normalize(d.DosageForm),
-                    Normalize(d.RouteOfAdministration),
-                    Normalize(d.Manufacturer)))
-                .Select(g => g.First())
-                .ToList();
+            // فهرس دليل الأدوية حسب المعرف.
+            var catalogById = catalogDrugs
+                .GroupBy(d => d.Id)
+                .ToDictionary(g => g.Key, g => g.First());
 
-            // إنشاء فهرس سريع لأسماء الأدوية في الدليل
+            // فهرس أسماء الأدوية في الدليل.
             var catalogNameIndex =
                 new Dictionary<string, List<CatalogDrug>>(
                     StringComparer.Ordinal);
@@ -151,7 +143,7 @@ WHERE IsActive = 1
                 }
             }
 
-            // إنشاء فهرس سريع لأسماء الأصناف الموجودة بالمخزون
+            // فهرس أسماء جميع كروت المخزون.
             var inventoryNameIndex =
                 new Dictionary<string, List<SalesProductSearchResult>>(
                     StringComparer.Ordinal);
@@ -161,8 +153,7 @@ WHERE IsActive = 1
                 if (result.Product == null)
                     continue;
 
-                string normalizedName =
-                    Normalize(result.Name);
+                string normalizedName = Normalize(result.Name);
 
                 if (normalizedName.Length == 0)
                     continue;
@@ -173,23 +164,35 @@ WHERE IsActive = 1
                     result);
             }
 
-            // مطابقة الأصناف الموجودة بالمخزون مع دليل الأدوية
+            // أولًا: الربط المباشر باستخدام DrugCatalogId.
+            // يسمح ذلك بإثراء جميع كروت السعر التابعة للدواء نفسه.
+            foreach (var result in results)
+            {
+                if (result.Product == null ||
+                    !result.Product.DrugCatalogId.HasValue)
+                {
+                    continue;
+                }
+
+                CatalogDrug drug;
+
+                if (catalogById.TryGetValue(
+                    result.Product.DrugCatalogId.Value,
+                    out drug))
+                {
+                    ApplyCatalogData(result, drug);
+                }
+            }
+
+            // ثانيًا: محاولة المطابقة بالاسم للأصناف القديمة
+            // التي لا تحتوي على DrugCatalogId.
             foreach (var drug in catalogDrugs)
             {
-                string englishName =
-                    Normalize(drug.TradeName);
-
-                string arabicName =
-                    Normalize(drug.TradeNameArabic);
-
                 var aliases = GetAliases(
-                    englishName,
-                    arabicName);
+                    drug.TradeName,
+                    drug.TradeNameArabic);
 
-                // جمع سجلات الدليل التي تشترك في الاسم
-                // مع منع احتساب السجل نفسه أكثر من مرة.
-                var catalogMatches =
-                    new HashSet<int>();
+                var catalogMatches = new HashSet<int>();
 
                 foreach (string alias in aliases)
                 {
@@ -206,7 +209,11 @@ WHERE IsActive = 1
                         catalogMatches.Add(match.Id);
                 }
 
-                // البحث عن الصنف المطابق في المخزون
+                // لا نعتمد على الاسم وحده إذا كان مشتركًا
+                // بين أكثر من دواء في الدليل.
+                if (catalogMatches.Count != 1)
+                    continue;
+
                 var inventoryMatches =
                     new Dictionary<int, SalesProductSearchResult>();
 
@@ -226,47 +233,219 @@ WHERE IsActive = 1
                         if (match.Product == null)
                             continue;
 
-                        inventoryMatches[
-                            match.Product.Id] = match;
+                        // لا نغير بيانات كارت مرتبط بالفعل
+                        // بسجل مختلف في دليل الأدوية.
+                        if (match.Product.DrugCatalogId.HasValue)
+                            continue;
+
+                        inventoryMatches[match.Product.Id] = match;
                     }
                 }
 
-                // المطابقة الدقيقة والوحيدة فقط
-                if (inventoryMatches.Count == 1 &&
-                    catalogMatches.Count == 1)
+                // إذا كان هناك أكثر من كارت سعر للاسم نفسه،
+                // نُثري جميع الكروت المطابقة بدل رفض المطابقة.
+                foreach (var existing in inventoryMatches.Values)
                 {
-                    var existing =
-                        inventoryMatches.Values.First();
-
-                    existing.CatalogId = drug.Id;
-                    existing.TradeNameArabic =
-                        drug.TradeNameArabic;
-                    existing.GenericName =
-                        drug.GenericName;
-                    existing.Strength =
-                        drug.Strength;
-                    existing.DosageForm =
-                        drug.DosageForm;
-                    existing.RouteOfAdministration =
-                        drug.RouteOfAdministration;
-                    existing.Manufacturer =
-                        drug.Manufacturer;
-                    existing.DrugClass =
-                        drug.DrugClass;
+                    ApplyCatalogData(existing, drug);
                 }
-
-                // لا نضيف أدوية الدليل غير الموجودة بالمخزون
-                // إلى نتائج البحث أو قائمة الأصناف المتاحة للبيع.
             }
 
-            // ضمان أن كل نتيجة بحث مرتبطة بصنف مخزني
-            // وأن رصيده أكبر من صفر.
+            // لا نستبعد الكروت ذات الرصيد صفر.
+            // فحص الرصيد الصالح ومنع البيع يتم عند اختيار
+            // الكارت ومحاولة تخصيص تشغيلاته.
             return results
-                .Where(r =>
-                    r.Product != null &&
-                    r.Product.Quantity > 0)
+                .Where(r => r.Product != null)
                 .OrderBy(r => r.Name)
+                .ThenBy(r => r.ProductCode)
                 .ToList();
+        }
+
+        private List<Product> GetActiveProductsForSalesSearch(
+            int currentUserId)
+        {
+            var products = new List<Product>();
+
+            using (var connection =
+                new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                string role;
+
+                using (var command = new SQLiteCommand(
+                    @"SELECT Role
+                      FROM Users
+                      WHERE Id = @UserId
+                        AND IsActive = 1;",
+                    connection))
+                {
+                    command.Parameters.AddWithValue(
+                        "@UserId", currentUserId);
+
+                    object value = command.ExecuteScalar();
+
+                    if (value == null)
+                    {
+                        throw new UnauthorizedAccessException(
+                            "المستخدم غير موجود أو حسابه غير نشط.");
+                    }
+
+                    role = Convert.ToString(value);
+                }
+
+                if (!permissionService.HasPermission(
+                    role,
+                    "Sales.SearchProducts"))
+                {
+                    throw new UnauthorizedAccessException(
+                        "ليس لديك صلاحية البحث عن الأصناف للبيع.");
+                }
+
+                string sql = @"
+SELECT
+    p.Id,
+    p.ProductCode,
+    p.Name,
+    p.DrugCatalogId,
+    p.CategoryId,
+    p.UnitName,
+    p.SmallUnitName,
+    p.UnitsPerPackage,
+    p.SalePrice,
+    p.PurchasePrice,
+    p.MaxDiscountPercentage,
+    p.MinimumStockLevel,
+    p.IsArchived,
+
+    COALESCE(
+        (SELECT SUM(b.Quantity)
+         FROM Batches b
+         WHERE b.ProductId = p.Id
+           AND b.Quantity > 0),
+        0
+    ) AS TotalQuantity,
+
+    COALESCE(
+        (SELECT SUM(b.Quantity)
+         FROM Batches b
+         WHERE b.ProductId = p.Id
+           AND (
+                b.ExpiryDate = ''
+                OR b.ExpiryDate >= @Today
+           )
+           AND b.Quantity > 0),
+        0
+    ) AS Quantity,
+
+    COALESCE(
+        (SELECT SUM(b.Quantity)
+         FROM Batches b
+         WHERE b.ProductId = p.Id
+           AND b.ExpiryDate <> ''
+           AND b.ExpiryDate < @Today
+           AND b.Quantity > 0),
+        0
+    ) AS ExpiredQuantity,
+
+    COALESCE(
+        (SELECT Barcode
+         FROM ProductBarcodes pb
+         WHERE pb.ProductId = p.Id
+         LIMIT 1),
+        ''
+    ) AS Barcode
+
+FROM Products p
+WHERE p.IsArchived = 0
+ORDER BY p.Name, p.ProductCode;";
+
+                using (var command =
+                    new SQLiteCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue(
+                        "@Today",
+                        DateTime.Today.ToString("yyyy-MM-dd"));
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            products.Add(new Product
+                            {
+                                Id = Convert.ToInt32(reader["Id"]),
+
+                                ProductCode =
+                                    Convert.ToString(reader["ProductCode"]),
+
+                                Name =
+                                    Convert.ToString(reader["Name"]),
+
+                                DrugCatalogId =
+                                    reader["DrugCatalogId"] == DBNull.Value
+                                        ? (int?)null
+                                        : Convert.ToInt32(reader["DrugCatalogId"]),
+
+                                CategoryId =
+                                    reader["CategoryId"] == DBNull.Value
+                                        ? (int?)null
+                                        : Convert.ToInt32(reader["CategoryId"]),
+
+                                UnitName =
+                                    Convert.ToString(reader["UnitName"]),
+
+                                SmallUnitName =
+                                    Convert.ToString(reader["SmallUnitName"]),
+
+                                UnitsPerPackage =
+                                    Convert.ToInt32(reader["UnitsPerPackage"]),
+
+                                SalePrice =
+                                    Convert.ToDouble(reader["SalePrice"]),
+
+                                PurchasePrice =
+                                    Convert.ToDouble(reader["PurchasePrice"]),
+
+                                MaxDiscountPercentage =
+                                    Convert.ToDouble(reader["MaxDiscountPercentage"]),
+
+                                MinimumStockLevel =
+                                    Convert.ToDouble(reader["MinimumStockLevel"]),
+
+                                Quantity =
+                                    Convert.ToDouble(reader["Quantity"]),
+
+                                TotalQuantity =
+                                    Convert.ToDouble(reader["TotalQuantity"]),
+
+                                ExpiredQuantity =
+                                    Convert.ToDouble(reader["ExpiredQuantity"]),
+
+                                IsArchived =
+                                    Convert.ToInt32(reader["IsArchived"]) == 1,
+
+                                Barcode =
+                                    Convert.ToString(reader["Barcode"])
+                            });
+                        }
+                    }
+                }
+            }
+
+            return products;
+        }
+
+        private void ApplyCatalogData(
+            SalesProductSearchResult result,
+            CatalogDrug drug)
+        {
+            result.CatalogId = drug.Id;
+            result.TradeNameArabic = drug.TradeNameArabic;
+            result.GenericName = drug.GenericName;
+            result.Strength = drug.Strength;
+            result.DosageForm = drug.DosageForm;
+            result.RouteOfAdministration = drug.RouteOfAdministration;
+            result.Manufacturer = drug.Manufacturer;
+            result.DrugClass = drug.DrugClass;
         }
 
         private List<string> GetAliases(
