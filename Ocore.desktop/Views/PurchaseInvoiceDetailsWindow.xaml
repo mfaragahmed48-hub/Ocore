@@ -173,15 +173,36 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
 
+                    <Button Content="▦ طباعة باركود الأصناف"
+        Width="190"
+        Height="38"
+        Margin="5"
+        Background="#246B58"
+        Foreground="White"
+        FontWeight="Bold"
+        BorderThickness="0"
+        Click="PrintInvoiceBarcodesButton_Click"/>
+
+
+                    <Button Content="▦ طباعة باركود الأصناف"
+        Width="190"
+        Height="38"
+        Margin="5"
+        Background="#246B58"
+        Foreground="White"
+        FontWeight="Bold"
+        BorderThickness="0"
+        Click="PrintInvoiceBarcodesButton_Click"/>
+
                     <Button Content="🖨 طباعة الفاتورة"
-                            Width="160"
-                            Height="38"
-                            Margin="5"
-                            Background="#16865D"
-                            Foreground="White"
-                            FontWeight="Bold"
-                            BorderThickness="0"
-                            Click="PrintInvoiceButton_Click"/>
+        Width="160"
+        Height="38"
+        Margin="5"
+        Background="#16865D"
+        Foreground="White"
+        FontWeight="Bold"
+        BorderThickness="0"
+        Click="PrintInvoiceButton_Click"/>
 
                     <Button Content="إغلاق"
                             Width="110"

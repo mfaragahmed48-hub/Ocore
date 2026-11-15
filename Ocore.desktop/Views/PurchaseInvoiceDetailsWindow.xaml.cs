@@ -1,6 +1,8 @@
 ﻿
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -736,6 +738,365 @@ namespace Ocore.desktop.Views
                 return Convert.ToString(value) ?? "";
             }
         }
+
+        #region Invoice Barcode Printing
+
+        private void PrintInvoiceBarcodesButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (currentInvoice == null ||
+                currentInvoice.Items == null ||
+                currentInvoice.Items.Count == 0)
+            {
+                MessageBox.Show(
+                    "لا توجد أصناف في الفاتورة لطباعة باركودها.",
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            try
+            {
+                // تجميع الكميات المحولة إلى علب حسب ProductId.
+                // لا يتم دمج كروت الأسعار المختلفة حتى لو تشابه الاسم.
+                Dictionary<int, double> packageQuantities =
+                    new Dictionary<int, double>();
+
+                foreach (PurchaseInvoiceItem item in currentInvoice.Items)
+                {
+                    if (item == null || item.ProductId <= 0)
+                    {
+                        throw new InvalidOperationException(
+                            "يوجد بند في الفاتورة لا يحتوي على كود صنف صحيح.");
+                    }
+
+                    if (double.IsNaN(item.Quantity) ||
+                        double.IsInfinity(item.Quantity) ||
+                        double.IsNaN(item.FreeQuantity) ||
+                        double.IsInfinity(item.FreeQuantity) ||
+                        item.Quantity < 0 ||
+                        item.FreeQuantity < 0)
+                    {
+                        throw new InvalidOperationException(
+                            "توجد كمية غير صحيحة في الصنف: " +
+                            (item.ItemName ?? ""));
+                    }
+
+                    double totalQuantity =
+                        item.Quantity + item.FreeQuantity;
+
+                    if (double.IsNaN(totalQuantity) ||
+                        double.IsInfinity(totalQuantity))
+                    {
+                        throw new InvalidOperationException(
+                            "إجمالي الكمية غير صالح للصنف: " +
+                            (item.ItemName ?? ""));
+                    }
+
+                    bool isSmallUnit =
+                        !string.IsNullOrWhiteSpace(item.UnitName) &&
+                        !string.IsNullOrWhiteSpace(item.SmallUnitName) &&
+                        string.Equals(
+                            item.UnitName.Trim(),
+                            item.SmallUnitName.Trim(),
+                            StringComparison.OrdinalIgnoreCase);
+
+                    double packageQuantity;
+
+                    if (isSmallUnit)
+                    {
+                        if (item.UnitsPerPackage <= 0)
+                        {
+                            throw new InvalidOperationException(
+                                "عدد الوحدات داخل العلبة غير صحيح للصنف: " +
+                                (item.ItemName ?? ""));
+                        }
+
+                        packageQuantity =
+                            totalQuantity / item.UnitsPerPackage;
+                    }
+                    else
+                    {
+                        packageQuantity = totalQuantity;
+                    }
+
+                    if (double.IsNaN(packageQuantity) ||
+                        double.IsInfinity(packageQuantity) ||
+                        packageQuantity < 0)
+                    {
+                        throw new InvalidOperationException(
+                            "تعذر تحويل كمية الصنف إلى علب: " +
+                            (item.ItemName ?? ""));
+                    }
+
+                    if (packageQuantities.ContainsKey(item.ProductId))
+                    {
+                        packageQuantities[item.ProductId] +=
+                            packageQuantity;
+                    }
+                    else
+                    {
+                        packageQuantities.Add(
+                            item.ProductId,
+                            packageQuantity);
+                    }
+
+                    if (double.IsNaN(packageQuantities[item.ProductId]) ||
+                        double.IsInfinity(packageQuantities[item.ProductId]))
+                    {
+                        throw new InvalidOperationException(
+                            "إجمالي كمية الصنف أكبر من النطاق المسموح: " +
+                            (item.ItemName ?? ""));
+                    }
+                }
+
+                // تحميل بيانات كروت الأصناف حسب ProductId.
+                // هذه الدالة تشمل الكروت المؤرشفة الموجودة في الفواتير القديمة.
+                ProductService productService = new ProductService();
+
+                List<Product> products =
+                    productService.GetProductsForManagement(currentUserId);
+
+                Dictionary<int, Product> productsById =
+                    products
+                        .Where(p => p != null &&
+                                    packageQuantities.ContainsKey(p.Id))
+                        .GroupBy(p => p.Id)
+                        .ToDictionary(g => g.Key, g => g.First());
+
+                BarcodePrintService barcodePrintService =
+                    new BarcodePrintService();
+
+                List<Tuple<Product, int>> printItems =
+                    new List<Tuple<Product, int>>();
+
+                foreach (KeyValuePair<int, double> entry in packageQuantities)
+                {
+                    // التقريب لأعلى بعد جمع كل بنود وتشغيلات الكارت نفسه.
+                    double normalizedQuantity =
+                        Math.Round(
+                            entry.Value,
+                            8,
+                            MidpointRounding.AwayFromZero);
+
+                    double roundedCount =
+                        Math.Ceiling(normalizedQuantity);
+
+                    if (roundedCount <= 0)
+                        continue;
+
+                    if (roundedCount > int.MaxValue)
+                    {
+                        throw new InvalidOperationException(
+                            "عدد الملصقات كبير جدًا لكارت الصنف رقم: " +
+                            entry.Key);
+                    }
+
+                    Product product;
+
+                    if (!productsById.TryGetValue(
+                        entry.Key,
+                        out product))
+                    {
+                        throw new InvalidOperationException(
+                            "تعذر تحميل بيانات كارت الصنف رقم: " +
+                            entry.Key);
+                    }
+
+                    if (!barcodePrintService.IsValidEan13(product.Barcode))
+                    {
+                        throw new InvalidOperationException(
+                            "باركود الصنف غير صحيح أو ليس EAN-13: " +
+                            (product.Name ?? "") +
+                            " - كود الصنف: " +
+                            (product.ProductCode ?? ""));
+                    }
+
+                    printItems.Add(
+                        Tuple.Create(
+                            product,
+                            checked((int)roundedCount)));
+                }
+
+                if (printItems.Count == 0)
+                {
+                    MessageBox.Show(
+                        "لا توجد كميات تنتج عنها ملصقات للطباعة.",
+                        "O CORE",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    return;
+                }
+
+                // استخدام إعدادات طابعة الباركود الحالية دون تعديلها أو حفظها.
+                PrinterConfiguration barcodeConfiguration =
+                    printerConfigurationService.GetConfiguration(
+                        PrinterType.BarcodeRoll);
+
+                if (barcodeConfiguration == null)
+                {
+                    barcodeConfiguration =
+                        PrinterConfigurationDefaults.Create(
+                            PrinterType.BarcodeRoll);
+                }
+
+                double labelWidth =
+                    barcodeConfiguration.BarcodeLabelWidth;
+
+                double labelHeight =
+                    barcodeConfiguration.BarcodeLabelHeight;
+
+                double gap =
+                    barcodeConfiguration.BarcodeGap;
+
+                double offsetX =
+                    barcodeConfiguration.BarcodeOffsetX;
+
+                double offsetY =
+                    barcodeConfiguration.BarcodeOffsetY;
+
+                if (!IsValidBarcodeDimension(labelWidth) ||
+                    !IsValidBarcodeDimension(labelHeight) ||
+                    !IsValidBarcodeNumber(gap) ||
+                    !IsValidBarcodeNumber(offsetX) ||
+                    !IsValidBarcodeNumber(offsetY) ||
+                    gap < 0 || gap > 50 ||
+                    offsetX < -50 || offsetX > 50 ||
+                    offsetY < -50 || offsetY > 50)
+                {
+                    throw new InvalidOperationException(
+                        "إعدادات مقاس أو مسافة أو إزاحة ملصق الباركود غير صحيحة. راجع إعدادات طابعة الباركود.");
+                }
+
+                string printerName =
+                    (barcodeConfiguration.PrinterName ?? "").Trim();
+
+                if (string.IsNullOrWhiteSpace(printerName))
+                {
+                    MessageBox.Show(
+                        "لم يتم تحديد طابعة باركود. افتح إعدادات الطابعات وحدد طابعة الباركود أولًا.",
+                        "O CORE",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
+                bool printerInstalled =
+                    System.Drawing.Printing.PrinterSettings.InstalledPrinters
+                        .Cast<string>()
+                        .Any(name => string.Equals(
+                            name,
+                            printerName,
+                            StringComparison.OrdinalIgnoreCase));
+
+                if (!printerInstalled)
+                {
+                    MessageBox.Show(
+                        "الطابعة المحفوظة غير موجودة ضمن طابعات Windows المثبتة:\n\n" +
+                        printerName,
+                        "طابعة الباركود غير متاحة",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
+                int totalLabels = printItems.Sum(item => item.Item2);
+
+                bool confirmed =
+                    MessageBox.Show(
+                        "سيتم طباعة " + totalLabels +
+                        " ملصق باركود لعدد " + printItems.Count +
+                        " كارت صنف.\n\nهل تريد المتابعة؟",
+                        "تأكيد طباعة باركود الفاتورة",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question) == MessageBoxResult.Yes;
+
+                if (!confirmed)
+                    return;
+
+                FixedDocument document =
+                    barcodePrintService.CreateRollDocument(
+                        printItems,
+                        labelWidth,
+                        labelHeight,
+                        gap,
+                        offsetX,
+                        offsetY,
+                        barcodeConfiguration.BarcodeShowPrice,
+                        barcodeConfiguration.BarcodeShowProductCode);
+
+                double pageHeightDip =
+                    ((labelHeight * 2) + gap) * 96.0 / 25.4;
+
+                using (LocalPrintServer localPrintServer =
+                    new LocalPrintServer())
+                {
+                    PrintQueue windowsPrintQueue =
+                        localPrintServer.GetPrintQueue(printerName);
+
+                    windowsPrintQueue.Refresh();
+
+                    System.Windows.Controls.PrintDialog printDialog =
+                        new System.Windows.Controls.PrintDialog();
+
+                    printDialog.PrintQueue = windowsPrintQueue;
+
+                    printDialog.PrintTicket = new PrintTicket
+                    {
+                        PageMediaSize =
+                            new PageMediaSize(
+                                labelWidth * 96.0 / 25.4,
+                                pageHeightDip),
+
+                        PageOrientation =
+                            PageOrientation.Portrait
+                    };
+
+                    printDialog.PrintDocument(
+                        document.DocumentPaginator,
+                        "O CORE - Purchase Invoice Barcodes");
+                }
+
+                MessageBox.Show(
+                    "تم إرسال " + totalLabels +
+                    " ملصق باركود إلى الطابعة:\n\n" +
+                    printerName,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "تعذرت طباعة باركود أصناف الفاتورة:\n\n" +
+                    ex.Message,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private static bool IsValidBarcodeDimension(double value)
+        {
+            return !double.IsNaN(value) &&
+                   !double.IsInfinity(value) &&
+                   value > 0 &&
+                   value <= 200;
+        }
+
+        private static bool IsValidBarcodeNumber(double value)
+        {
+            return !double.IsNaN(value) &&
+                   !double.IsInfinity(value);
+        }
+
+        #endregion
 
         private void CloseButton_Click(
             object sender,
