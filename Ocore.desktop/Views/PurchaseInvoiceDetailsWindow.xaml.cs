@@ -741,6 +741,7 @@ namespace Ocore.desktop.Views
 
         #region Invoice Barcode Printing
 
+
         private void PrintInvoiceBarcodesButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -760,11 +761,11 @@ namespace Ocore.desktop.Views
 
             try
             {
-                // تجميع الكميات المحولة إلى علب حسب ProductId.
-                // لا يتم دمج كروت الأسعار المختلفة حتى لو تشابه الاسم.
                 Dictionary<int, double> packageQuantities =
                     new Dictionary<int, double>();
 
+                // حساب إجمالي كمية كل كارت، شامل المجاني،
+                // وتحويل الأشرطة إلى علب قبل التجميع.
                 foreach (PurchaseInvoiceItem item in currentInvoice.Items)
                 {
                     if (item == null || item.ProductId <= 0)
@@ -854,7 +855,6 @@ namespace Ocore.desktop.Views
                 }
 
                 // تحميل بيانات كروت الأصناف حسب ProductId.
-                // هذه الدالة تشمل الكروت المؤرشفة الموجودة في الفواتير القديمة.
                 ProductService productService = new ProductService();
 
                 List<Product> products =
@@ -867,15 +867,11 @@ namespace Ocore.desktop.Views
                         .GroupBy(p => p.Id)
                         .ToDictionary(g => g.Key, g => g.First());
 
-                BarcodePrintService barcodePrintService =
-                    new BarcodePrintService();
-
                 List<Tuple<Product, int>> printItems =
                     new List<Tuple<Product, int>>();
 
                 foreach (KeyValuePair<int, double> entry in packageQuantities)
                 {
-                    // التقريب لأعلى بعد جمع كل بنود وتشغيلات الكارت نفسه.
                     double normalizedQuantity =
                         Math.Round(
                             entry.Value,
@@ -906,15 +902,6 @@ namespace Ocore.desktop.Views
                             entry.Key);
                     }
 
-                    if (!barcodePrintService.IsValidEan13(product.Barcode))
-                    {
-                        throw new InvalidOperationException(
-                            "باركود الصنف غير صحيح أو ليس EAN-13: " +
-                            (product.Name ?? "") +
-                            " - كود الصنف: " +
-                            (product.ProductCode ?? ""));
-                    }
-
                     printItems.Add(
                         Tuple.Create(
                             product,
@@ -932,7 +919,31 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
-                // استخدام إعدادات طابعة الباركود الحالية دون تعديلها أو حفظها.
+                // عرض نافذة اختيار الأصناف.
+                // كل الأصناف محددة تلقائيًا عند فتح النافذة.
+                List<Tuple<Product, int>> selectedItems =
+                    ShowBarcodeSelectionWindow(printItems);
+
+                if (selectedItems == null || selectedItems.Count == 0)
+                    return;
+
+                BarcodePrintService barcodePrintService =
+                    new BarcodePrintService();
+
+                // التحقق من الباركود للأصناف المختارة فقط.
+                foreach (Tuple<Product, int> item in selectedItems)
+                {
+                    if (!barcodePrintService.IsValidEan13(item.Item1.Barcode))
+                    {
+                        throw new InvalidOperationException(
+                            "باركود الصنف المختار غير صحيح أو ليس EAN-13:\n\n" +
+                            (item.Item1.Name ?? "") +
+                            " - كود الصنف: " +
+                            (item.Item1.ProductCode ?? ""));
+                    }
+                }
+
+                // استخدام إعدادات طابعة الباركود الحالية دون تعديلها.
                 PrinterConfiguration barcodeConfiguration =
                     printerConfigurationService.GetConfiguration(
                         PrinterType.BarcodeRoll);
@@ -1006,12 +1017,15 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
-                int totalLabels = printItems.Sum(item => item.Item2);
+                long totalLabels =
+                    selectedItems.Aggregate(
+                        0L,
+                        (total, item) => checked(total + item.Item2));
 
                 bool confirmed =
                     MessageBox.Show(
                         "سيتم طباعة " + totalLabels +
-                        " ملصق باركود لعدد " + printItems.Count +
+                        " ملصق باركود لعدد " + selectedItems.Count +
                         " كارت صنف.\n\nهل تريد المتابعة؟",
                         "تأكيد طباعة باركود الفاتورة",
                         MessageBoxButton.YesNo,
@@ -1022,7 +1036,7 @@ namespace Ocore.desktop.Views
 
                 FixedDocument document =
                     barcodePrintService.CreateRollDocument(
-                        printItems,
+                        selectedItems,
                         labelWidth,
                         labelHeight,
                         gap,
@@ -1081,6 +1095,191 @@ namespace Ocore.desktop.Views
                     MessageBoxImage.Error);
             }
         }
+
+        private List<Tuple<Product, int>> ShowBarcodeSelectionWindow(
+            List<Tuple<Product, int>> items)
+        {
+            Window selectionWindow = new Window
+            {
+                Title = "اختيار أصناف طباعة الباركود",
+                Width = 520,
+                Height = 600,
+                MinWidth = 420,
+                MinHeight = 400,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                FlowDirection = FlowDirection.RightToLeft,
+                ResizeMode = ResizeMode.CanResize,
+                Background = Brushes.White
+            };
+
+            StackPanel mainPanel = new StackPanel
+            {
+                Margin = new Thickness(15)
+            };
+
+            TextBlock titleText = new TextBlock
+            {
+                Text = "حدد الأصناف التي تريد طباعة باركودها",
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(
+                    Color.FromRgb(24, 63, 54)),
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            TextBlock instructionText = new TextBlock
+            {
+                Text = "كل الأصناف محددة تلقائيًا. أزل علامة الاختيار من أي صنف لا تريد طباعته.",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Brushes.Gray,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
+            StackPanel itemsPanel = new StackPanel
+            {
+                Margin = new Thickness(5)
+            };
+
+            List<CheckBox> checkBoxes = new List<CheckBox>();
+
+            TextBlock totalText = new TextBlock
+            {
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(
+                    Color.FromRgb(22, 134, 93)),
+                Margin = new Thickness(0, 12, 0, 12)
+            };
+
+            Button printButton = new Button
+            {
+                Content = "متابعة الطباعة",
+                Width = 140,
+                Height = 38,
+                Margin = new Thickness(5),
+                Background = new SolidColorBrush(
+                    Color.FromRgb(22, 134, 93)),
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Bold,
+                BorderThickness = new Thickness(0)
+            };
+
+            Button cancelButton = new Button
+            {
+                Content = "إلغاء",
+                Width = 100,
+                Height = 38,
+                Margin = new Thickness(5)
+            };
+
+            Action updateTotal = () =>
+            {
+                long count = 0;
+                int selectedCount = 0;
+
+                foreach (CheckBox checkBox in checkBoxes)
+                {
+                    if (checkBox.IsChecked == true)
+                    {
+                        Tuple<Product, int> item =
+                            checkBox.Tag as Tuple<Product, int>;
+
+                        if (item != null)
+                        {
+                            count += item.Item2;
+                            selectedCount++;
+                        }
+                    }
+                }
+
+                totalText.Text =
+                    "عدد الأصناف المختارة: " + selectedCount +
+                    "    |    إجمالي الملصقات: " + count;
+
+                printButton.IsEnabled = selectedCount > 0;
+            };
+
+            foreach (Tuple<Product, int> item in items)
+            {
+                CheckBox checkBox = new CheckBox
+                {
+                    IsChecked = true,
+                    Tag = item,
+                    Margin = new Thickness(5, 8, 5, 8),
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    FontSize = 14,
+                    Content =
+                        (item.Item1.Name ?? "صنف بدون اسم") +
+                        "   |   كود: " +
+                        (item.Item1.ProductCode ?? "-") +
+                        "   |   عدد الملصقات: " +
+                        item.Item2
+                };
+
+                checkBoxes.Add(checkBox);
+
+                itemsPanel.Children.Add(checkBox);
+            }
+
+            foreach (CheckBox checkBox in checkBoxes)
+            {
+                checkBox.Checked += (s, e) => updateTotal();
+                checkBox.Unchecked += (s, e) => updateTotal();
+            }
+
+            ScrollViewer scrollViewer = new ScrollViewer
+            {
+                Content = itemsPanel,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                MaxHeight = 390
+            };
+
+            StackPanel buttonsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            buttonsPanel.Children.Add(printButton);
+            buttonsPanel.Children.Add(cancelButton);
+
+            mainPanel.Children.Add(titleText);
+            mainPanel.Children.Add(instructionText);
+            mainPanel.Children.Add(scrollViewer);
+            mainPanel.Children.Add(totalText);
+            mainPanel.Children.Add(buttonsPanel);
+
+            selectionWindow.Content = mainPanel;
+
+            bool confirmed = false;
+
+            printButton.Click += (s, e) =>
+            {
+                confirmed = true;
+                selectionWindow.DialogResult = true;
+            };
+
+            cancelButton.Click += (s, e) =>
+            {
+                selectionWindow.DialogResult = false;
+            };
+
+            updateTotal();
+
+            selectionWindow.ShowDialog();
+
+            if (!confirmed)
+                return null;
+
+            return checkBoxes
+                .Where(c => c.IsChecked == true)
+                .Select(c => c.Tag as Tuple<Product, int>)
+                .Where(item => item != null)
+                .ToList();
+        }
+
 
         private static bool IsValidBarcodeDimension(double value)
         {
