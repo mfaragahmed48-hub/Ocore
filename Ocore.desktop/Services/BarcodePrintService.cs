@@ -526,7 +526,7 @@ namespace Ocore.desktop.Services
                 Product product = item.Item1;
                 int labelCount = item.Item2;
 
-                int pairCount = (labelCount + 1) / 2;
+                int pairCount = labelCount / 2 + labelCount % 2;
 
                 for (int pairIndex = 0;
                      pairIndex < pairCount;
