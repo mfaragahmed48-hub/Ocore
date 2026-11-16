@@ -69,7 +69,6 @@ namespace Ocore.desktop.Views
         {
             try
             {
-
                 double previousReturnsTotal =
                     returnsService.GetPreviousReturnsTotal(
                         currentUserId,
@@ -388,7 +387,10 @@ namespace Ocore.desktop.Views
                 maximumQuantity = remainingPackages;
             }
 
-            return Math.Round(maximumQuantity, 2, MidpointRounding.AwayFromZero);
+            return Math.Round(
+                maximumQuantity,
+                2,
+                MidpointRounding.AwayFromZero);
         }
 
         // ==========================================
@@ -477,6 +479,54 @@ namespace Ocore.desktop.Views
         }
 
         // ==========================================
+        // قراءة الكمية بصورة صحيحة حسب الفاصل العشري
+        // ==========================================
+
+        private bool TryParseReturnQuantity(
+            string text,
+            out double quantity)
+        {
+            quantity = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            string normalized = text.Trim()
+                .Replace('\u066B', '.');
+
+            NumberStyles styles =
+                NumberStyles.AllowLeadingSign |
+                NumberStyles.AllowDecimalPoint;
+
+            // النقطة تُعامل كفاصل عشري أولاً،
+            // حتى لا تُفسر كفاصل آلاف في إعدادات اللغة العربية.
+            if (normalized.Contains(".") &&
+                double.TryParse(
+                    normalized,
+                    styles,
+                    CultureInfo.InvariantCulture,
+                    out quantity))
+            {
+                return true;
+            }
+
+            if (double.TryParse(
+                normalized,
+                styles,
+                CultureInfo.CurrentCulture,
+                out quantity))
+            {
+                return true;
+            }
+
+            return double.TryParse(
+                normalized,
+                styles,
+                CultureInfo.InvariantCulture,
+                out quantity);
+        }
+
+        // ==========================================
         // التحقق الفوري عند تغيير كمية المرتجع
         // ==========================================
 
@@ -502,30 +552,16 @@ namespace Ocore.desktop.Views
             if (item == null)
                 return;
 
-            string text = (textBox.Text ?? "").Trim();
-
-            if (string.IsNullOrWhiteSpace(text))
-                return;
-
             double enteredQuantity;
 
-            bool parsed = double.TryParse(
-                text,
-                NumberStyles.Number,
-                CultureInfo.CurrentCulture,
-                out enteredQuantity);
-
-            if (!parsed)
+            if (!TryParseReturnQuantity(
+                textBox.Text,
+                out enteredQuantity))
             {
-                parsed = double.TryParse(
-                    text,
-                    NumberStyles.Number,
-                    CultureInfo.InvariantCulture,
-                    out enteredQuantity);
+                return;
             }
 
-            if (!parsed ||
-                double.IsNaN(enteredQuantity) ||
+            if (double.IsNaN(enteredQuantity) ||
                 double.IsInfinity(enteredQuantity) ||
                 enteredQuantity <= 0)
             {
@@ -535,6 +571,7 @@ namespace Ocore.desktop.Views
             double maximumQuantity =
                 GetMaximumReturnUnitQuantity(item);
 
+            // السماح بالكمية المساوية للمتاح.
             if (enteredQuantity <= maximumQuantity + Epsilon)
                 return;
 
@@ -545,6 +582,7 @@ namespace Ocore.desktop.Views
                 item.ReturnUnitQuantity = maximumQuantity;
 
                 textBox.Text = maximumQuantity.ToString(
+                    "0.##",
                     CultureInfo.CurrentCulture);
 
                 textBox.CaretIndex = textBox.Text.Length;
@@ -555,7 +593,9 @@ namespace Ocore.desktop.Views
                     "\n\nوحدة المرتجع: " +
                     item.ReturnUnitName +
                     "\nالحد الأقصى المسموح: " +
-                    maximumQuantity.ToString("N0"),
+                    maximumQuantity.ToString(
+                        "0.##",
+                        CultureInfo.CurrentCulture),
                     "تجاوز الكمية المتاحة",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -694,21 +734,24 @@ namespace Ocore.desktop.Views
             if (quantity <= 0)
                 return true;
 
-            if (Math.Abs(quantity - Math.Round(quantity)) > Epsilon)
-            {
-                errorMessage =
-                    "كمية المرتجع للصنف " +
-                    item.ItemName +
-                    " يجب أن تكون عددًا صحيحًا من الوحدة المختارة.";
-
-                return false;
-            }
-
             if (string.IsNullOrWhiteSpace(item.ReturnUnitName))
             {
                 errorMessage =
                     "اختر وحدة المرتجع للصنف: " +
                     item.ItemName;
+
+                return false;
+            }
+
+            // الوحدة الصغيرة يجب أن تكون عددًا صحيحًا.
+            // وحدة العبوة تسمح بالكسور مثل نصف علبة.
+            if (IsSmallReturnUnit(item) &&
+                Math.Abs(quantity - Math.Round(quantity)) > Epsilon)
+            {
+                errorMessage =
+                    "كمية المرتجع للصنف " +
+                    item.ItemName +
+                    " يجب أن تكون عددًا صحيحًا من الوحدة الصغيرة.";
 
                 return false;
             }

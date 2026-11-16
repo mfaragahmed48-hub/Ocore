@@ -20,16 +20,11 @@ namespace Ocore.desktop.Services
             var database = new DatabaseManager();
             database.InitializeDatabase();
 
-            // تجهيز جداول الشيفت وعمود ShiftId قبل تنفيذ المرتجعات.
             new ShiftService();
 
             connectionString =
                 "Data Source=" + database.GetDatabasePath() + ";Version=3;";
         }
-
-        // ==========================================
-        // التحقق من صلاحية تنفيذ المرتجعات
-        // ==========================================
 
         private string ValidateReturnPermission(
             SQLiteConnection connection,
@@ -63,10 +58,6 @@ namespace Ocore.desktop.Services
             }
         }
 
-        // ==========================================
-        // البحث عن الأصناف القابلة للمرتجع
-        // ==========================================
-
         public List<SalesReturnItem> SearchReturnableItems(
             int userId,
             string searchText)
@@ -75,7 +66,6 @@ namespace Ocore.desktop.Services
                 throw new Exception("رقم المستخدم غير صحيح.");
 
             var items = new List<SalesReturnItem>();
-
             string search = (searchText ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(search))
@@ -93,21 +83,17 @@ namespace Ocore.desktop.Services
                         si.InvoiceNumber,
                         si.CreatedAt AS InvoiceDate,
                         u.FullName AS EmployeeName,
-
                         sii.Id AS InvoiceItemId,
                         sii.ProductId,
                         p.ProductCode,
                         sii.ItemName,
                         sii.UnitName,
-
                         sii.Quantity AS SoldQuantity,
                         sii.UnitPrice,
                         sii.PackageQuantity,
-
                         COALESCE(p.UnitName, sii.UnitName) AS PackageUnitName,
                         COALESCE(p.SmallUnitName, '') AS SmallUnitName,
                         COALESCE(p.UnitsPerPackage, 0) AS UnitsPerPackage,
-
                         COALESCE(
                             (
                                 SELECT SUM(sri.PackageQuantity)
@@ -118,25 +104,19 @@ namespace Ocore.desktop.Services
                                   AND sr.Status = 'Completed'
                             ), 0
                         ) AS ReturnedPackageQuantity
-
                     FROM SalesInvoiceItems sii
-
                     INNER JOIN SalesInvoices si
                         ON si.Id = sii.InvoiceId
-
                     INNER JOIN Users u
                         ON u.Id = si.UserId
-
                     LEFT JOIN Products p
                         ON p.Id = sii.ProductId
-
                     WHERE si.Status = 'Completed'
-
-                     AND (
-    sii.ItemName LIKE @SearchPattern
-    OR COALESCE(p.Name, '') LIKE @SearchPattern
-    OR COALESCE(p.ProductCode, '') LIKE @SearchPattern
-)
+                      AND (
+                        sii.ItemName LIKE @SearchPattern
+                        OR COALESCE(p.Name, '') LIKE @SearchPattern
+                        OR COALESCE(p.ProductCode, '') LIKE @SearchPattern
+                      )
                     ORDER BY si.Id DESC, sii.Id;";
 
                 using (var command = new SQLiteCommand(sql, connection))
@@ -186,10 +166,6 @@ namespace Ocore.desktop.Services
             return items;
         }
 
-        // ==========================================
-        // جلب فواتير البيع المكتملة القابلة للمرتجع
-        // ==========================================
-
         public List<SalesReturnDetails> GetInvoicesForReturn(
             int userId,
             string searchText)
@@ -214,21 +190,15 @@ namespace Ocore.desktop.Services
                         si.Status,
                         si.CreatedAt,
                         u.FullName AS EmployeeName
-
                     FROM SalesInvoices si
-
                     INNER JOIN Users u
                         ON u.Id = si.UserId
-
                     WHERE si.Status = 'Completed'
-
                     AND EXISTS
                     (
                         SELECT 1
                         FROM SalesInvoiceItems sii
-
                         WHERE sii.InvoiceId = si.Id
-
                         AND (
                             sii.PackageQuantity -
                             COALESCE(
@@ -243,32 +213,24 @@ namespace Ocore.desktop.Services
                             )
                         ) > @Epsilon
                     )
-
                     AND (
                         @SearchText = ''
-
                         OR si.InvoiceNumber LIKE @SearchPattern
-
                         OR u.FullName LIKE @SearchPattern
-
                         OR EXISTS
                         (
                             SELECT 1
                             FROM SalesInvoiceItems sii
-
                             INNER JOIN Products p
                                 ON p.Id = sii.ProductId
-
                             WHERE sii.InvoiceId = si.Id
-
-AND (
-    sii.ItemName LIKE @SearchPattern
-    OR COALESCE(p.Name, '') LIKE @SearchPattern
-    OR COALESCE(p.ProductCode, '') LIKE @SearchPattern
-)
+                            AND (
+                                sii.ItemName LIKE @SearchPattern
+                                OR COALESCE(p.Name, '') LIKE @SearchPattern
+                                OR COALESCE(p.ProductCode, '') LIKE @SearchPattern
+                            )
                         )
                     )
-
                     ORDER BY si.Id DESC;";
 
                 using (var command = new SQLiteCommand(sql, connection))
@@ -299,22 +261,11 @@ AND (
                             invoices.Add(new SalesReturnDetails
                             {
                                 InvoiceId = Convert.ToInt32(reader["Id"]),
-
-                                InvoiceNumber = Convert.ToString(
-                                    reader["InvoiceNumber"]),
-
-                                UserId = Convert.ToInt32(
-                                    reader["UserId"]),
-
-                                EmployeeName = Convert.ToString(
-                                    reader["EmployeeName"]),
-
-                                Total = Convert.ToDouble(
-                                    reader["Total"]),
-
-                                Status = Convert.ToString(
-                                    reader["Status"]),
-
+                                InvoiceNumber = Convert.ToString(reader["InvoiceNumber"]),
+                                UserId = Convert.ToInt32(reader["UserId"]),
+                                EmployeeName = Convert.ToString(reader["EmployeeName"]),
+                                Total = Convert.ToDouble(reader["Total"]),
+                                Status = Convert.ToString(reader["Status"]),
                                 CreatedAt = createdAt
                             });
                         }
@@ -324,12 +275,6 @@ AND (
 
             return invoices;
         }
-
-        // ==========================================
-        // جلب أصناف فاتورة محددة
-        // ==========================================
-
-
 
         public List<SalesReturnItem> GetInvoiceItemsForReturn(
             int userId,
@@ -350,51 +295,42 @@ AND (
                 ValidateReturnPermission(connection, null, userId);
 
                 string sql = @"
-            SELECT
-                si.Id AS InvoiceId,
-                si.InvoiceNumber,
-                si.CreatedAt AS InvoiceDate,
-                u.FullName AS EmployeeName,
-
-                sii.Id AS InvoiceItemId,
-                sii.ProductId,
-                p.ProductCode,
-                sii.ItemName,
-                sii.UnitName,
-                sii.Quantity AS SoldQuantity,
-                sii.UnitPrice,
-                sii.PackageQuantity,
-
-                COALESCE(p.UnitName, sii.UnitName) AS PackageUnitName,
-                COALESCE(p.SmallUnitName, '') AS SmallUnitName,
-                COALESCE(p.UnitsPerPackage, 0) AS UnitsPerPackage,
-
-                COALESCE(
-                    (
-                        SELECT SUM(sri.PackageQuantity)
-                        FROM SalesReturnItems sri
-                        INNER JOIN SalesReturns sr
-                            ON sr.Id = sri.ReturnId
-                        WHERE sri.InvoiceItemId = sii.Id
-                          AND sr.Status = 'Completed'
-                    ), 0
-                ) AS ReturnedPackageQuantity
-
-            FROM SalesInvoiceItems sii
-
-            INNER JOIN SalesInvoices si
-                ON si.Id = sii.InvoiceId
-
-            INNER JOIN Users u
-                ON u.Id = si.UserId
-
-            LEFT JOIN Products p
-                ON p.Id = sii.ProductId
-
-            WHERE si.Id = @InvoiceId
-              AND si.Status = 'Completed'
-
-            ORDER BY sii.Id;";
+                    SELECT
+                        si.Id AS InvoiceId,
+                        si.InvoiceNumber,
+                        si.CreatedAt AS InvoiceDate,
+                        u.FullName AS EmployeeName,
+                        sii.Id AS InvoiceItemId,
+                        sii.ProductId,
+                        p.ProductCode,
+                        sii.ItemName,
+                        sii.UnitName,
+                        sii.Quantity AS SoldQuantity,
+                        sii.UnitPrice,
+                        sii.PackageQuantity,
+                        COALESCE(p.UnitName, sii.UnitName) AS PackageUnitName,
+                        COALESCE(p.SmallUnitName, '') AS SmallUnitName,
+                        COALESCE(p.UnitsPerPackage, 0) AS UnitsPerPackage,
+                        COALESCE(
+                            (
+                                SELECT SUM(sri.PackageQuantity)
+                                FROM SalesReturnItems sri
+                                INNER JOIN SalesReturns sr
+                                    ON sr.Id = sri.ReturnId
+                                WHERE sri.InvoiceItemId = sii.Id
+                                  AND sr.Status = 'Completed'
+                            ), 0
+                        ) AS ReturnedPackageQuantity
+                    FROM SalesInvoiceItems sii
+                    INNER JOIN SalesInvoices si
+                        ON si.Id = sii.InvoiceId
+                    INNER JOIN Users u
+                        ON u.Id = si.UserId
+                    LEFT JOIN Products p
+                        ON p.Id = sii.ProductId
+                    WHERE si.Id = @InvoiceId
+                      AND si.Status = 'Completed'
+                    ORDER BY sii.Id;";
 
                 using (var command = new SQLiteCommand(sql, connection))
                 {
@@ -408,25 +344,17 @@ AND (
                             SalesReturnItem item =
                                 CreateReturnItemFromReader(reader);
 
-                            item.InvoiceId = Convert.ToInt32(
-                                reader["InvoiceId"]);
-
-                            item.InvoiceNumber = Convert.ToString(
-                                reader["InvoiceNumber"]);
+                            item.InvoiceId = Convert.ToInt32(reader["InvoiceId"]);
+                            item.InvoiceNumber = Convert.ToString(reader["InvoiceNumber"]);
 
                             item.InvoiceDate = Convert.ToDateTime(
                                 reader["InvoiceDate"],
                                 CultureInfo.InvariantCulture)
                                 .ToString("yyyy-MM-dd HH:mm");
 
-                            item.EmployeeName = Convert.ToString(
-                                reader["EmployeeName"]);
+                            item.EmployeeName = Convert.ToString(reader["EmployeeName"]);
+                            item.ProductCode = Convert.ToString(reader["ProductCode"]);
 
-                            item.ProductCode = Convert.ToString(
-                                reader["ProductCode"]);
-
-                            // كل أصناف الفاتورة تظهر،
-                            // حتى الأصناف التي أُرجعت بالكامل.
                             items.Add(item);
                         }
                     }
@@ -435,11 +363,6 @@ AND (
 
             return items;
         }
-
-
-        // ==========================================
-        // حساب إجمالي المرتجعات السابقة للفاتورة
-        // ==========================================
 
         public double GetPreviousReturnsTotal(
             int userId,
@@ -458,10 +381,10 @@ AND (
                 ValidateReturnPermission(connection, null, userId);
 
                 using (var command = new SQLiteCommand(@"
-            SELECT COALESCE(SUM(Total), 0)
-            FROM SalesReturns
-            WHERE InvoiceId = @InvoiceId
-              AND Status = 'Completed';",
+                    SELECT COALESCE(SUM(Total), 0)
+                    FROM SalesReturns
+                    WHERE InvoiceId = @InvoiceId
+                      AND Status = 'Completed';",
                     connection))
                 {
                     command.Parameters.AddWithValue(
@@ -477,11 +400,6 @@ AND (
                 }
             }
         }
-
-
-        // ==========================================
-        // إنشاء بيانات الصنف مع وحدات المرتجع
-        // ==========================================
 
         private SalesReturnItem CreateReturnItemFromReader(
             SQLiteDataReader reader)
@@ -536,7 +454,6 @@ AND (
                 remainingPackageQuantity *
                 soldQuantity / originalPackageQuantity;
 
-            // السعر التاريخي للعبوة وقت البيع
             double historicalPackagePrice =
                 originalUnitPrice *
                 soldQuantity / originalPackageQuantity;
@@ -576,48 +493,25 @@ AND (
 
             return new SalesReturnItem
             {
-                InvoiceItemId = Convert.ToInt32(
-                    reader["InvoiceItemId"]),
-
-                ProductId = Convert.ToInt32(
-                    reader["ProductId"]),
-
-                ItemName = Convert.ToString(
-                    reader["ItemName"]),
-
+                InvoiceItemId = Convert.ToInt32(reader["InvoiceItemId"]),
+                ProductId = Convert.ToInt32(reader["ProductId"]),
+                ItemName = Convert.ToString(reader["ItemName"]),
                 UnitName = originalUnitName,
-
                 SmallUnitName = smallUnitName,
-
                 UnitsPerPackage = unitsPerPackage,
-
                 ReturnUnits = returnUnits,
-
                 ReturnUnitName = originalUnitName,
-
                 ReturnUnitQuantity = 0,
-
                 ReturnUnitPrice = defaultReturnPrice,
-
                 SoldQuantity = soldQuantity,
-
                 ReturnedQuantity = returnedQuantity,
-
                 RemainingQuantity = remainingQuantity,
-
                 Quantity = 0,
-
                 UnitPrice = originalUnitPrice,
-
                 PackageQuantity = originalPackageQuantity,
-
                 Total = 0
             };
         }
-
-        // ==========================================
-        // قراءة بيانات الصنف الأصلية من الفاتورة
-        // ==========================================
 
         private InvoiceReturnInfo GetInvoiceReturnInfo(
             SQLiteConnection connection,
@@ -634,11 +528,9 @@ AND (
                     sii.Quantity,
                     sii.UnitPrice,
                     sii.PackageQuantity,
-
                     COALESCE(p.UnitName, sii.UnitName) AS PackageUnitName,
                     COALESCE(p.SmallUnitName, '') AS SmallUnitName,
                     COALESCE(p.UnitsPerPackage, 0) AS UnitsPerPackage,
-
                     COALESCE(
                         (
                             SELECT SUM(sri.PackageQuantity)
@@ -649,12 +541,9 @@ AND (
                               AND sr.Status = 'Completed'
                         ), 0
                     ) AS ReturnedPackageQuantity
-
                 FROM SalesInvoiceItems sii
-
                 LEFT JOIN Products p
                     ON p.Id = sii.ProductId
-
                 WHERE sii.Id = @InvoiceItemId
                   AND sii.InvoiceId = @InvoiceId;",
                 connection, transaction))
@@ -675,43 +564,20 @@ AND (
 
                     return new InvoiceReturnInfo
                     {
-                        ProductId = Convert.ToInt32(
-                            reader["ProductId"]),
-
-                        ItemName = Convert.ToString(
-                            reader["ItemName"]),
-
-                        OriginalUnitName = Convert.ToString(
-                            reader["UnitName"]),
-
-                        PackageUnitName = Convert.ToString(
-                            reader["PackageUnitName"]),
-
-                        SmallUnitName = Convert.ToString(
-                            reader["SmallUnitName"]),
-
-                        SoldQuantity = Convert.ToDouble(
-                            reader["Quantity"]),
-
-                        OriginalUnitPrice = Convert.ToDouble(
-                            reader["UnitPrice"]),
-
-                        OriginalPackageQuantity = Convert.ToDouble(
-                            reader["PackageQuantity"]),
-
-                        UnitsPerPackage = Convert.ToDouble(
-                            reader["UnitsPerPackage"]),
-
-                        ReturnedPackageQuantity = Convert.ToDouble(
-                            reader["ReturnedPackageQuantity"])
+                        ProductId = Convert.ToInt32(reader["ProductId"]),
+                        ItemName = Convert.ToString(reader["ItemName"]),
+                        OriginalUnitName = Convert.ToString(reader["UnitName"]),
+                        PackageUnitName = Convert.ToString(reader["PackageUnitName"]),
+                        SmallUnitName = Convert.ToString(reader["SmallUnitName"]),
+                        SoldQuantity = Convert.ToDouble(reader["Quantity"]),
+                        OriginalUnitPrice = Convert.ToDouble(reader["UnitPrice"]),
+                        OriginalPackageQuantity = Convert.ToDouble(reader["PackageQuantity"]),
+                        UnitsPerPackage = Convert.ToDouble(reader["UnitsPerPackage"]),
+                        ReturnedPackageQuantity = Convert.ToDouble(reader["ReturnedPackageQuantity"])
                     };
                 }
             }
         }
-
-        // ==========================================
-        // تجهيز سطر المرتجع والتحويل إلى وحدة العبوة
-        // ==========================================
 
         private PreparedReturnItem PrepareReturnItem(
             SalesReturnItem item,
@@ -734,12 +600,8 @@ AND (
             double selectedQuantity =
                 item.ReturnUnitQuantity;
 
-            // توافق مؤقت مع الشاشة القديمة قبل تحديثها
-            if (selectedQuantity <= 0 &&
-                item.Quantity > 0)
-            {
+            if (selectedQuantity <= 0 && item.Quantity > 0)
                 selectedQuantity = item.Quantity;
-            }
 
             if (selectedQuantity <= 0 ||
                 double.IsNaN(selectedQuantity) ||
@@ -748,15 +610,6 @@ AND (
                 throw new Exception(
                     "أدخل كمية مرتجع صحيحة للصنف: " +
                     info.ItemName);
-            }
-
-            // عدد صحيح في الوحدة المختارة: علبة أو شريط أو قرص
-            if (Math.Abs(
-                selectedQuantity - Math.Round(selectedQuantity)) > Epsilon)
-            {
-                throw new Exception(
-                    "كمية المرتجع للصنف " + info.ItemName +
-                    " يجب أن تكون عددًا صحيحًا من الوحدة المختارة.");
             }
 
             bool isPackageUnit = string.Equals(
@@ -779,13 +632,24 @@ AND (
                     info.ItemName);
             }
 
+            // يسمح بالكسور في وحدة العبوة فقط.
+            // وحدة الشريط/الوحدة الصغيرة يجب أن تكون عددًا صحيحًا.
+            if (isSmallUnit &&
+                Math.Abs(
+                    selectedQuantity - Math.Round(selectedQuantity)) > Epsilon)
+            {
+                throw new Exception(
+                    "كمية المرتجع للصنف " + info.ItemName +
+                    " يجب أن تكون عددًا صحيحًا من وحدة " +
+                    selectedUnit + ".");
+            }
+
             double historicalPackagePrice =
                 info.OriginalUnitPrice *
                 info.SoldQuantity /
                 info.OriginalPackageQuantity;
 
             double selectedUnitPrice;
-
             double packageQuantity;
 
             if (isPackageUnit)
@@ -824,16 +688,15 @@ AND (
                 double availableSelectedQuantity =
                     isPackageUnit
                         ? remainingPackageQuantity
-                        : remainingPackageQuantity *
-                          info.UnitsPerPackage;
+                        : remainingPackageQuantity * info.UnitsPerPackage;
 
                 throw new Exception(
                     "الكمية المطلوبة أكبر من المتبقي للصنف: " +
                     info.ItemName +
-                    ". الكمية المتاحة تقريبًا: " +
-                    Math.Floor(
-                        availableSelectedQuantity + Epsilon)
-                        .ToString(CultureInfo.InvariantCulture) +
+                    ". الحد الأقصى المتاح: " +
+                    availableSelectedQuantity.ToString(
+                        "0.##",
+                        CultureInfo.InvariantCulture) +
                     " " + selectedUnit);
             }
 
@@ -850,32 +713,18 @@ AND (
             return new PreparedReturnItem
             {
                 InvoiceItemId = item.InvoiceItemId,
-
                 ProductId = info.ProductId,
-
                 ItemName = info.ItemName,
-
                 OriginalUnitName = info.OriginalUnitName,
-
                 OriginalUnitPrice = info.OriginalUnitPrice,
-
                 InvoiceUnitQuantity = invoiceUnitEquivalent,
-
                 PackageQuantity = packageQuantity,
-
                 ReturnUnitName = selectedUnit,
-
                 ReturnUnitQuantity = selectedQuantity,
-
                 ReturnUnitPrice = selectedUnitPrice,
-
                 Total = lineTotal
             };
         }
-
-        // ==========================================
-        // حفظ مرتجع البيع - توافق مع الاستدعاءات القديمة
-        // ==========================================
 
         public int SaveReturn(
             int userId,
@@ -891,10 +740,6 @@ AND (
                 0,
                 "");
         }
-
-        // ==========================================
-        // حفظ مرتجع البيع مع مبلغ الرد الفعلي ووسيلته
-        // ==========================================
 
         public int SaveReturn(
             int userId,
@@ -971,21 +816,16 @@ AND (
                         }
 
                         var usedInvoiceItems = new HashSet<int>();
-
-                        var preparedItems =
-                            new List<PreparedReturnItem>();
-
+                        var preparedItems = new List<PreparedReturnItem>();
                         double returnTotal = 0;
 
-                        // التحقق من الأصناف وحساب قيمة المرتجع
                         foreach (var item in items)
                         {
                             if (item == null)
                                 throw new Exception("يوجد صنف غير صالح.");
 
                             if (item.InvoiceItemId <= 0)
-                                throw new Exception(
-                                    "رقم صنف الفاتورة غير صحيح.");
+                                throw new Exception("رقم صنف الفاتورة غير صحيح.");
 
                             if (!usedInvoiceItems.Add(item.InvoiceItemId))
                             {
@@ -1004,7 +844,6 @@ AND (
                                 PrepareReturnItem(item, info);
 
                             preparedItems.Add(prepared);
-
                             returnTotal += prepared.Total;
                         }
 
@@ -1016,18 +855,15 @@ AND (
                         if (double.IsNaN(returnTotal) ||
                             double.IsInfinity(returnTotal))
                         {
-                            throw new Exception(
-                                "إجمالي المرتجع غير صحيح.");
+                            throw new Exception("إجمالي المرتجع غير صحيح.");
                         }
 
-                        // التحقق من أن مبلغ الرد لا يتجاوز إجمالي المرتجع.
                         if (refundAmount > returnTotal + Epsilon)
                         {
                             throw new Exception(
                                 "مبلغ الرد الفعلي لا يمكن أن يكون أكبر من إجمالي المرتجع.");
                         }
 
-                        // لا تُسجل وسيلة رد إذا لم يتم صرف أي مبلغ.
                         if (refundAmount <= Epsilon)
                         {
                             refundAmount = 0;
@@ -1056,9 +892,6 @@ AND (
                             "yyyy-MM-dd HH:mm:ss",
                             CultureInfo.InvariantCulture);
 
-                        // فتح شيفت تلقائيًا مع أول عملية مرتجع،
-                        // أو استخدام الشيفت المفتوح بالفعل.
-                        // يتم ذلك داخل نفس معاملة حفظ المرتجع.
                         int shiftId = ShiftService.EnsureOpenShift(
                             connection,
                             transaction,
@@ -1098,39 +931,19 @@ AND (
                             SELECT last_insert_rowid();",
                             connection, transaction))
                         {
-                            command.Parameters.AddWithValue(
-                                "@ReturnNumber", returnNumber);
+                            command.Parameters.AddWithValue("@ReturnNumber", returnNumber);
+                            command.Parameters.AddWithValue("@InvoiceId", invoiceId);
+                            command.Parameters.AddWithValue("@UserId", userId);
+                            command.Parameters.AddWithValue("@ShiftId", shiftId);
+                            command.Parameters.AddWithValue("@Total", returnTotal);
+                            command.Parameters.AddWithValue("@RefundAmount", refundAmount);
+                            command.Parameters.AddWithValue("@RefundPaymentMethod", refundPaymentMethod);
+                            command.Parameters.AddWithValue("@Reason", (reason ?? "").Trim());
+                            command.Parameters.AddWithValue("@CreatedAt", createdAt);
 
-                            command.Parameters.AddWithValue(
-                                "@InvoiceId", invoiceId);
-
-                            command.Parameters.AddWithValue(
-                                "@UserId", userId);
-
-                            command.Parameters.AddWithValue(
-                                "@ShiftId", shiftId);
-
-                            command.Parameters.AddWithValue(
-                                "@Total", returnTotal);
-
-                            command.Parameters.AddWithValue(
-                                "@RefundAmount", refundAmount);
-
-                            command.Parameters.AddWithValue(
-                                "@RefundPaymentMethod",
-                                refundPaymentMethod);
-
-                            command.Parameters.AddWithValue(
-                                "@Reason", (reason ?? "").Trim());
-
-                            command.Parameters.AddWithValue(
-                                "@CreatedAt", createdAt);
-
-                            returnId = Convert.ToInt32(
-                                command.ExecuteScalar());
+                            returnId = Convert.ToInt32(command.ExecuteScalar());
                         }
 
-                        // حفظ عناصر المرتجع وتوزيعها على التشغيلات الأصلية
                         foreach (var item in preparedItems)
                         {
                             int returnItemId;
@@ -1170,44 +983,20 @@ AND (
                                 SELECT last_insert_rowid();",
                                 connection, transaction))
                             {
-                                command.Parameters.AddWithValue(
-                                    "@ReturnId", returnId);
+                                command.Parameters.AddWithValue("@ReturnId", returnId);
+                                command.Parameters.AddWithValue("@InvoiceItemId", item.InvoiceItemId);
+                                command.Parameters.AddWithValue("@ProductId", item.ProductId);
+                                command.Parameters.AddWithValue("@ItemName", item.ItemName);
+                                command.Parameters.AddWithValue("@UnitName", item.OriginalUnitName);
+                                command.Parameters.AddWithValue("@Quantity", item.InvoiceUnitQuantity);
+                                command.Parameters.AddWithValue("@UnitPrice", item.OriginalUnitPrice);
+                                command.Parameters.AddWithValue("@Total", item.Total);
+                                command.Parameters.AddWithValue("@PackageQuantity", item.PackageQuantity);
+                                command.Parameters.AddWithValue("@ReturnUnitName", item.ReturnUnitName);
+                                command.Parameters.AddWithValue("@ReturnUnitQuantity", item.ReturnUnitQuantity);
+                                command.Parameters.AddWithValue("@ReturnUnitPrice", item.ReturnUnitPrice);
 
-                                command.Parameters.AddWithValue(
-                                    "@InvoiceItemId", item.InvoiceItemId);
-
-                                command.Parameters.AddWithValue(
-                                    "@ProductId", item.ProductId);
-
-                                command.Parameters.AddWithValue(
-                                    "@ItemName", item.ItemName);
-
-                                command.Parameters.AddWithValue(
-                                    "@UnitName", item.OriginalUnitName);
-
-                                command.Parameters.AddWithValue(
-                                    "@Quantity", item.InvoiceUnitQuantity);
-
-                                command.Parameters.AddWithValue(
-                                    "@UnitPrice", item.OriginalUnitPrice);
-
-                                command.Parameters.AddWithValue(
-                                    "@Total", item.Total);
-
-                                command.Parameters.AddWithValue(
-                                    "@PackageQuantity", item.PackageQuantity);
-
-                                command.Parameters.AddWithValue(
-                                    "@ReturnUnitName", item.ReturnUnitName);
-
-                                command.Parameters.AddWithValue(
-                                    "@ReturnUnitQuantity", item.ReturnUnitQuantity);
-
-                                command.Parameters.AddWithValue(
-                                    "@ReturnUnitPrice", item.ReturnUnitPrice);
-
-                                returnItemId = Convert.ToInt32(
-                                    command.ExecuteScalar());
+                                returnItemId = Convert.ToInt32(command.ExecuteScalar());
                             }
 
                             RestoreOriginalBatches(
@@ -1218,7 +1007,6 @@ AND (
                                 item.PackageQuantity);
                         }
 
-                        // تسجيل العملية ومبلغ الرد ووسيلته في سجل المراجعة.
                         using (var command = new SQLiteCommand(@"
                             INSERT INTO AuditLogs
                             (
@@ -1244,20 +1032,11 @@ AND (
                             );",
                             connection, transaction))
                         {
-                            command.Parameters.AddWithValue(
-                                "@UserId", userId);
-
-                            command.Parameters.AddWithValue(
-                                "@Username", username);
-
-                            command.Parameters.AddWithValue(
-                                "@ActionType", "Create");
-
-                            command.Parameters.AddWithValue(
-                                "@EntityType", "SalesReturn");
-
-                            command.Parameters.AddWithValue(
-                                "@EntityId", returnId);
+                            command.Parameters.AddWithValue("@UserId", userId);
+                            command.Parameters.AddWithValue("@Username", username);
+                            command.Parameters.AddWithValue("@ActionType", "Create");
+                            command.Parameters.AddWithValue("@EntityType", "SalesReturn");
+                            command.Parameters.AddWithValue("@EntityId", returnId);
 
                             string refundDetails =
                                 refundAmount > 0
@@ -1289,7 +1068,6 @@ AND (
                         }
 
                         transaction.Commit();
-
                         return returnId;
                     }
                     catch
@@ -1300,10 +1078,6 @@ AND (
                 }
             }
         }
-
-        // ==========================================
-        // إعادة الكمية إلى نفس تشغيلات البيع الأصلية
-        // ==========================================
 
         private void RestoreOriginalBatches(
             SQLiteConnection connection,
@@ -1320,7 +1094,6 @@ AND (
                     a.BatchId,
                     SUM(a.Quantity) AS OriginalQuantity,
                     b.ExpiryDate,
-
                     SUM(a.Quantity) -
                     COALESCE(
                         (
@@ -1335,16 +1108,11 @@ AND (
                               AND sr.Status = 'Completed'
                         ), 0
                     ) AS RemainingAllocation
-
                 FROM SalesInvoiceBatchAllocations a
-
                 INNER JOIN Batches b
                     ON b.Id = a.BatchId
-
                 WHERE a.InvoiceItemId = @InvoiceItemId
-
                 GROUP BY a.BatchId, b.ExpiryDate
-
                 ORDER BY MIN(a.Id);";
 
             double remainingToAllocate = Math.Round(
@@ -1366,15 +1134,10 @@ AND (
                     {
                         allocations.Add(new ReturnAllocation
                         {
-                            BatchId = Convert.ToInt32(
-                                reader["BatchId"]),
-
-                            ExpiryDate = Convert.ToString(
-                                reader["ExpiryDate"]),
-
+                            BatchId = Convert.ToInt32(reader["BatchId"]),
+                            ExpiryDate = Convert.ToString(reader["ExpiryDate"]),
                             RemainingQuantity = Math.Round(
-                                Convert.ToDouble(
-                                    reader["RemainingAllocation"]),
+                                Convert.ToDouble(reader["RemainingAllocation"]),
                                 8,
                                 MidpointRounding.AwayFromZero)
                         });
@@ -1400,8 +1163,8 @@ AND (
                         if (allocatedQuantity <= Epsilon)
                             continue;
 
-                        bool isExpired = IsBatchExpired(
-                            allocation.ExpiryDate);
+                        bool isExpired =
+                            IsBatchExpired(allocation.ExpiryDate);
 
                         using (var insertCommand = new SQLiteCommand(@"
                             INSERT INTO SalesReturnBatchAllocations
@@ -1420,22 +1183,14 @@ AND (
                             );",
                             connection, transaction))
                         {
-                            insertCommand.Parameters.AddWithValue(
-                                "@ReturnItemId", returnItemId);
-
-                            insertCommand.Parameters.AddWithValue(
-                                "@BatchId", allocation.BatchId);
-
-                            insertCommand.Parameters.AddWithValue(
-                                "@Quantity", allocatedQuantity);
-
-                            insertCommand.Parameters.AddWithValue(
-                                "@Restocked", isExpired ? 0 : 1);
+                            insertCommand.Parameters.AddWithValue("@ReturnItemId", returnItemId);
+                            insertCommand.Parameters.AddWithValue("@BatchId", allocation.BatchId);
+                            insertCommand.Parameters.AddWithValue("@Quantity", allocatedQuantity);
+                            insertCommand.Parameters.AddWithValue("@Restocked", isExpired ? 0 : 1);
 
                             insertCommand.ExecuteNonQuery();
                         }
 
-                        // لا نعيد الكمية للمخزون إذا كانت التشغيلة منتهية
                         if (!isExpired)
                         {
                             using (var updateCommand = new SQLiteCommand(@"
@@ -1444,11 +1199,8 @@ AND (
                                 WHERE Id = @BatchId;",
                                 connection, transaction))
                             {
-                                updateCommand.Parameters.AddWithValue(
-                                    "@Quantity", allocatedQuantity);
-
-                                updateCommand.Parameters.AddWithValue(
-                                    "@BatchId", allocation.BatchId);
+                                updateCommand.Parameters.AddWithValue("@Quantity", allocatedQuantity);
+                                updateCommand.Parameters.AddWithValue("@BatchId", allocation.BatchId);
 
                                 if (updateCommand.ExecuteNonQuery() != 1)
                                 {
@@ -1474,10 +1226,6 @@ AND (
             }
         }
 
-        // ==========================================
-        // التحقق من انتهاء صلاحية التشغيلة
-        // ==========================================
-
         private bool IsBatchExpired(string expiryDate)
         {
             DateTime parsedDate;
@@ -1495,64 +1243,39 @@ AND (
             return parsedDate.Date < DateTime.Today;
         }
 
-        // ==========================================
-        // نماذج داخلية
-        // ==========================================
-
         private class InvoiceReturnInfo
         {
             public int ProductId { get; set; }
-
             public string ItemName { get; set; }
-
             public string OriginalUnitName { get; set; }
-
             public string PackageUnitName { get; set; }
-
             public string SmallUnitName { get; set; }
-
             public double SoldQuantity { get; set; }
-
             public double OriginalUnitPrice { get; set; }
-
             public double OriginalPackageQuantity { get; set; }
-
             public double UnitsPerPackage { get; set; }
-
             public double ReturnedPackageQuantity { get; set; }
         }
 
         private class PreparedReturnItem
         {
             public int InvoiceItemId { get; set; }
-
             public int ProductId { get; set; }
-
             public string ItemName { get; set; }
-
             public string OriginalUnitName { get; set; }
-
             public double OriginalUnitPrice { get; set; }
-
             public double InvoiceUnitQuantity { get; set; }
-
             public double PackageQuantity { get; set; }
-
             public string ReturnUnitName { get; set; }
-
             public double ReturnUnitQuantity { get; set; }
-
             public double ReturnUnitPrice { get; set; }
-
             public double Total { get; set; }
         }
 
         private class ReturnAllocation
         {
             public int BatchId { get; set; }
-
             public string ExpiryDate { get; set; }
-
             public double RemainingQuantity { get; set; }
         }
     }
