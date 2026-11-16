@@ -11,7 +11,8 @@ namespace Ocore.desktop.Services
 {
     public class ThermalReceiptDocumentBuilder
     {
-        private const double DefaultPadding = 8;
+        private const double DefaultPadding = 5;
+        private const double ReceiptFontSize = 7.2;
         private const double MinimumPageHeight = 180;
         private const int DefaultDpi = 203;
         private const double MaximumPageHeight = 30000;
@@ -103,7 +104,7 @@ namespace Ocore.desktop.Services
             {
                 FlowDirection = FlowDirection.RightToLeft,
                 FontFamily = new FontFamily("Arial"),
-                FontSize = 8.5 * fontScale,
+                FontSize = ReceiptFontSize * fontScale,
                 PageWidth = pageWidth,
                 PageHeight = MinimumPageHeight,
                 PagePadding = new Thickness(DefaultPadding),
@@ -116,7 +117,6 @@ namespace Ocore.desktop.Services
             AddInvoiceInformation(invoice);
             AddItems(invoice);
             AddFinancialSummary(invoice);
-            AddPayments(invoice);
             AddFooter(settings);
 
             double initialHeight = Math.Max(
@@ -205,10 +205,10 @@ namespace Ocore.desktop.Services
 
             AddParagraph(
                 pharmacyName,
-                15,
-                FontWeights.Bold,
+                ReceiptFontSize,
+                FontWeights.Normal,
                 TextAlignment.Center,
-                3);
+                1);
 
             string cashierName =
                 string.IsNullOrWhiteSpace(invoice.EmployeeName)
@@ -217,17 +217,17 @@ namespace Ocore.desktop.Services
 
             AddParagraph(
                 "الكاشير: " + cashierName,
-                8.5,
+                ReceiptFontSize,
                 FontWeights.Normal,
                 TextAlignment.Center,
-                3);
+                1);
 
             AddParagraph(
                 "فاتورة بيع",
-                8.5,
+                ReceiptFontSize,
                 FontWeights.Normal,
                 TextAlignment.Center,
-                4);
+                2);
         }
 
         #endregion
@@ -255,6 +255,7 @@ namespace Ocore.desktop.Services
                         culture);
 
             AddLabelValue("التاريخ", dateText);
+            AddHorizontalRule();
         }
 
         #endregion
@@ -263,23 +264,14 @@ namespace Ocore.desktop.Services
 
         private void AddItems(SaleInvoiceDetails invoice)
         {
-            AddParagraph(
-                "تفاصيل الأصناف",
-                8.5,
-                FontWeights.Normal,
-                TextAlignment.Right,
-                3);
-
-            if (invoice.Items == null ||
-                invoice.Items.Count == 0)
+            if (invoice.Items == null || invoice.Items.Count == 0)
             {
                 AddParagraph(
                     "لا توجد أصناف في الفاتورة.",
-                    8.5,
+                    ReceiptFontSize,
                     FontWeights.Normal,
                     TextAlignment.Center,
-                    3);
-
+                    2);
                 return;
             }
 
@@ -287,9 +279,10 @@ namespace Ocore.desktop.Services
                 "الصنف",
                 "الكمية",
                 "السعر",
-                "الخصم",
-                "الصافي",
+                "الإجمالي",
                 true);
+
+            AddHorizontalRule();
 
             foreach (SaleInvoiceItem item in invoice.Items)
             {
@@ -301,39 +294,31 @@ namespace Ocore.desktop.Services
                         ? "صنف بدون اسم"
                         : item.ItemName.Trim();
 
-                string unitName =
-                    string.IsNullOrWhiteSpace(item.UnitName)
-                        ? string.Empty
-                        : " " + item.UnitName.Trim();
+                // عند بيع الوحدة الصغيرة تكون Quantity بوحدات صغيرة،
+                // بينما PackageQuantity تكون مكافئها من العبوات.
+                bool isSmallUnit =
+                    Math.Abs(item.Quantity - item.PackageQuantity) > 0.0000001;
 
                 string quantity =
-                    FormatNumber(item.Quantity) + unitName;
-
-                string price =
-                    FormatNumber(item.UnitPrice);
-
-                string discount =
-                    FormatNumber(item.DiscountAmount);
-
-                string net =
-                    FormatNumber(item.NetTotal);
+                    (isSmallUnit ? "U " : "P ") +
+                    item.Quantity.ToString("0.##", culture);
 
                 AddItemRow(
                     itemName,
                     quantity,
-                    price,
-                    discount,
-                    net,
+                    FormatNumber(item.UnitPrice),
+                    FormatNumber(item.Total),
                     false);
             }
+
+            AddHorizontalRule();
         }
 
         private void AddItemRow(
             string itemName,
             string quantity,
             string price,
-            string discount,
-            string net,
+            string total,
             bool isHeader)
         {
             Grid row = new Grid
@@ -347,25 +332,7 @@ namespace Ocore.desktop.Services
             row.ColumnDefinitions.Add(
                 new ColumnDefinition
                 {
-                    Width = new GridLength(36, GridUnitType.Star)
-                });
-
-            row.ColumnDefinitions.Add(
-                new ColumnDefinition
-                {
-                    Width = new GridLength(15, GridUnitType.Star)
-                });
-
-            row.ColumnDefinitions.Add(
-                new ColumnDefinition
-                {
-                    Width = new GridLength(16, GridUnitType.Star)
-                });
-
-            row.ColumnDefinitions.Add(
-                new ColumnDefinition
-                {
-                    Width = new GridLength(15, GridUnitType.Star)
+                    Width = new GridLength(42, GridUnitType.Star)
                 });
 
             row.ColumnDefinitions.Add(
@@ -374,14 +341,22 @@ namespace Ocore.desktop.Services
                     Width = new GridLength(18, GridUnitType.Star)
                 });
 
-            double rowFontSize =
-                (isHeader ? 7.3 : 7.0) * fontScale;
+            row.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(18, GridUnitType.Star)
+                });
 
-            AddItemCell(row, itemName, 0, rowFontSize, false);
-            AddItemCell(row, quantity, 1, rowFontSize, true);
-            AddItemCell(row, price, 2, rowFontSize, true);
-            AddItemCell(row, discount, 3, rowFontSize, true);
-            AddItemCell(row, net, 4, rowFontSize, true);
+            row.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(22, GridUnitType.Star)
+                });
+
+            AddItemCell(row, itemName, 0, false);
+            AddItemCell(row, quantity, 1, true);
+            AddItemCell(row, price, 2, true);
+            AddItemCell(row, total, 3, true);
 
             row.Measure(
                 new Size(
@@ -389,32 +364,30 @@ namespace Ocore.desktop.Services
                     double.PositiveInfinity));
 
             double rowHeight =
-                Math.Max(15 * fontScale, row.DesiredSize.Height);
+                Math.Max(ReceiptFontSize * 2, row.DesiredSize.Height);
 
             BlockUIContainer container =
                 new BlockUIContainer(row)
                 {
-                    Margin = new Thickness(0, 1, 0, 1),
+                    Margin = new Thickness(0),
                     TextAlignment = TextAlignment.Right
                 };
 
             document.Blocks.Add(container);
-
-            estimatedHeight += rowHeight + 2;
+            estimatedHeight += rowHeight + 1;
         }
 
         private void AddItemCell(
             Grid row,
             string value,
             int column,
-            double fontSize,
             bool centered)
         {
             TextBlock textBlock = new TextBlock
             {
                 Text = value ?? "-",
                 FontFamily = new FontFamily("Arial"),
-                FontSize = fontSize,
+                FontSize = ReceiptFontSize * fontScale,
                 FontWeight = FontWeights.Normal,
                 FlowDirection = FlowDirection.RightToLeft,
                 TextAlignment = centered
@@ -423,7 +396,7 @@ namespace Ocore.desktop.Services
                 TextWrapping = TextWrapping.Wrap,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(0, 1, 0, 1),
+                Margin = new Thickness(0),
                 Padding = new Thickness(0)
             };
 
@@ -438,13 +411,6 @@ namespace Ocore.desktop.Services
         private void AddFinancialSummary(
             SaleInvoiceDetails invoice)
         {
-            AddParagraph(
-                "ملخص الفاتورة",
-                8.5,
-                FontWeights.Normal,
-                TextAlignment.Right,
-                3);
-
             double subtotal =
                 invoice.Subtotal > 0
                     ? invoice.Subtotal
@@ -455,66 +421,136 @@ namespace Ocore.desktop.Services
                     ? invoice.NetTotal
                     : invoice.Total;
 
-            AddLabelValue(
-                "إجمالي الأصناف",
-                FormatNumber(subtotal));
+            int itemCount = 0;
 
-            if (invoice.DiscountAmount > 0)
+            if (invoice.Items != null)
             {
-                AddLabelValue(
-                    "إجمالي الخصومات",
-                    FormatNumber(invoice.DiscountAmount));
+                foreach (SaleInvoiceItem item in invoice.Items)
+                {
+                    if (item != null)
+                        itemCount++;
+                }
             }
 
-            if (invoice.DiscountValue > 0)
-            {
-                AddParagraph(
-                    GetDiscountDescription(invoice),
-                    8.5,
-                    FontWeights.Normal,
-                    TextAlignment.Right,
-                    2);
-            }
+            AddSummaryRow(
+                "عدد الأصناف: " + itemCount.ToString(culture),
+                "إجمالي الأصناف: " + FormatNumber(subtotal));
 
-            AddLabelValue(
-                "صافي الفاتورة",
-                FormatNumber(netTotal));
+            AddSummaryRow(
+                "ض.ق.م: -",
+                "الخصم: " + FormatNumber(invoice.DiscountAmount));
 
-            AddLabelValue(
-                "المدفوع",
-                FormatNumber(invoice.PaidAmount));
+            AddHorizontalRule();
 
-            AddLabelValue(
-                "المتبقي",
-                FormatNumber(invoice.RemainingAmount));
+            string paymentDescription =
+                "حالة السداد: " + GetPaymentStatus(invoice.PaymentStatus) +
+                " | الدفع: " + GetPaymentMethodsSummary(invoice);
 
-            AddLabelValue(
-                "حالة السداد",
-                GetPaymentStatus(invoice.PaymentStatus));
+            AddSummaryRow(
+                paymentDescription,
+                "صافي المطلوب: " + FormatNumber(netTotal));
         }
 
-        private string GetDiscountDescription(
+        private void AddSummaryRow(
+            string rightText,
+            string leftText)
+        {
+            Grid row = new Grid
+            {
+                Width = availableWidth,
+                FlowDirection = FlowDirection.RightToLeft,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            row.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
+
+            row.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
+
+            AddSummaryCell(row, rightText, 0, false);
+            AddSummaryCell(row, leftText, 1, true);
+
+            row.Measure(
+                new Size(
+                    availableWidth,
+                    double.PositiveInfinity));
+
+            double rowHeight =
+                Math.Max(ReceiptFontSize * 2, row.DesiredSize.Height);
+
+            document.Blocks.Add(
+                new BlockUIContainer(row)
+                {
+                    Margin = new Thickness(0, 1, 0, 1),
+                    TextAlignment = TextAlignment.Right
+                });
+
+            estimatedHeight += rowHeight + 2;
+        }
+
+        private void AddSummaryCell(
+            Grid row,
+            string value,
+            int column,
+            bool centered)
+        {
+            TextBlock textBlock = new TextBlock
+            {
+                Text = value ?? "-",
+                FontFamily = new FontFamily("Arial"),
+                FontSize = ReceiptFontSize * fontScale,
+                FontWeight = FontWeights.Normal,
+                FlowDirection = FlowDirection.RightToLeft,
+                TextAlignment = centered
+                    ? TextAlignment.Center
+                    : TextAlignment.Right,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0),
+                Padding = new Thickness(0)
+            };
+
+            Grid.SetColumn(textBlock, column);
+            row.Children.Add(textBlock);
+        }
+
+        private string GetPaymentMethodsSummary(
             SaleInvoiceDetails invoice)
         {
-            if (string.Equals(
-                invoice.DiscountType,
-                "Percentage",
-                StringComparison.OrdinalIgnoreCase))
+            if (invoice.Payments == null ||
+                invoice.Payments.Count == 0)
             {
-                return "الخصم العام المطلوب: " +
-                       FormatNumber(invoice.DiscountValue) + "%";
+                return "غير محدد";
             }
 
-            if (string.Equals(
-                invoice.DiscountType,
-                "Amount",
-                StringComparison.OrdinalIgnoreCase))
+            var methods = new System.Collections.Generic.List<string>();
+
+            foreach (SaleInvoicePaymentDetails payment in invoice.Payments)
             {
-                return "الخصم العام المطلوب: " +
-                       FormatNumber(invoice.DiscountValue);
+                if (payment == null ||
+                    payment.Amount <= 0)
+                    continue;
+
+                string method = GetPaymentMethod(payment.PaymentMethod);
+
+                if (!string.IsNullOrWhiteSpace(method) &&
+                    method != "-" &&
+                    !methods.Contains(method))
+                {
+                    methods.Add(method);
+                }
             }
 
-            return "الخصم العام";
+            return methods.Count == 0
+                ? "غير محدد"
+                : string.Join(" + ", methods);
         }
 
         #endregion
@@ -587,7 +623,10 @@ namespace Ocore.desktop.Services
                     return "نقدي";
 
                 case "Card":
-                    return "بطاقة";
+                    return "فيزا";
+
+                case "InstaPay":
+                    return "إنستا";
 
                 case "Transfer":
                     return "تحويل";
@@ -633,25 +672,18 @@ namespace Ocore.desktop.Services
             {
                 AddParagraph(
                     "هاتف الصيدلية: " + settings.Phone.Trim(),
-                    8.5,
+                    ReceiptFontSize,
                     FontWeights.Normal,
                     TextAlignment.Center,
-                    3);
+                    1);
             }
 
             AddParagraph(
                 "شكراً لتعاملكم معنا",
-                8.5,
+                ReceiptFontSize,
                 FontWeights.Normal,
                 TextAlignment.Center,
-                2);
-
-            AddParagraph(
-                "نتمنى لكم دوام الصحة والعافية",
-                8.5,
-                FontWeights.Normal,
-                TextAlignment.Center,
-                2);
+                1);
         }
 
         #endregion
@@ -667,16 +699,15 @@ namespace Ocore.desktop.Services
                     ? "-"
                     : value;
 
-            string line =
-                label + ": " + safeValue;
+            string line = label + ": " + safeValue;
 
             Paragraph paragraph = new Paragraph
             {
                 FlowDirection = FlowDirection.RightToLeft,
                 TextAlignment = TextAlignment.Right,
-                FontSize = 8.5 * fontScale,
+                FontSize = ReceiptFontSize * fontScale,
                 FontWeight = FontWeights.Normal,
-                Margin = new Thickness(0, 1, 0, 1)
+                Margin = new Thickness(0)
             };
 
             paragraph.Inlines.Add(
@@ -689,8 +720,8 @@ namespace Ocore.desktop.Services
 
             estimatedHeight += EstimateTextHeight(
                 line,
-                8.5,
-                3);
+                ReceiptFontSize,
+                1);
         }
 
         private void AddParagraph(
@@ -707,23 +738,45 @@ namespace Ocore.desktop.Services
             {
                 FlowDirection = FlowDirection.RightToLeft,
                 TextAlignment = alignment,
-                FontSize = fontSize * fontScale,
-                FontWeight = weight,
-                Margin = new Thickness(0, 1, 0, bottomMargin)
+                FontSize = ReceiptFontSize * fontScale,
+                FontWeight = FontWeights.Normal,
+                Margin = new Thickness(0, 0, 0, bottomMargin)
             };
 
             paragraph.Inlines.Add(
                 new Run(text)
                 {
-                    FontWeight = weight
+                    FontWeight = FontWeights.Normal
                 });
 
             document.Blocks.Add(paragraph);
 
             estimatedHeight += EstimateTextHeight(
                 text,
-                fontSize,
-                bottomMargin + 2);
+                ReceiptFontSize,
+                bottomMargin + 1);
+        }
+
+        private void AddHorizontalRule()
+        {
+            Border rule = new Border
+            {
+                Width = availableWidth,
+                Height = 1,
+                BorderBrush = Brushes.Black,
+                BorderThickness = new Thickness(0, 0, 0, 0.7),
+                Margin = new Thickness(0, 2, 0, 2),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            document.Blocks.Add(
+                new BlockUIContainer(rule)
+                {
+                    Margin = new Thickness(0),
+                    TextAlignment = TextAlignment.Right
+                });
+
+            estimatedHeight += 5;
         }
 
         private double EstimateTextHeight(
@@ -735,7 +788,7 @@ namespace Ocore.desktop.Services
             {
                 Text = text ?? string.Empty,
                 FontFamily = new FontFamily("Arial"),
-                FontSize = fontSize * fontScale,
+                FontSize = ReceiptFontSize * fontScale,
                 FlowDirection = FlowDirection.RightToLeft,
                 TextWrapping = TextWrapping.Wrap
             };
@@ -752,8 +805,7 @@ namespace Ocore.desktop.Services
                 double.IsInfinity(measuredHeight) ||
                 measuredHeight <= 0)
             {
-                measuredHeight =
-                    fontSize * fontScale * 1.8;
+                measuredHeight = ReceiptFontSize * fontScale * 1.8;
             }
 
             return measuredHeight + extraHeight;
