@@ -278,6 +278,11 @@
                                                 IsReadOnly="False"
                                                 Width="65"/>
 
+                            <DataGridTextColumn Header="الخصم الفعلي %"
+                    Binding="{Binding AppliedDiscountPercentage, StringFormat={}{0:N2}}"
+                    IsReadOnly="True"
+                    Width="100"/>
+                            
                             <DataGridTextColumn Header="قيمة الخصم"
                                                 Binding="{Binding DiscountAmount, StringFormat={}{0:N2}}"
                                                 IsReadOnly="True"

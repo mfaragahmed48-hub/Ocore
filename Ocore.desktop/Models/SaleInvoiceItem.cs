@@ -103,6 +103,7 @@ namespace Ocore.desktop.Models
                 discountAmount = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(NetTotal));
+                OnPropertyChanged(nameof(AppliedDiscountPercentage));
             }
         }
 
@@ -117,6 +118,7 @@ namespace Ocore.desktop.Models
                 total = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(NetTotal));
+                OnPropertyChanged(nameof(AppliedDiscountPercentage));
             }
         }
 
@@ -126,6 +128,18 @@ namespace Ocore.desktop.Models
             {
                 double result = Total - DiscountAmount;
                 return result < 0 ? 0 : result;
+            }
+        }
+
+        // النسبة الفعلية للخصم بعد احتساب الخصم اليدوي والخصم العام.
+        public double AppliedDiscountPercentage
+        {
+            get
+            {
+                if (Total <= 0)
+                    return 0;
+
+                return (DiscountAmount / Total) * 100.0;
             }
         }
 
