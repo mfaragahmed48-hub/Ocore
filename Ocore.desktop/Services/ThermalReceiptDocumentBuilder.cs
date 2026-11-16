@@ -13,10 +13,11 @@ namespace Ocore.desktop.Services
     {
         private const double DefaultPadding = 5;
         private const double ReceiptFontSize = 7.2;
-        private const double MinimumPageHeight = 180;
+        private const double MinimumPageHeight = 1;
         private const int DefaultDpi = 203;
         private const double MaximumPageHeight = 30000;
         private const int MaximumLayoutAttempts = 8;
+        private const int HeightOptimizationAttempts = 14;
 
         private readonly CultureInfo culture =
             CultureInfo.GetCultureInfo("ar-EG");
@@ -26,7 +27,6 @@ namespace Ocore.desktop.Services
         private double estimatedHeight;
         private FlowDocument document;
 
-        // الاستدعاء القديم للتوافق مع بقية أجزاء البرنامج.
         public FlowDocument Build(
             SaleInvoiceDetails invoice,
             PharmacySettings settings,
@@ -46,7 +46,6 @@ namespace Ocore.desktop.Services
                 legacyPrintWidthDots);
         }
 
-        // الاستدعاء الجديد الذي يستقبل عرض الطباعة من الإعدادات المركزية.
         public FlowDocument Build(
             SaleInvoiceDetails invoice,
             PharmacySettings settings,
@@ -119,9 +118,11 @@ namespace Ocore.desktop.Services
             AddFinancialSummary(invoice);
             AddFooter(settings);
 
+            // نبدأ بارتفاع قريب من حجم المحتوى الفعلي.
+            // ثم يتم ضبط الارتفاع تلقائيًا لتقليل المساحة الفارغة.
             double initialHeight = Math.Max(
                 MinimumPageHeight,
-                Math.Ceiling(estimatedHeight + 25));
+                Math.Ceiling(estimatedHeight + 2));
 
             document.PageHeight = Math.Min(
                 initialHeight,
@@ -141,39 +142,63 @@ namespace Ocore.desktop.Services
             DocumentPaginator paginator =
                 paginatorSource.DocumentPaginator;
 
+            double high = document.PageHeight;
+            double low = MinimumPageHeight;
+
+            paginator.PageSize = new Size(pageWidth, high);
+            paginator.ComputePageCount();
+
+            // إذا كان الارتفاع التقديري غير كافٍ، نزيده تدريجيًا.
+            int expansionAttempt = 0;
+
+            while (paginator.PageCount != 1 &&
+                   expansionAttempt < MaximumLayoutAttempts &&
+                   high < MaximumPageHeight)
+            {
+                high = Math.Min(
+                    Math.Ceiling(Math.Max(high + 20, high * 1.5)),
+                    MaximumPageHeight);
+
+                document.PageHeight = high;
+
+                paginator.PageSize = new Size(pageWidth, high);
+                paginator.ComputePageCount();
+
+                expansionAttempt++;
+            }
+
+            if (paginator.PageCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "تعذر احتواء الفاتورة بالكامل داخل صفحة واحدة. " +
+                    "حجم محتوى الفاتورة تجاوز الحد الآمن لارتفاع الإيصال.");
+            }
+
+            // نبحث عن أقل ارتفاع يسمح بطباعة الإيصال كاملًا في صفحة واحدة.
+            // هذا يمنع ترك مساحة ورق كبيرة أسفل آخر كلمة.
             for (int attempt = 0;
-                 attempt < MaximumLayoutAttempts;
+                 attempt < HeightOptimizationAttempts;
                  attempt++)
             {
-                double currentHeight = document.PageHeight;
+                double middle = (low + high) / 2.0;
 
-                paginator.PageSize = new Size(
-                    pageWidth,
-                    currentHeight);
+                document.PageHeight = middle;
 
+                paginator.PageSize = new Size(pageWidth, middle);
                 paginator.ComputePageCount();
 
                 if (paginator.PageCount == 1)
-                    return;
-
-                if (paginator.PageCount <= 0)
                 {
-                    throw new InvalidOperationException(
-                        "تعذر تحديد عدد صفحات الإيصال.");
+                    high = middle;
                 }
-
-                if (currentHeight >= MaximumPageHeight)
-                    break;
-
-                double nextHeight = Math.Ceiling(
-                    Math.Max(
-                        currentHeight + 100,
-                        currentHeight * 1.5));
-
-                document.PageHeight = Math.Min(
-                    nextHeight,
-                    MaximumPageHeight);
+                else
+                {
+                    low = middle;
+                }
             }
+
+            // هامش صغير جدًا لتجنب قص آخر سطر أثناء الطباعة.
+            document.PageHeight = Math.Ceiling((high + 1) * 10) / 10;
 
             paginator.PageSize = new Size(
                 pageWidth,
@@ -183,9 +208,19 @@ namespace Ocore.desktop.Services
 
             if (paginator.PageCount != 1)
             {
+                document.PageHeight = high + 2;
+
+                paginator.PageSize = new Size(
+                    pageWidth,
+                    document.PageHeight);
+
+                paginator.ComputePageCount();
+            }
+
+            if (paginator.PageCount != 1)
+            {
                 throw new InvalidOperationException(
-                    "تعذر احتواء الفاتورة بالكامل داخل صفحة واحدة. " +
-                    "حجم محتوى الفاتورة تجاوز الحد الآمن لارتفاع الإيصال.");
+                    "تعذر ضبط ارتفاع الإيصال على صفحة واحدة.");
             }
         }
 
@@ -237,15 +272,20 @@ namespace Ocore.desktop.Services
         private void AddInvoiceInformation(
             SaleInvoiceDetails invoice)
         {
-            AddLabelValue(
-                "رقم الفاتورة",
-                invoice.InvoiceNumber);
+            string invoiceNumber =
+                string.IsNullOrWhiteSpace(invoice.InvoiceNumber)
+                    ? "-"
+                    : invoice.InvoiceNumber.Trim();
 
-            AddLabelValue(
-                "العميل",
+            string customerName =
                 string.IsNullOrWhiteSpace(invoice.CustomerName)
                     ? "عميل نقدي"
-                    : invoice.CustomerName);
+                    : invoice.CustomerName.Trim();
+
+            // رقم الفاتورة في أقصى اليمين والعميل بجواره في نفس الصف.
+            AddInvoiceInfoRow(
+                "رقم الفاتورة: " + invoiceNumber,
+                "العميل: " + customerName);
 
             string dateText =
                 invoice.CreatedAt == DateTime.MinValue
@@ -255,7 +295,79 @@ namespace Ocore.desktop.Services
                         culture);
 
             AddLabelValue("التاريخ", dateText);
+
             AddHorizontalRule();
+        }
+
+        private void AddInvoiceInfoRow(
+            string rightText,
+            string leftText)
+        {
+            Grid row = new Grid
+            {
+                Width = availableWidth,
+                FlowDirection = FlowDirection.RightToLeft,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            row.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
+
+            row.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
+
+            AddInvoiceInfoCell(row, rightText, 0);
+            AddInvoiceInfoCell(row, leftText, 1);
+
+            row.Measure(
+                new Size(
+                    availableWidth,
+                    double.PositiveInfinity));
+
+            double rowHeight =
+                Math.Max(
+                    ReceiptFontSize * 2,
+                    row.DesiredSize.Height);
+
+            document.Blocks.Add(
+                new BlockUIContainer(row)
+                {
+                    Margin = new Thickness(0),
+                    TextAlignment = TextAlignment.Right
+                });
+
+            estimatedHeight += rowHeight + 1;
+        }
+
+        private void AddInvoiceInfoCell(
+            Grid row,
+            string value,
+            int column)
+        {
+            TextBlock textBlock = new TextBlock
+            {
+                Text = value ?? "-",
+                FontFamily = new FontFamily("Arial"),
+                FontSize = ReceiptFontSize * fontScale,
+                FontWeight = FontWeights.Normal,
+                FlowDirection = FlowDirection.RightToLeft,
+                TextAlignment = TextAlignment.Right,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0),
+                Padding = new Thickness(0)
+            };
+
+            Grid.SetColumn(textBlock, column);
+            row.Children.Add(textBlock);
         }
 
         #endregion
@@ -272,6 +384,7 @@ namespace Ocore.desktop.Services
                     FontWeights.Normal,
                     TextAlignment.Center,
                     2);
+
                 return;
             }
 
@@ -294,8 +407,6 @@ namespace Ocore.desktop.Services
                         ? "صنف بدون اسم"
                         : item.ItemName.Trim();
 
-                // عند بيع الوحدة الصغيرة تكون Quantity بوحدات صغيرة،
-                // بينما PackageQuantity تكون مكافئها من العبوات.
                 bool isSmallUnit =
                     Math.Abs(item.Quantity - item.PackageQuantity) > 0.0000001;
 
@@ -530,12 +641,12 @@ namespace Ocore.desktop.Services
                 return "غير محدد";
             }
 
-            var methods = new System.Collections.Generic.List<string>();
+            var methods =
+                new System.Collections.Generic.List<string>();
 
             foreach (SaleInvoicePaymentDetails payment in invoice.Payments)
             {
-                if (payment == null ||
-                    payment.Amount <= 0)
+                if (payment == null || payment.Amount <= 0)
                     continue;
 
                 string method = GetPaymentMethod(payment.PaymentMethod);
@@ -595,8 +706,7 @@ namespace Ocore.desktop.Services
                     "المبلغ",
                     FormatNumber(payment.Amount));
 
-                if (!string.IsNullOrWhiteSpace(
-                    payment.ReferenceNumber))
+                if (!string.IsNullOrWhiteSpace(payment.ReferenceNumber))
                 {
                     AddLabelValue(
                         "رقم المرجع",
@@ -678,12 +788,13 @@ namespace Ocore.desktop.Services
                     1);
             }
 
+            // آخر سطر في الإيصال، ولا توجد عناصر بعده.
             AddParagraph(
                 "شكراً لتعاملكم معنا",
                 ReceiptFontSize,
                 FontWeights.Normal,
                 TextAlignment.Center,
-                1);
+                0);
         }
 
         #endregion
