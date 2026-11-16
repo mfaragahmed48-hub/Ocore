@@ -573,7 +573,12 @@ namespace Ocore.desktop.Views
 
             // السماح بالكمية المساوية للمتاح.
             if (enteredQuantity <= maximumQuantity + Epsilon)
+            {
+                // تثبيت القيمة المقروءة مباشرة في نموذج الصنف،
+                // حتى لا نعتمد فقط على تحويل الـ Binding حسب ثقافة النظام.
+                item.ReturnUnitQuantity = enteredQuantity;
                 return;
+            }
 
             isAdjustingReturnQuantity = true;
 
