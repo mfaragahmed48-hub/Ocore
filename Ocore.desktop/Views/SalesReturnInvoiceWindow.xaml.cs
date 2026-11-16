@@ -69,6 +69,23 @@ namespace Ocore.desktop.Views
         {
             try
             {
+
+                double previousReturnsTotal =
+                    returnsService.GetPreviousReturnsTotal(
+                        currentUserId,
+                        selectedInvoiceId);
+
+                PreviousReturnsTotalText.Text =
+                    previousReturnsTotal.ToString("N2");
+
+                double netInvoiceTotal = Math.Round(
+                    selectedInvoice.Total - previousReturnsTotal,
+                    2,
+                    MidpointRounding.AwayFromZero);
+
+                NetInvoiceTotalText.Text =
+                    netInvoiceTotal.ToString("N2");
+
                 isLoadingInvoice = true;
 
                 List<SalesReturnItem> items =

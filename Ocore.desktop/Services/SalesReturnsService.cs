@@ -437,6 +437,47 @@ AND (
         }
 
 
+        // ==========================================
+        // حساب إجمالي المرتجعات السابقة للفاتورة
+        // ==========================================
+
+        public double GetPreviousReturnsTotal(
+            int userId,
+            int invoiceId)
+        {
+            if (userId <= 0)
+                throw new Exception("رقم المستخدم غير صحيح.");
+
+            if (invoiceId <= 0)
+                throw new Exception("رقم الفاتورة غير صحيح.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                ValidateReturnPermission(connection, null, userId);
+
+                using (var command = new SQLiteCommand(@"
+            SELECT COALESCE(SUM(Total), 0)
+            FROM SalesReturns
+            WHERE InvoiceId = @InvoiceId
+              AND Status = 'Completed';",
+                    connection))
+                {
+                    command.Parameters.AddWithValue(
+                        "@InvoiceId", invoiceId);
+
+                    double total = Convert.ToDouble(
+                        command.ExecuteScalar());
+
+                    return Math.Round(
+                        total,
+                        2,
+                        MidpointRounding.AwayFromZero);
+                }
+            }
+        }
+
 
         // ==========================================
         // إنشاء بيانات الصنف مع وحدات المرتجع

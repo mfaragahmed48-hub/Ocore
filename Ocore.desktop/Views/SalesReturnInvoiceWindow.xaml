@@ -26,6 +26,11 @@
                 Margin="0,0,0,12">
 
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -34,7 +39,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Margin="5">
+                <StackPanel Grid.Row="0" Grid.Column="0" Margin="5">
                     <TextBlock Text="رقم الفاتورة"
                                Foreground="#64748B"/>
                     <TextBlock x:Name="InvoiceNumberText"
@@ -45,7 +50,7 @@
                                Margin="0,5,0,0"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Margin="5">
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="5">
                     <TextBlock Text="تاريخ البيع"
                                Foreground="#64748B"/>
                     <TextBlock x:Name="InvoiceDateText"
@@ -55,7 +60,7 @@
                                Margin="0,5,0,0"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Margin="5">
+                <StackPanel Grid.Row="0" Grid.Column="2" Margin="5">
                     <TextBlock Text="الموظف"
                                Foreground="#64748B"/>
                     <TextBlock x:Name="EmployeeNameText"
@@ -65,8 +70,8 @@
                                Margin="0,5,0,0"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="3" Margin="5">
-                    <TextBlock Text="إجمالي الفاتورة"
+                <StackPanel Grid.Row="0" Grid.Column="3" Margin="5">
+                    <TextBlock Text="إجمالي الفاتورة الأصلي"
                                Foreground="#64748B"/>
                     <TextBlock x:Name="InvoiceTotalText"
                                Text="0.00"
@@ -76,7 +81,9 @@
                                Margin="0,5,0,0"/>
                 </StackPanel>
 
-                <Button Grid.Column="4"
+                <Button Grid.Row="0"
+                        Grid.RowSpan="2"
+                        Grid.Column="4"
                         x:Name="ReturnFullInvoiceButton"
                         Content="إرجاع الفاتورة كاملة"
                         Width="175"
@@ -89,6 +96,48 @@
                         Foreground="White"
                         BorderThickness="0"
                         FontWeight="Bold"/>
+
+                <!-- المرتجعات السابقة وصافي الفاتورة -->
+                <Grid Grid.Row="1"
+                      Grid.Column="0"
+                      Grid.ColumnSpan="4"
+                      Margin="5,12,5,0">
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0"
+                                Margin="0,0,10,0">
+
+                        <TextBlock Text="إجمالي المرتجعات السابقة"
+                                   Foreground="#64748B"
+                                   FontSize="12"/>
+
+                        <TextBlock x:Name="PreviousReturnsTotalText"
+                                   Text="0.00"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="#DC2626"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Margin="10,0,0,0">
+
+                        <TextBlock Text="صافي الفاتورة بعد المرتجعات"
+                                   Foreground="#64748B"
+                                   FontSize="12"/>
+
+                        <TextBlock x:Name="NetInvoiceTotalText"
+                                   Text="0.00"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="#16A34A"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
 
@@ -204,16 +253,14 @@
 
                             <DataGridTemplateColumn.CellEditingTemplate>
                                 <DataTemplate>
-
                                     <TextBox Text="{Binding ReturnUnitQuantity,
-            Mode=TwoWay,
-            UpdateSourceTrigger=PropertyChanged,
-            ValidatesOnExceptions=True}"
-         TextChanged="ReturnQuantityTextBox_TextChanged"
-         VerticalContentAlignment="Center"
-         HorizontalContentAlignment="Center"
-         Padding="4"/>
-
+                                            Mode=TwoWay,
+                                            UpdateSourceTrigger=PropertyChanged,
+                                            ValidatesOnExceptions=True}"
+                                             TextChanged="ReturnQuantityTextBox_TextChanged"
+                                             VerticalContentAlignment="Center"
+                                             HorizontalContentAlignment="Center"
+                                             Padding="4"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
 
@@ -269,6 +316,7 @@
 
                 <StackPanel Grid.Column="1"
                             Margin="12,0">
+
                     <TextBlock Text="إجمالي المرتجع"
                                FontWeight="SemiBold"
                                Margin="0,0,0,7"/>
@@ -290,6 +338,7 @@
 
                     <StackPanel Grid.Column="0"
                                 Margin="0,0,6,0">
+
                         <TextBlock Text="المبلغ المصروف فعليًا"
                                    FontWeight="SemiBold"
                                    Margin="0,0,0,7"/>
@@ -305,6 +354,7 @@
 
                     <StackPanel Grid.Column="1"
                                 Margin="6,0,0,0">
+
                         <TextBlock Text="وسيلة الرد"
                                    FontWeight="SemiBold"
                                    Margin="0,0,0,7"/>
