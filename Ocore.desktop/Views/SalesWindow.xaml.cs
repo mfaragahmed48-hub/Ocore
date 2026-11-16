@@ -386,12 +386,25 @@ namespace Ocore.desktop.Views
 
         #region Accounting
 
+
+
         private void AccountingInput_TextChanged(
             object sender,
             TextChangedEventArgs e)
         {
+            if (sender == DiscountValueTextBox)
+            {
+                foreach (SaleInvoiceItem item in invoiceItems)
+                {
+                    item.HasManualDiscountOverride = false;
+                    item.DiscountPercentage = 0;
+                }
+            }
+
             UpdateGrandTotal();
         }
+
+
 
         private void AccountingInput_SelectionChanged(
             object sender,
@@ -795,12 +808,18 @@ namespace Ocore.desktop.Views
             return true;
         }
 
+
         private double CalculateMaximumDiscountCapacity()
         {
             double capacity = 0;
 
             foreach (SaleInvoiceItem item in invoiceItems)
             {
+                // الصنف الذي تم تعديل خصمه يدويًا
+                // لا يدخل ضمن سعة الخصم العام.
+                if (item.HasManualDiscountOverride)
+                    continue;
+
                 double maximumDiscount =
                     RoundMoney(
                         item.Total *
@@ -816,6 +835,7 @@ namespace Ocore.desktop.Views
 
             return RoundMoney(capacity);
         }
+
 
         private bool TryGetAccountingValues(
             out double subtotal,
@@ -957,6 +977,8 @@ namespace Ocore.desktop.Views
         }
 
 
+
+
         private Dictionary<SaleInvoiceItem, long>
             CalculateGeneralDiscountAllocation(
                 string discountType,
@@ -971,13 +993,18 @@ namespace Ocore.desktop.Views
             if (discountValue <= 0 || invoiceItems.Count == 0)
                 return allocations;
 
-            // عند اختيار خصم عام بالنسبة المئوية:
-            // النسبة المدخلة هي الحد النهائي للخصم على كل صنف،
-            // وليست خصمًا إضافيًا فوق الخصم اليدوي.
+            // الخصم العام بالنسبة المئوية.
             if (discountType == "Percentage")
             {
                 foreach (SaleInvoiceItem item in invoiceItems)
                 {
+                    // الصنف المعدل يدويًا لا يحصل على خصم عام إضافي.
+                    if (item.HasManualDiscountOverride)
+                    {
+                        allocations[item] = 0;
+                        continue;
+                    }
+
                     long manualDiscountCents =
                         ToCents(GetManualDiscountAmount(item));
 
@@ -992,8 +1019,6 @@ namespace Ocore.desktop.Views
                                 item.Total *
                                 allowedPercentage / 100.0));
 
-                    // إذا كان الخصم اليدوي أعلى من الخصم العام،
-                    // نحافظ على الخصم اليدوي دون إضافة خصم عام للصنف.
                     long additionalDiscountCents =
                         Math.Max(
                             0,
@@ -1006,7 +1031,7 @@ namespace Ocore.desktop.Views
                 return allocations;
             }
 
-            // الخصم بالمبلغ الثابت يحتفظ بطريقة التوزيع الحالية.
+            // الخصم العام بالمبلغ الثابت.
             var capacities =
                 new Dictionary<SaleInvoiceItem, long>();
 
@@ -1015,6 +1040,13 @@ namespace Ocore.desktop.Views
 
             foreach (SaleInvoiceItem item in invoiceItems)
             {
+                if (item.HasManualDiscountOverride)
+                {
+                    capacities[item] = 0;
+                    weights[item] = 0;
+                    continue;
+                }
+
                 long lineTotalCents =
                     ToCents(item.Total);
 
@@ -1131,6 +1163,10 @@ namespace Ocore.desktop.Views
         }
 
 
+
+
+
+
         private void UpdateLineDiscountDisplays(
             string discountType,
             double discountValue)
@@ -1154,6 +1190,8 @@ namespace Ocore.desktop.Views
                     manualDiscount + generalAllocation);
             }
         }
+
+
 
         private void UpdateGrandTotal()
         {
@@ -2134,6 +2172,8 @@ namespace Ocore.desktop.Views
                     DispatcherPriority.Background,
                     new Action(() =>
                     {
+                        item.HasManualDiscountOverride = true;
+
                         item.DiscountPercentage =
                             newDiscountPercentage;
 
