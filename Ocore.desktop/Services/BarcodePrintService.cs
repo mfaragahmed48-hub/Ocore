@@ -458,6 +458,7 @@ namespace Ocore.desktop.Services
                 showProductCode);
         }
 
+
         public FixedDocument CreateRollDocument(
             IEnumerable<Tuple<Product, int>> items,
             double labelWidthMm,
@@ -506,6 +507,18 @@ namespace Ocore.desktop.Services
                     "لا توجد ملصقات صالحة للطباعة.");
             }
 
+            // تجميع جميع الملصقات في قائمة واحدة
+            // حتى لا يبدأ كل صنف زوجًا جديدًا مستقلًا.
+            List<Product> labels = new List<Product>();
+
+            foreach (Tuple<Product, int> item in validItems)
+            {
+                for (int i = 0; i < item.Item2; i++)
+                {
+                    labels.Add(item.Item1);
+                }
+            }
+
             double labelWidth = MmToDip(labelWidthMm);
             double labelHeight = MmToDip(labelHeightMm);
 
@@ -521,81 +534,77 @@ namespace Ocore.desktop.Services
             document.DocumentPaginator.PageSize =
                 new Size(pageWidth, pageHeight);
 
-            foreach (Tuple<Product, int> item in validItems)
+            // تقسيم جميع الملصقات إلى أزواج متتابعة
+            // بغض النظر عن اختلاف الأصناف.
+            for (int i = 0; i < labels.Count; i += 2)
             {
-                Product product = item.Item1;
-                int labelCount = item.Item2;
-
-                int pairCount = labelCount / 2 + labelCount % 2;
-
-                for (int pairIndex = 0;
-                     pairIndex < pairCount;
-                     pairIndex++)
+                FixedPage page = new FixedPage
                 {
-                    FixedPage page = new FixedPage
-                    {
-                        Width = pageWidth,
-                        Height = pageHeight,
-                        Background = Brushes.White,
-                        ClipToBounds = true
-                    };
+                    Width = pageWidth,
+                    Height = pageHeight,
+                    Background = Brushes.White,
+                    ClipToBounds = true
+                };
 
-                    DrawingVisual firstLabel =
+                // الملصق الأول في الزوج.
+                Product firstProduct = labels[i];
+
+                DrawingVisual firstLabel =
+                    CreateLabelVisual(
+                        firstProduct,
+                        labelWidthMm,
+                        labelHeightMm,
+                        showPrice,
+                        showProductCode);
+
+                VisualHost firstHost = new VisualHost(
+                    firstLabel,
+                    labelWidth,
+                    labelHeight);
+
+                FixedPage.SetLeft(firstHost, offsetX);
+                FixedPage.SetTop(firstHost, offsetY);
+
+                page.Children.Add(firstHost);
+
+                // الملصق الثاني إن وجد، حتى لو كان لصنف مختلف.
+                if (i + 1 < labels.Count)
+                {
+                    Product secondProduct = labels[i + 1];
+
+                    DrawingVisual secondLabel =
                         CreateLabelVisual(
-                            product,
+                            secondProduct,
                             labelWidthMm,
                             labelHeightMm,
                             showPrice,
                             showProductCode);
 
-                    VisualHost firstHost = new VisualHost(
-                        firstLabel,
+                    VisualHost secondHost = new VisualHost(
+                        secondLabel,
                         labelWidth,
                         labelHeight);
 
-                    FixedPage.SetLeft(firstHost, offsetX);
-                    FixedPage.SetTop(firstHost, offsetY);
+                    FixedPage.SetLeft(secondHost, offsetX);
 
-                    page.Children.Add(firstHost);
+                    FixedPage.SetTop(
+                        secondHost,
+                        labelHeight + offsetY);
 
-                    bool hasSecondLabel =
-                        (pairIndex * 2 + 1) < labelCount;
-
-                    if (hasSecondLabel)
-                    {
-                        DrawingVisual secondLabel =
-                            CreateLabelVisual(
-                                product,
-                                labelWidthMm,
-                                labelHeightMm,
-                                showPrice,
-                                showProductCode);
-
-                        VisualHost secondHost = new VisualHost(
-                            secondLabel,
-                            labelWidth,
-                            labelHeight);
-
-                        FixedPage.SetLeft(secondHost, offsetX);
-
-                        FixedPage.SetTop(
-                            secondHost,
-                            labelHeight + offsetY);
-
-                        page.Children.Add(secondHost);
-                    }
-
-                    PageContent pageContent = new PageContent
-                    {
-                        Child = page
-                    };
-
-                    document.Pages.Add(pageContent);
+                    page.Children.Add(secondHost);
                 }
+
+                PageContent pageContent = new PageContent
+                {
+                    Child = page
+                };
+
+                document.Pages.Add(pageContent);
             }
 
             return document;
         }
+
 
         #endregion
 
