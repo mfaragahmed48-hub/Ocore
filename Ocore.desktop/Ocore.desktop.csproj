@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props" Condition="Exists('..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -139,6 +139,7 @@
     <Compile Include="Models\SalesReturnItem.cs" />
     <Compile Include="Models\Supplier.cs" />
     <Compile Include="Services\ExpenseService.cs" />
+    <Compile Include="Services\ExpiryAlertService.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationDefaults.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationService.cs" />
     <Compile Include="Services\Printing\PrinterSettingsNavigationService.cs" />
@@ -152,12 +153,14 @@
       <DependentUpon>BatchSelectionWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\DashboardWindow.Expenses.cs" />
+    <Compile Include="Views\DashboardWindow.ExpiryAlerts.cs" />
     <Compile Include="Views\DashboardWindow.Expenses.xaml.cs" />
     <Compile Include="Views\DashboardWindow.ShiftHandover.cs" />
     <Compile Include="Views\DashboardWindow.ShiftReview.cs" />
     <Compile Include="Views\ExpensesWindow.xaml.cs">
       <DependentUpon>ExpensesWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\ExpiryAlertsWindow.cs" />
     <Compile Include="Views\PrinterSettingsHubWindow.xaml.cs">
       <DependentUpon>PrinterSettingsHubWindow.xaml</DependentUpon>
     </Compile>
@@ -417,15 +420,15 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Views\SalesReturnsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Views\SalesReturnDetailsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\SalesReturnsHistoryWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Views\SalesReturnsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -485,7 +488,7 @@
   <Import Project="..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets" Condition="Exists('..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them. For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets'))" />
     <Error Condition="!Exists('..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props'))" />

@@ -243,7 +243,7 @@
             </Border>
 
             <UniformGrid Grid.Row="1"
-                         Columns="4"
+                         Columns="5"
                          Margin="0,12,0,12">
 
                 <Border Background="White"
@@ -314,7 +314,29 @@
                                    Margin="0,8,0,0"/>
                     </StackPanel>
                 </Border>
+                <Border x:Name="ExpiryAlertsCard"
+        Background="White"
+        CornerRadius="10"
+        Padding="12"
+        Margin="4"
+        Cursor="Hand"
+        ToolTip="اضغط لعرض تنبيهات صلاحية التشغيلات"
+        Visibility="Collapsed"
+        Loaded="ExpiryAlertsCard_Loaded"
+        MouseLeftButtonUp="ExpiryAlertsCard_MouseLeftButtonUp">
 
+                    <StackPanel>
+                        <TextBlock Text="تنبيهات الصلاحية"
+                   Foreground="#64736F"/>
+
+                        <TextBlock x:Name="ExpiryAlertsCountText"
+                   Text="0"
+                   FontSize="22"
+                   FontWeight="Bold"
+                   Foreground="#B7791F"
+                   Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
             </UniformGrid>
 
             <Border Grid.Row="2"
