@@ -70,27 +70,98 @@ namespace Ocore.desktop.Views
             Loaded += BatchSelectionWindow_Loaded;
         }
 
+
+
+
         private void BatchSelectionWindow_Loaded(
             object sender,
             RoutedEventArgs e)
         {
+            SaleInvoiceBatchAllocation targetBatch = null;
+
             if (previouslySelectedBatchId > 0)
             {
-                SaleInvoiceBatchAllocation previous =
+                targetBatch =
                     availableBatchAllocations.FirstOrDefault(
                         x => x.BatchId == previouslySelectedBatchId);
-
-                if (previous != null)
-                {
-                    BatchesDataGrid.SelectedItem = previous;
-                    BatchesDataGrid.ScrollIntoView(previous);
-                    return;
-                }
             }
 
-            BatchesDataGrid.SelectedItem = null;
+            if (targetBatch == null &&
+                availableBatchAllocations.Count > 0)
+            {
+                targetBatch = availableBatchAllocations[0];
+            }
+
+            if (targetBatch != null)
+            {
+                BatchesDataGrid.SelectedItem = targetBatch;
+
+                if (BatchesDataGrid.Columns.Count > 0)
+                {
+                    BatchesDataGrid.CurrentCell =
+                        new DataGridCellInfo(
+                            targetBatch,
+                            BatchesDataGrid.Columns[0]);
+
+                    BatchesDataGrid.ScrollIntoView(
+                        targetBatch,
+                        BatchesDataGrid.Columns[0]);
+                }
+            }
+            else
+            {
+                BatchesDataGrid.SelectedItem = null;
+            }
+
             UpdateSummary();
+
+            Dispatcher.BeginInvoke(
+                new Action(() =>
+                {
+                    if (targetBatch == null)
+                        return;
+
+                    BatchesDataGrid.UpdateLayout();
+
+                    BatchesDataGrid.Focus();
+
+                    if (BatchesDataGrid.Columns.Count > 0)
+                    {
+                        DataGridRow row =
+                            BatchesDataGrid.ItemContainerGenerator
+                                .ContainerFromItem(targetBatch)
+                                as DataGridRow;
+
+                        if (row != null)
+                        {
+                            FrameworkElement content =
+                                BatchesDataGrid.Columns[0]
+                                    .GetCellContent(targetBatch);
+
+                            DataGridCell cell =
+                                content?.Parent as DataGridCell;
+
+                            if (cell != null)
+                            {
+                                BatchesDataGrid.CurrentCell =
+                                    new DataGridCellInfo(
+                                        targetBatch,
+                                        BatchesDataGrid.Columns[0]);
+
+                                cell.Focus();
+                                Keyboard.Focus(cell);
+                                return;
+                            }
+                        }
+                    }
+
+                    Keyboard.Focus(BatchesDataGrid);
+                }),
+                System.Windows.Threading.DispatcherPriority.ContextIdle);
         }
+
+
+
 
         private void BuildAvailableBatches(
             List<ProductBatch> availableBatches)
