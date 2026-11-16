@@ -344,6 +344,8 @@ namespace Ocore.desktop.Services
         // جلب أصناف فاتورة محددة
         // ==========================================
 
+
+
         public List<SalesReturnItem> GetInvoiceItemsForReturn(
             int userId,
             int invoiceId)
@@ -363,42 +365,51 @@ namespace Ocore.desktop.Services
                 ValidateReturnPermission(connection, null, userId);
 
                 string sql = @"
-                    SELECT
-                        sii.Id AS InvoiceItemId,
-                        sii.ProductId,
-                        sii.ItemName,
-                        sii.UnitName,
-                        sii.Quantity AS SoldQuantity,
-                        sii.UnitPrice,
-                        sii.PackageQuantity,
+            SELECT
+                si.Id AS InvoiceId,
+                si.InvoiceNumber,
+                si.CreatedAt AS InvoiceDate,
+                u.FullName AS EmployeeName,
 
-                        COALESCE(p.UnitName, sii.UnitName) AS PackageUnitName,
-                        COALESCE(p.SmallUnitName, '') AS SmallUnitName,
-                        COALESCE(p.UnitsPerPackage, 0) AS UnitsPerPackage,
+                sii.Id AS InvoiceItemId,
+                sii.ProductId,
+                p.ProductCode,
+                sii.ItemName,
+                sii.UnitName,
+                sii.Quantity AS SoldQuantity,
+                sii.UnitPrice,
+                sii.PackageQuantity,
 
-                        COALESCE(
-                            (
-                                SELECT SUM(sri.PackageQuantity)
-                                FROM SalesReturnItems sri
-                                INNER JOIN SalesReturns sr
-                                    ON sr.Id = sri.ReturnId
-                                WHERE sri.InvoiceItemId = sii.Id
-                                  AND sr.Status = 'Completed'
-                            ), 0
-                        ) AS ReturnedPackageQuantity
+                COALESCE(p.UnitName, sii.UnitName) AS PackageUnitName,
+                COALESCE(p.SmallUnitName, '') AS SmallUnitName,
+                COALESCE(p.UnitsPerPackage, 0) AS UnitsPerPackage,
 
-                    FROM SalesInvoiceItems sii
+                COALESCE(
+                    (
+                        SELECT SUM(sri.PackageQuantity)
+                        FROM SalesReturnItems sri
+                        INNER JOIN SalesReturns sr
+                            ON sr.Id = sri.ReturnId
+                        WHERE sri.InvoiceItemId = sii.Id
+                          AND sr.Status = 'Completed'
+                    ), 0
+                ) AS ReturnedPackageQuantity
 
-                    INNER JOIN SalesInvoices si
-                        ON si.Id = sii.InvoiceId
+            FROM SalesInvoiceItems sii
 
-                    LEFT JOIN Products p
-                        ON p.Id = sii.ProductId
+            INNER JOIN SalesInvoices si
+                ON si.Id = sii.InvoiceId
 
-                    WHERE si.Id = @InvoiceId
-                      AND si.Status = 'Completed'
+            INNER JOIN Users u
+                ON u.Id = si.UserId
 
-                    ORDER BY sii.Id;";
+            LEFT JOIN Products p
+                ON p.Id = sii.ProductId
+
+            WHERE si.Id = @InvoiceId
+              AND si.Status = 'Completed'
+
+            ORDER BY sii.Id;";
 
                 using (var command = new SQLiteCommand(sql, connection))
                 {
@@ -412,8 +423,26 @@ namespace Ocore.desktop.Services
                             SalesReturnItem item =
                                 CreateReturnItemFromReader(reader);
 
-                            if (item.RemainingQuantity > Epsilon)
-                                items.Add(item);
+                            item.InvoiceId = Convert.ToInt32(
+                                reader["InvoiceId"]);
+
+                            item.InvoiceNumber = Convert.ToString(
+                                reader["InvoiceNumber"]);
+
+                            item.InvoiceDate = Convert.ToDateTime(
+                                reader["InvoiceDate"],
+                                CultureInfo.InvariantCulture)
+                                .ToString("yyyy-MM-dd HH:mm");
+
+                            item.EmployeeName = Convert.ToString(
+                                reader["EmployeeName"]);
+
+                            item.ProductCode = Convert.ToString(
+                                reader["ProductCode"]);
+
+                            // كل أصناف الفاتورة تظهر،
+                            // حتى الأصناف التي أُرجعت بالكامل.
+                            items.Add(item);
                         }
                     }
                 }
@@ -421,6 +450,8 @@ namespace Ocore.desktop.Services
 
             return items;
         }
+
+
 
         // ==========================================
         // إنشاء بيانات الصنف مع وحدات المرتجع
