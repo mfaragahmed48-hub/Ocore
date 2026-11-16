@@ -531,6 +531,7 @@ namespace Ocore.desktop.Views
         // ==========================================
 
 
+
         private void ReturnQuantityTextBox_TextChanged(
             object sender,
             TextChangedEventArgs e)
@@ -572,9 +573,11 @@ namespace Ocore.desktop.Views
             double maximumQuantity =
                 GetMaximumReturnUnitQuantity(item);
 
+            // لا نحدّث قيمة النموذج أثناء الكتابة.
+            // نترك النص يحتفظ بالنقطة العشرية حتى يكتمل إدخال الرقم،
+            // ثم يقوم Binding بتحديث القيمة عند مغادرة مربع النص.
             if (enteredQuantity <= maximumQuantity + Epsilon)
             {
-                item.ReturnUnitQuantity = enteredQuantity;
                 return;
             }
 
@@ -582,33 +585,28 @@ namespace Ocore.desktop.Views
 
             try
             {
-                string diagnostic =
-                    "لا يمكن إرجاع كمية أكبر من المتاح للصنف: " +
-                    item.ItemName +
-                    "\n\nالكمية المدخلة فعليًا: " +
-                    enteredQuantity.ToString("R", CultureInfo.InvariantCulture) +
-                    "\nالحد الأقصى الفعلي: " +
-                    maximumQuantity.ToString("R", CultureInfo.InvariantCulture) +
-                    "\nوحدة المرتجع: " +
-                    item.ReturnUnitName +
-                    "\nالوحدة الصغيرة: " +
-                    item.SmallUnitName +
-                    "\nعدد الوحدات داخل العبوة: " +
-                    item.UnitsPerPackage.ToString("R", CultureInfo.InvariantCulture) +
-                    "\nالكمية المتبقية: " +
-                    item.RemainingQuantity.ToString("R", CultureInfo.InvariantCulture);
-
                 item.ReturnUnitQuantity = maximumQuantity;
 
                 textBox.Text = maximumQuantity.ToString(
                     "0.##",
-                    CultureInfo.CurrentCulture);
+                    CultureInfo.InvariantCulture);
 
                 textBox.CaretIndex = textBox.Text.Length;
 
                 MessageBox.Show(
-                    diagnostic,
-                    "تشخيص تجاوز الكمية",
+                    "لا يمكن إرجاع كمية أكبر من المتاح للصنف: " +
+                    item.ItemName +
+                    "\n\nالكمية المدخلة: " +
+                    enteredQuantity.ToString(
+                        "0.##",
+                        CultureInfo.InvariantCulture) +
+                    "\nالحد الأقصى المسموح: " +
+                    maximumQuantity.ToString(
+                        "0.##",
+                        CultureInfo.InvariantCulture) +
+                    "\nوحدة المرتجع: " +
+                    item.ReturnUnitName,
+                    "تجاوز الكمية المتاحة",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
@@ -617,6 +615,7 @@ namespace Ocore.desktop.Views
                 isAdjustingReturnQuantity = false;
             }
         }
+
 
 
         // ==========================================

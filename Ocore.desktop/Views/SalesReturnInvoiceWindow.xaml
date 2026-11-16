@@ -253,16 +253,18 @@
 
                             <DataGridTemplateColumn.CellEditingTemplate>
                                 <DataTemplate>
+
                                     <TextBox Text="{Binding ReturnUnitQuantity,
-                                            Mode=TwoWay,
-                                            UpdateSourceTrigger=PropertyChanged,
-                                            ValidatesOnExceptions=True}"
-                                             TextChanged="ReturnQuantityTextBox_TextChanged"
-                                             FlowDirection="LeftToRight"
-                                             Language="en-US"
-                                             VerticalContentAlignment="Center"
-                                             HorizontalContentAlignment="Center"
-                                             Padding="4"/>
+        Mode=TwoWay,
+        UpdateSourceTrigger=LostFocus,
+        ValidatesOnExceptions=True}"
+         TextChanged="ReturnQuantityTextBox_TextChanged"
+         FlowDirection="LeftToRight"
+         Language="en-US"
+         VerticalContentAlignment="Center"
+         HorizontalContentAlignment="Center"
+         Padding="4"/>
+
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
 
