@@ -258,6 +258,8 @@
                                             UpdateSourceTrigger=PropertyChanged,
                                             ValidatesOnExceptions=True}"
                                              TextChanged="ReturnQuantityTextBox_TextChanged"
+                                             FlowDirection="LeftToRight"
+                                             Language="en-US"
                                              VerticalContentAlignment="Center"
                                              HorizontalContentAlignment="Center"
                                              Padding="4"/>

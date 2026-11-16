@@ -530,6 +530,7 @@ namespace Ocore.desktop.Views
         // التحقق الفوري عند تغيير كمية المرتجع
         // ==========================================
 
+
         private void ReturnQuantityTextBox_TextChanged(
             object sender,
             TextChangedEventArgs e)
@@ -571,11 +572,8 @@ namespace Ocore.desktop.Views
             double maximumQuantity =
                 GetMaximumReturnUnitQuantity(item);
 
-            // السماح بالكمية المساوية للمتاح.
             if (enteredQuantity <= maximumQuantity + Epsilon)
             {
-                // تثبيت القيمة المقروءة مباشرة في نموذج الصنف،
-                // حتى لا نعتمد فقط على تحويل الـ Binding حسب ثقافة النظام.
                 item.ReturnUnitQuantity = enteredQuantity;
                 return;
             }
@@ -584,6 +582,22 @@ namespace Ocore.desktop.Views
 
             try
             {
+                string diagnostic =
+                    "لا يمكن إرجاع كمية أكبر من المتاح للصنف: " +
+                    item.ItemName +
+                    "\n\nالكمية المدخلة فعليًا: " +
+                    enteredQuantity.ToString("R", CultureInfo.InvariantCulture) +
+                    "\nالحد الأقصى الفعلي: " +
+                    maximumQuantity.ToString("R", CultureInfo.InvariantCulture) +
+                    "\nوحدة المرتجع: " +
+                    item.ReturnUnitName +
+                    "\nالوحدة الصغيرة: " +
+                    item.SmallUnitName +
+                    "\nعدد الوحدات داخل العبوة: " +
+                    item.UnitsPerPackage.ToString("R", CultureInfo.InvariantCulture) +
+                    "\nالكمية المتبقية: " +
+                    item.RemainingQuantity.ToString("R", CultureInfo.InvariantCulture);
+
                 item.ReturnUnitQuantity = maximumQuantity;
 
                 textBox.Text = maximumQuantity.ToString(
@@ -593,15 +607,8 @@ namespace Ocore.desktop.Views
                 textBox.CaretIndex = textBox.Text.Length;
 
                 MessageBox.Show(
-                    "لا يمكن إرجاع كمية أكبر من المتاح للصنف: " +
-                    item.ItemName +
-                    "\n\nوحدة المرتجع: " +
-                    item.ReturnUnitName +
-                    "\nالحد الأقصى المسموح: " +
-                    maximumQuantity.ToString(
-                        "0.##",
-                        CultureInfo.CurrentCulture),
-                    "تجاوز الكمية المتاحة",
+                    diagnostic,
+                    "تشخيص تجاوز الكمية",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
@@ -610,6 +617,7 @@ namespace Ocore.desktop.Views
                 isAdjustingReturnQuantity = false;
             }
         }
+
 
         // ==========================================
         // عند تعديل الوحدة أو الكمية
