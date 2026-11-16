@@ -956,6 +956,7 @@ namespace Ocore.desktop.Views
             return true;
         }
 
+
         private Dictionary<SaleInvoiceItem, long>
             CalculateGeneralDiscountAllocation(
                 string discountType,
@@ -967,17 +968,50 @@ namespace Ocore.desktop.Views
             foreach (SaleInvoiceItem item in invoiceItems)
                 allocations[item] = 0;
 
-            if (discountValue <= 0 ||
-                invoiceItems.Count == 0)
+            if (discountValue <= 0 || invoiceItems.Count == 0)
                 return allocations;
 
+            // عند اختيار خصم عام بالنسبة المئوية:
+            // النسبة المدخلة هي الحد النهائي للخصم على كل صنف،
+            // وليست خصمًا إضافيًا فوق الخصم اليدوي.
+            if (discountType == "Percentage")
+            {
+                foreach (SaleInvoiceItem item in invoiceItems)
+                {
+                    long manualDiscountCents =
+                        ToCents(GetManualDiscountAmount(item));
+
+                    double allowedPercentage =
+                        Math.Min(
+                            discountValue,
+                            item.MaxDiscountPercentage);
+
+                    long maximumTotalDiscountCents =
+                        ToCents(
+                            RoundMoney(
+                                item.Total *
+                                allowedPercentage / 100.0));
+
+                    // إذا كان الخصم اليدوي أعلى من الخصم العام،
+                    // نحافظ على الخصم اليدوي دون إضافة خصم عام للصنف.
+                    long additionalDiscountCents =
+                        Math.Max(
+                            0,
+                            maximumTotalDiscountCents -
+                            manualDiscountCents);
+
+                    allocations[item] = additionalDiscountCents;
+                }
+
+                return allocations;
+            }
+
+            // الخصم بالمبلغ الثابت يحتفظ بطريقة التوزيع الحالية.
             var capacities =
                 new Dictionary<SaleInvoiceItem, long>();
 
             var weights =
                 new Dictionary<SaleInvoiceItem, long>();
-
-            long subtotalAfterManualDiscountCents = 0;
 
             foreach (SaleInvoiceItem item in invoiceItems)
             {
@@ -987,10 +1021,11 @@ namespace Ocore.desktop.Views
                 long manualDiscountCents =
                     ToCents(GetManualDiscountAmount(item));
 
-                long maximumDiscountCents = ToCents(
-                    RoundMoney(
-                        item.Total *
-                        item.MaxDiscountPercentage / 100.0));
+                long maximumDiscountCents =
+                    ToCents(
+                        RoundMoney(
+                            item.Total *
+                            item.MaxDiscountPercentage / 100.0));
 
                 capacities[item] =
                     Math.Max(
@@ -1001,28 +1036,10 @@ namespace Ocore.desktop.Views
                     Math.Max(
                         0,
                         lineTotalCents - manualDiscountCents);
-
-                subtotalAfterManualDiscountCents +=
-                    lineTotalCents - manualDiscountCents;
             }
 
-            long requestedTotalCents;
-
-            if (discountType == "Percentage")
-            {
-                double subtotalAfterManualDiscount =
-                    FromCents(subtotalAfterManualDiscountCents);
-
-                requestedTotalCents = ToCents(
-                    RoundMoney(
-                        subtotalAfterManualDiscount *
-                        discountValue / 100.0));
-            }
-            else
-            {
-                requestedTotalCents =
-                    ToCents(RoundMoney(discountValue));
-            }
+            long requestedTotalCents =
+                ToCents(RoundMoney(discountValue));
 
             if (requestedTotalCents <= 0)
                 return allocations;
@@ -1064,9 +1081,7 @@ namespace Ocore.desktop.Views
                     exactShare - Math.Floor(exactShare);
 
                 long appliedShare =
-                    Math.Min(
-                        floorShare,
-                        capacities[item]);
+                    Math.Min(floorShare, capacities[item]);
 
                 allocations[item] = appliedShare;
 
@@ -1114,6 +1129,7 @@ namespace Ocore.desktop.Views
 
             return allocations;
         }
+
 
         private void UpdateLineDiscountDisplays(
             string discountType,

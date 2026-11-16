@@ -92,6 +92,10 @@ namespace Ocore.desktop.Models
             }
         }
 
+        // يحدد هل المستخدم عدّل خصم هذا الصنف يدويًا.
+        // عند التعديل اليدوي يُستثنى الصنف من الخصم العام.
+        public bool HasManualDiscountOverride { get; set; } = false;
+
         public double DiscountAmount
         {
             get { return discountAmount; }
