@@ -132,12 +132,11 @@ namespace Ocore.desktop.Services
 
                     WHERE si.Status = 'Completed'
 
-                      AND (
-                            sii.ItemName LIKE @SearchPattern
-                            OR COALESCE(p.Name, '') LIKE @SearchPattern
-                            OR COALESCE(p.ProductCode, '') LIKE @SearchPattern
-                          )
-
+                     AND (
+    sii.ItemName LIKE @SearchPattern
+    OR COALESCE(p.Name, '') LIKE @SearchPattern
+    OR COALESCE(p.ProductCode, '') LIKE @SearchPattern
+)
                     ORDER BY si.Id DESC, sii.Id;";
 
                 using (var command = new SQLiteCommand(sql, connection))
@@ -262,25 +261,11 @@ namespace Ocore.desktop.Services
 
                             WHERE sii.InvoiceId = si.Id
 
-                            AND (
-                                sii.PackageQuantity -
-                                COALESCE(
-                                    (
-                                        SELECT SUM(sri.PackageQuantity)
-                                        FROM SalesReturnItems sri
-                                        INNER JOIN SalesReturns sr
-                                            ON sr.Id = sri.ReturnId
-                                        WHERE sri.InvoiceItemId = sii.Id
-                                          AND sr.Status = 'Completed'
-                                    ), 0
-                                )
-                            ) > @Epsilon
-
-                            AND (
-                                sii.ItemName LIKE @SearchPattern
-                                OR p.Name LIKE @SearchPattern
-                                OR p.ProductCode LIKE @SearchPattern
-                            )
+AND (
+    sii.ItemName LIKE @SearchPattern
+    OR COALESCE(p.Name, '') LIKE @SearchPattern
+    OR COALESCE(p.ProductCode, '') LIKE @SearchPattern
+)
                         )
                     )
 

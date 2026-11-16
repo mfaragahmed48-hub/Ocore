@@ -19,6 +19,9 @@ namespace Ocore.desktop.Views
         private const double Epsilon = 0.00000001;
 
         private bool isUpdatingItems;
+        private bool isLoadingInvoice;
+
+        private int selectedInvoiceId;
 
         public SalesReturnsWindow(int userId)
         {
@@ -27,13 +30,17 @@ namespace Ocore.desktop.Views
             currentUserId = userId;
             returnsService = new SalesReturnsService();
 
+            selectedInvoiceId = 0;
+
             ReturnTotalText.Text = "0.00";
             RefundAmountTextBox.Text = "0";
             RefundPaymentMethodComboBox.SelectedIndex = -1;
+
+            ReturnFullInvoiceButton.IsEnabled = false;
         }
 
         // ==========================================
-        // البحث عن الأصناف المباعة
+        // البحث عن فواتير البيع
         // ==========================================
 
         private void SearchTextBox_TextChanged(
@@ -55,40 +62,50 @@ namespace Ocore.desktop.Views
         {
             try
             {
+                isLoadingInvoice = true;
+
+                selectedInvoiceId = 0;
+
+                InvoicesDataGrid.SelectedItem = null;
+                InvoicesDataGrid.ItemsSource = null;
+
                 ItemsDataGrid.ItemsSource = null;
+
+                ReturnFullInvoiceButton.IsEnabled = false;
+
                 ReturnTotalText.Text = "0.00";
 
-                string searchText = SearchTextBox.Text.Trim();
+                string searchText =
+                    (SearchTextBox.Text ?? "").Trim();
 
                 if (string.IsNullOrWhiteSpace(searchText))
                 {
                     ItemsStatusText.Text =
-                        "اكتب اسم الصنف أو كوده للبحث عن عمليات البيع المتاحة للمرتجع.";
+                        "اكتب رقم الفاتورة أو اسم الصنف أو كوده للبحث.";
 
                     return;
                 }
 
-                List<SalesReturnItem> items =
-                    returnsService.SearchReturnableItems(
+                List<SalesReturnDetails> invoices =
+                    returnsService.GetInvoicesForReturn(
                         currentUserId,
                         searchText);
 
-                ItemsDataGrid.ItemsSource = items;
+                InvoicesDataGrid.ItemsSource = invoices;
 
-                if (items.Count == 0)
+                if (invoices.Count == 0)
                 {
                     ItemsStatusText.Text =
-                        "لا توجد عمليات بيع تحتوي على هذا الصنف وبها كمية متاحة للمرتجع.";
+                        "لا توجد فواتير مكتملة مطابقة للبحث وبها كميات متاحة للمرتجع.";
 
                     return;
                 }
 
                 ItemsStatusText.Text =
-                    "عدد عمليات البيع المتاحة: " +
-                    items.Count +
-                    " | اختر وحدة المرتجع والكمية المطلوبة لكل صنف.";
+                    "عدد الفواتير المطابقة: " +
+                    invoices.Count +
+                    " | اختر الفاتورة لعرض جميع أصنافها.";
 
-                UpdateReturnTotal();
             }
             catch (Exception ex)
             {
@@ -98,17 +115,206 @@ namespace Ocore.desktop.Views
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+            finally
+            {
+                isLoadingInvoice = false;
+            }
         }
 
         // ==========================================
-        // توافق مع عنصر ComboBox القديم
+        // اختيار فاتورة وعرض جميع أصنافها
         // ==========================================
 
-        private void InvoicesComboBox_SelectionChanged(
+        private void InvoicesDataGrid_SelectionChanged(
             object sender,
             SelectionChangedEventArgs e)
         {
-            // الشاشة لا تعتمد على اختيار الفاتورة من هذا العنصر.
+            if (isLoadingInvoice)
+                return;
+
+            SalesReturnDetails invoice =
+                InvoicesDataGrid.SelectedItem as SalesReturnDetails;
+
+            if (invoice == null)
+            {
+                selectedInvoiceId = 0;
+
+                ItemsDataGrid.ItemsSource = null;
+
+                ReturnFullInvoiceButton.IsEnabled = false;
+
+                ReturnTotalText.Text = "0.00";
+
+                return;
+            }
+
+            LoadInvoiceItems(invoice);
+        }
+
+        // ==========================================
+        // تحميل أصناف الفاتورة المحددة
+        // ==========================================
+
+        private void LoadInvoiceItems(
+            SalesReturnDetails invoice)
+        {
+            if (invoice == null || invoice.InvoiceId <= 0)
+                return;
+
+            try
+            {
+                isLoadingInvoice = true;
+
+                selectedInvoiceId = invoice.InvoiceId;
+
+                ItemsDataGrid.ItemsSource = null;
+
+                ReturnTotalText.Text = "0.00";
+
+                List<SalesReturnItem> items =
+                    returnsService.GetInvoiceItemsForReturn(
+                        currentUserId,
+                        invoice.InvoiceId);
+
+                ItemsDataGrid.ItemsSource = items;
+
+                bool hasRemainingItems =
+                    items.Any(x => x.RemainingQuantity > Epsilon);
+
+                ReturnFullInvoiceButton.IsEnabled =
+                    hasRemainingItems;
+
+                if (items.Count == 0)
+                {
+                    ItemsStatusText.Text =
+                        "لا توجد أصناف في هذه الفاتورة.";
+
+                    return;
+                }
+
+                int remainingItemsCount =
+                    items.Count(x => x.RemainingQuantity > Epsilon);
+
+                int fullyReturnedItemsCount =
+                    items.Count(x => x.RemainingQuantity <= Epsilon);
+
+                ItemsStatusText.Text =
+                    "الفاتورة: " + invoice.InvoiceNumber +
+                    " | إجمالي الأصناف: " + items.Count +
+                    " | أصناف متاحة للمرتجع: " + remainingItemsCount +
+                    " | أصناف مرتجعة بالكامل: " + fullyReturnedItemsCount +
+                    " | أدخل كميات المرتجع المطلوبة.";
+
+                UpdateAllReturnItems();
+            }
+            catch (Exception ex)
+            {
+                selectedInvoiceId = 0;
+
+                ItemsDataGrid.ItemsSource = null;
+
+                ReturnFullInvoiceButton.IsEnabled = false;
+
+                ReturnTotalText.Text = "0.00";
+
+                MessageBox.Show(
+                    ex.Message,
+                    "خطأ في تحميل الفاتورة",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                isLoadingInvoice = false;
+            }
+        }
+
+        // ==========================================
+        // إرجاع الفاتورة كاملة
+        // ==========================================
+
+        private void ReturnFullInvoiceButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            try
+            {
+                if (selectedInvoiceId <= 0)
+                {
+                    MessageBox.Show(
+                        "اختر فاتورة أولاً.",
+                        "تنبيه",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
+                ItemsDataGrid.CommitEdit(
+                    DataGridEditingUnit.Cell, true);
+
+                ItemsDataGrid.CommitEdit(
+                    DataGridEditingUnit.Row, true);
+
+                int updatedItemsCount = 0;
+
+                foreach (var row in ItemsDataGrid.Items)
+                {
+                    SalesReturnItem item =
+                        row as SalesReturnItem;
+
+                    if (item == null)
+                        continue;
+
+                    if (item.RemainingQuantity <= Epsilon)
+                    {
+                        item.ReturnUnitQuantity = 0;
+                        item.Total = 0;
+                        continue;
+                    }
+
+                    // استخدام وحدة البيع الأصلية حتى لا يحدث
+                    // تحويل غير صحيح عند إرجاع الفاتورة كاملة.
+                    item.ReturnUnitName = item.UnitName;
+
+                    item.ReturnUnitQuantity =
+                        item.RemainingQuantity;
+
+                    UpdateReturnItem(item);
+
+                    updatedItemsCount++;
+                }
+
+                ItemsDataGrid.Items.Refresh();
+
+                UpdateAllReturnItems();
+
+                if (updatedItemsCount == 0)
+                {
+                    MessageBox.Show(
+                        "لا توجد كميات متبقية في هذه الفاتورة لإرجاعها.",
+                        "تنبيه",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    ReturnFullInvoiceButton.IsEnabled = false;
+
+                    return;
+                }
+
+                ItemsStatusText.Text =
+                    "تم تحديد جميع الكميات المتبقية للمرتجع. " +
+                    "يمكنك تعديل كمية أي صنف قبل الحفظ.";
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "خطأ في تحديد كميات المرتجع",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         // ==========================================
@@ -542,7 +748,6 @@ namespace Ocore.desktop.Views
             if (string.IsNullOrWhiteSpace(amountText))
                 amountText = "0";
 
-            // دعم إدخال الأرقام بالفاصلة العشرية أو النقطة
             string normalizedAmount = amountText
                 .Replace("٬", "")
                 .Replace("٫", ".")
@@ -584,7 +789,6 @@ namespace Ocore.desktop.Views
                 return false;
             }
 
-            // عند عدم صرف أي مبلغ لا نحتاج إلى وسيلة رد.
             if (refundAmount <= Epsilon)
             {
                 refundAmount = 0;
@@ -628,6 +832,17 @@ namespace Ocore.desktop.Views
         {
             try
             {
+                if (selectedInvoiceId <= 0)
+                {
+                    MessageBox.Show(
+                        "اختر فاتورة من قائمة الفواتير أولاً.",
+                        "لم يتم اختيار فاتورة",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
                 ItemsDataGrid.CommitEdit(
                     DataGridEditingUnit.Cell, true);
 
@@ -677,8 +892,7 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
-                int originalInvoiceId =
-                    selectedItems[0].InvoiceId;
+                int originalInvoiceId = selectedInvoiceId;
 
                 bool hasDifferentInvoices =
                     selectedItems.Any(
@@ -687,9 +901,8 @@ namespace Ocore.desktop.Views
                 if (hasDifferentInvoices)
                 {
                     MessageBox.Show(
-                        "لقد اخترت أصنافًا من أكثر من فاتورة.\n\n" +
-                        "يجب أن تكون جميع الأصناف في عملية المرتجع الواحدة من نفس فاتورة البيع.\n" +
-                        "أزل كميات الأصناف التابعة للفواتير الأخرى ثم حاول مرة أخرى.",
+                        "توجد أصناف لا تتبع الفاتورة المحددة.\n" +
+                        "يجب أن تكون جميع الأصناف في عملية المرتجع الواحدة من نفس الفاتورة.",
                         "اختلاف الفواتير",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
@@ -705,7 +918,6 @@ namespace Ocore.desktop.Views
                     2,
                     MidpointRounding.AwayFromZero);
 
-                // قراءة مبلغ الرد الفعلي ووسيلته قبل الحفظ
                 double refundAmount;
                 string refundPaymentMethod;
                 string refundError;
@@ -816,6 +1028,17 @@ namespace Ocore.desktop.Views
                 default:
                     return "غير محدد";
             }
+        }
+
+        // ==========================================
+        // توافق مؤقت مع عنصر ComboBox القديم
+        // ==========================================
+
+        private void InvoicesComboBox_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
+        {
+            // لا يعتمد التدفق الجديد على هذا العنصر.
         }
 
         // ==========================================

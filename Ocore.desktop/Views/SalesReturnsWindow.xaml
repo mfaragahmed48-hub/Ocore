@@ -32,7 +32,7 @@
                            FontWeight="Bold"
                            Foreground="#1E293B"/>
 
-                <TextBlock Text="ابحث عن الصنف بالاسم أو الكود، واختر وحدة وكمية المرتجع لكل صنف"
+                <TextBlock Text="ابحث عن رقم الفاتورة أو اسم الصنف أو كوده، ثم اختر الفاتورة وحدد الأصناف والكميات المراد إرجاعها"
                            FontSize="13"
                            Foreground="#64748B"
                            Margin="0,5,0,0"/>
@@ -54,7 +54,7 @@
 
                 <StackPanel Grid.Column="0">
 
-                    <TextBlock Text="اسم الصنف أو كود الصنف"
+                    <TextBlock Text="رقم الفاتورة أو اسم الصنف أو كود الصنف"
                                FontWeight="SemiBold"
                                Margin="0,0,0,7"/>
 
@@ -63,10 +63,10 @@
                              FontSize="15"
                              Padding="10"
                              VerticalContentAlignment="Center"
-                             ToolTip="اكتب اسم الصنف أو كوده"
+                             ToolTip="اكتب رقم الفاتورة أو اسم الصنف أو كوده"
                              TextChanged="SearchTextBox_TextChanged"/>
 
-                    <TextBlock Text="ستظهر عمليات البيع المتاحة للمرتجع لكل صنف"
+                    <TextBlock Text="سيتم عرض الفواتير المطابقة، ثم يمكنك اختيار الفاتورة لعرض جميع أصنافها"
                                FontSize="11"
                                Foreground="#64748B"
                                Margin="0,5,0,0"/>
@@ -85,7 +85,7 @@
             </Grid>
         </Border>
 
-        <!-- نتائج البحث -->
+        <!-- نتائج البحث وتفاصيل الفاتورة -->
         <Border Grid.Row="2"
                 Background="White"
                 CornerRadius="10"
@@ -95,19 +95,93 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="145"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
+                <!-- عنوان قائمة الفواتير -->
                 <TextBlock Grid.Row="0"
-                           Text="نتائج البحث وعمليات البيع المتاحة للمرتجع"
-                           FontSize="17"
+                           Text="الفواتير المطابقة للبحث"
+                           FontSize="16"
                            FontWeight="Bold"
                            Foreground="#1E293B"
-                           Margin="0,0,0,12"/>
+                           Margin="0,0,0,8"/>
 
-                <DataGrid x:Name="ItemsDataGrid"
+                <!-- قائمة الفواتير -->
+                <DataGrid x:Name="InvoicesDataGrid"
                           Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeight="35"
+                          FontSize="12"
+                          Background="White"
+                          BorderBrush="#E2E8F0"
+                          AlternatingRowBackground="#F8FAFC"
+                          CanUserSortColumns="True"
+                          SelectionChanged="InvoicesDataGrid_SelectionChanged">
+
+                    <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="رقم الفاتورة"
+                                            Binding="{Binding InvoiceNumber}"
+                                            Width="1.2*"/>
+
+                        <DataGridTextColumn Header="تاريخ البيع"
+                                            Binding="{Binding CreatedAt, StringFormat=yyyy-MM-dd HH:mm}"
+                                            Width="1.5*"/>
+
+                        <DataGridTextColumn Header="الموظف"
+                                            Binding="{Binding EmployeeName}"
+                                            Width="1.5*"/>
+
+                        <DataGridTextColumn Header="إجمالي الفاتورة"
+                                            Binding="{Binding Total, StringFormat=N2}"
+                                            Width="1.2*"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- عنوان تفاصيل الفاتورة وزر الإرجاع الكامل -->
+                <Grid Grid.Row="2"
+                      Margin="0,12,0,8">
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="أصناف الفاتورة المحددة"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#1E293B"
+                               VerticalAlignment="Center"/>
+
+                    <Button x:Name="ReturnFullInvoiceButton"
+                            Grid.Column="1"
+                            Content="إرجاع الفاتورة كاملة"
+                            Width="175"
+                            Height="34"
+                            IsEnabled="False"
+                            Click="ReturnFullInvoiceButton_Click"
+                            Background="#D97706"
+                            Foreground="White"
+                            BorderThickness="0"
+                            FontWeight="Bold"/>
+
+                </Grid>
+
+                <!-- أصناف الفاتورة المختارة -->
+                <DataGrid x:Name="ItemsDataGrid"
+                          Grid.Row="3"
                           AutoGenerateColumns="False"
                           CanUserAddRows="False"
                           CanUserDeleteRows="False"
@@ -136,21 +210,6 @@
                                             Width="2*"
                                             IsReadOnly="True"/>
 
-                        <DataGridTextColumn Header="الفاتورة الأصلية"
-                                            Binding="{Binding InvoiceNumber}"
-                                            Width="*"
-                                            IsReadOnly="True"/>
-
-                        <DataGridTextColumn Header="تاريخ البيع"
-                                            Binding="{Binding InvoiceDate}"
-                                            Width="1.3*"
-                                            IsReadOnly="True"/>
-
-                        <DataGridTextColumn Header="الموظف"
-                                            Binding="{Binding EmployeeName}"
-                                            Width="1.2*"
-                                            IsReadOnly="True"/>
-
                         <DataGridTextColumn Header="وحدة البيع"
                                             Binding="{Binding UnitName}"
                                             Width="0.9*"
@@ -166,9 +225,9 @@
                                             Width="0.9*"
                                             IsReadOnly="True"/>
 
-                        <DataGridTextColumn Header="المتاح"
+                        <DataGridTextColumn Header="المتاح للمرتجع"
                                             Binding="{Binding RemainingQuantity, StringFormat=N2}"
-                                            Width="0.9*"
+                                            Width="1*"
                                             IsReadOnly="True"/>
 
                         <!-- اختيار وحدة المرتجع -->
@@ -199,7 +258,7 @@
 
                         </DataGridTemplateColumn>
 
-                        <!-- كمية الوحدة المختارة -->
+                        <!-- كمية المرتجع -->
                         <DataGridTemplateColumn Header="كمية المرتجع"
                                                 Width="1.1*"
                                                 IsReadOnly="False">
@@ -239,11 +298,12 @@
                     </DataGrid.Columns>
                 </DataGrid>
 
+                <!-- حالة البحث والاختيار -->
                 <TextBlock x:Name="ItemsStatusText"
-                           Grid.Row="2"
-                           Text="ابحث باسم الصنف أو كوده لعرض عمليات البيع المتاحة للمرتجع."
+                           Grid.Row="4"
+                           Text="ابحث عن فاتورة أو صنف لعرض الفواتير المتاحة للمرتجع."
                            Foreground="#64748B"
-                           Margin="0,12,0,0"
+                           Margin="0,10,0,0"
                            FontSize="12"/>
             </Grid>
         </Border>
@@ -371,7 +431,7 @@
             </Grid>
         </Border>
 
-        <!-- توافق مع الكود القديم -->
+        <!-- توافق مؤقت مع الكود القديم -->
         <ComboBox x:Name="InvoicesComboBox"
                   Visibility="Collapsed"
                   SelectionChanged="InvoicesComboBox_SelectionChanged"/>
