@@ -525,6 +525,7 @@ namespace Ocore.desktop.Data
                 "Data Source=" + databasePath + ";Version=3;");
         }
 
+
         public string ClearTestData()
         {
             string backupPath = null;
@@ -543,6 +544,7 @@ namespace Ocore.desktop.Data
 
                 backupPath = Path.Combine(folder, backupName);
 
+                // إنشاء نسخة احتياطية قبل أي حذف.
                 File.Copy(databasePath, backupPath, false);
 
                 using (var connection = new SQLiteConnection(
@@ -560,53 +562,77 @@ namespace Ocore.desktop.Data
                     {
                         try
                         {
-                            string sql = @"
+                            // حذف البيانات التابعة أولاً.
+                            string[] tablesToClear =
+                            {
+                        "SalesReturnBatchAllocations",
+                        "SalesReturnItems",
+                        "SalesReturns",
 
-DELETE FROM SalesReturnBatchAllocations;
-DELETE FROM SalesReturnItems;
-DELETE FROM SalesReturns;
+                        "SalesInvoiceBatchAllocations",
+                        "SalesInvoicePayments",
+                        "CustomerAccountTransactions",
+                        "SalesInvoiceItems",
+                        "SalesInvoices",
 
-DELETE FROM SalesInvoiceBatchAllocations;
-DELETE FROM SalesInvoicePayments;
-DELETE FROM CustomerAccountTransactions;
-DELETE FROM SalesInvoiceItems;
-DELETE FROM SalesInvoices;
+                        "PurchaseInvoiceItems",
+                        "PurchaseInvoices",
 
-DELETE FROM PurchaseInvoiceItems;
-DELETE FROM PurchaseInvoices;
+                        "ExpenseTransactions",
+                        "ShiftHandovers",
+                        "ShiftClosures",
+                        "Shifts",
 
-DELETE FROM ProductBarcodes;
-DELETE FROM Batches;
-DELETE FROM Products;
-DELETE FROM Categories;
-DELETE FROM Suppliers;
+                        "ProductBarcodes",
+                        "Batches",
+                        "Products",
+                        "Categories",
+                        "Suppliers",
+                        "Customers"
+                    };
 
-DELETE FROM Customers;
+                            foreach (string tableName in tablesToClear)
+                            {
+                                DeleteTableDataIfExists(
+                                    connection,
+                                    transaction,
+                                    tableName);
+                            }
 
+                            // تصفير أرقام التسلسل للجداول التشغيلية.
+                            string sequenceSql = @"
 DELETE FROM sqlite_sequence
 WHERE name IN (
     'SalesReturnBatchAllocations',
     'SalesReturnItems',
     'SalesReturns',
+
     'SalesInvoiceBatchAllocations',
     'SalesInvoicePayments',
     'CustomerAccountTransactions',
     'SalesInvoiceItems',
     'SalesInvoices',
+
     'PurchaseInvoiceItems',
     'PurchaseInvoices',
+
+    'ExpenseTransactions',
+    'ShiftHandovers',
+    'ShiftClosures',
+    'Shifts',
+
     'ProductBarcodes',
     'Batches',
     'Products',
     'Categories',
     'Suppliers',
     'Customers'
-);
-
-";
+);";
 
                             using (var command = new SQLiteCommand(
-                                sql, connection, transaction))
+                                sequenceSql,
+                                connection,
+                                transaction))
                             {
                                 command.ExecuteNonQuery();
                             }
@@ -623,7 +649,10 @@ WHERE name IN (
 
                 return
                     "تم تنظيف البيانات التجريبية بنجاح.\n\n" +
-                    "تم الاحتفاظ بالمستخدمين والصلاحيات والإعدادات وسجل العمليات.\n\n" +
+                    "تم حذف بيانات الأصناف والمخزون والفواتير والمرتجعات " +
+                    "وحسابات العملاء والمصروفات والشيفتات والإغلاقات والتسليمات.\n\n" +
+                    "تم الاحتفاظ بالمستخدمين والصلاحيات والإعدادات " +
+                    "وسجل العمليات ودليل الأدوية.\n\n" +
                     "النسخة الاحتياطية محفوظة في:\n" +
                     backupPath;
             }
@@ -635,6 +664,40 @@ WHERE name IN (
                     (backupPath != null
                         ? "\n\nالنسخة الاحتياطية:\n" + backupPath
                         : "");
+            }
+        }
+
+
+        private static void DeleteTableDataIfExists(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            string tableName)
+        {
+            using (var checkCommand = new SQLiteCommand(
+                @"SELECT COUNT(*)
+          FROM sqlite_master
+          WHERE type = 'table'
+            AND name = @TableName;",
+                connection,
+                transaction))
+            {
+                checkCommand.Parameters.AddWithValue(
+                    "@TableName",
+                    tableName);
+
+                int exists = Convert.ToInt32(
+                    checkCommand.ExecuteScalar());
+
+                if (exists == 0)
+                    return;
+            }
+
+            using (var deleteCommand = new SQLiteCommand(
+                "DELETE FROM \"" + tableName + "\";",
+                connection,
+                transaction))
+            {
+                deleteCommand.ExecuteNonQuery();
             }
         }
 
