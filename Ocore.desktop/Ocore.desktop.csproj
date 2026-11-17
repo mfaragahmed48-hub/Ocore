@@ -147,6 +147,7 @@
     <Compile Include="Services\ShiftClosurePrintingService.cs" />
     <Compile Include="Services\ShiftHandoverService.cs" />
     <Compile Include="Services\ShiftService.cs" />
+    <Compile Include="Services\TaxCalculationService.cs" />
     <Compile Include="Services\ThermalReceiptDocumentBuilder.cs" />
     <Compile Include="Views\BatchSelectionWindow.xaml.cs">
       <DependentUpon>BatchSelectionWindow.xaml</DependentUpon>
@@ -198,6 +199,7 @@
     <Compile Include="Services\SalesService.cs" />
     <Compile Include="Services\SupplierService.cs" />
     <Compile Include="Services\TaxProfileService.cs" />
+<Compile Include="Services\TaxCalculationService.cs" />
     <Compile Include="Services\ThermalPrinterService.cs" />
     <Compile Include="Services\ThermalReceiptRenderer.cs" />
     <Compile Include="Services\UserService.cs" />
