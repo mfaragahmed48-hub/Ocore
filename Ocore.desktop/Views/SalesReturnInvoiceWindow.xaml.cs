@@ -170,11 +170,11 @@ namespace Ocore.desktop.Views
                     {
                         item.ReturnUnitQuantity = 0;
                         item.Total = 0;
+                        item.DisplayTotal = 0;
+                        item.DisplayUnitPrice = 0;
                         continue;
                     }
 
-                    // استخدام وحدة البيع الأصلية حتى لا يحدث
-                    // تحويل غير صحيح عند إرجاع الفاتورة كاملة.
                     item.ReturnUnitName = item.UnitName;
 
                     item.ReturnUnitQuantity =
@@ -252,7 +252,7 @@ namespace Ocore.desktop.Views
         }
 
         // ==========================================
-        // سعر العبوة التاريخي
+        // سعر العبوة التاريخي قبل الخصم والضريبة
         // ==========================================
 
         private double GetHistoricalPackagePrice(SalesReturnItem item)
@@ -275,7 +275,7 @@ namespace Ocore.desktop.Views
         }
 
         // ==========================================
-        // حساب سعر وحدة المرتجع المختارة
+        // حساب سعر وحدة المرتجع الأصلية
         // ==========================================
 
         private void UpdateReturnUnitPrice(SalesReturnItem item)
@@ -425,11 +425,12 @@ namespace Ocore.desktop.Views
                 item.Quantity = packageQuantity;
             }
 
+            // Total يظل بالقيمة الأصلية قبل الخصم والضريبة.
             item.Total = CalculateLineTotal(item);
         }
 
         // ==========================================
-        // حساب إجمالي سطر المرتجع
+        // حساب إجمالي السطر قبل الخصم والضريبة
         // ==========================================
 
         private double CalculateLineTotal(SalesReturnItem item)
@@ -445,6 +446,48 @@ namespace Ocore.desktop.Views
                 item.ReturnUnitQuantity * item.ReturnUnitPrice,
                 2,
                 MidpointRounding.AwayFromZero);
+        }
+
+        // ==========================================
+        // حساب قيمة العرض بعد الخصم والضريبة
+        // باستخدام نفس محرك حساب المرتجعات
+        // ==========================================
+
+        private void UpdateReturnDisplayAmounts(
+            SalesReturnItem item)
+        {
+            if (item == null)
+                return;
+
+            if (item.ReturnUnitQuantity <= Epsilon)
+            {
+                item.DisplayUnitPrice = 0;
+                item.DisplayTotal = 0;
+                return;
+            }
+
+            // نستخدم الخدمة نفسها حتى يكون توزيع الخصم والضريبة
+            // مطابقًا تمامًا لما سيتم حفظه في قاعدة البيانات.
+            double accountingTotal =
+                returnsService.CalculateReturnAccountingTotal(
+                    currentUserId,
+                    selectedInvoiceId,
+                    new List<SalesReturnItem> { item });
+
+            accountingTotal = Math.Round(
+                accountingTotal,
+                2,
+                MidpointRounding.AwayFromZero);
+
+            item.DisplayTotal = accountingTotal;
+
+            item.DisplayUnitPrice =
+                item.ReturnUnitQuantity > Epsilon
+                    ? Math.Round(
+                        accountingTotal / item.ReturnUnitQuantity,
+                        4,
+                        MidpointRounding.AwayFromZero)
+                    : 0;
         }
 
         // ==========================================
@@ -472,14 +515,11 @@ namespace Ocore.desktop.Views
             if (string.IsNullOrWhiteSpace(selectedUnit))
                 return;
 
-            // تحديث الوحدة فقط أثناء تحرير الخلية.
-            // لا يتم تحديث الجدول أو استدعاء Items.Refresh هنا،
-            // لأن DataGrid ما زال في وضع تحرير الخلية.
             item.ReturnUnitName = selectedUnit;
         }
 
         // ==========================================
-        // قراءة الكمية بصورة صحيحة حسب الفاصل العشري
+        // قراءة الكمية حسب الفاصل العشري
         // ==========================================
 
         private bool TryParseReturnQuantity(
@@ -498,8 +538,6 @@ namespace Ocore.desktop.Views
                 NumberStyles.AllowLeadingSign |
                 NumberStyles.AllowDecimalPoint;
 
-            // النقطة تُعامل كفاصل عشري أولاً،
-            // حتى لا تُفسر كفاصل آلاف في إعدادات اللغة العربية.
             if (normalized.Contains(".") &&
                 double.TryParse(
                     normalized,
@@ -529,8 +567,6 @@ namespace Ocore.desktop.Views
         // ==========================================
         // التحقق الفوري عند تغيير كمية المرتجع
         // ==========================================
-
-
 
         private void ReturnQuantityTextBox_TextChanged(
             object sender,
@@ -573,13 +609,8 @@ namespace Ocore.desktop.Views
             double maximumQuantity =
                 GetMaximumReturnUnitQuantity(item);
 
-            // لا نحدّث قيمة النموذج أثناء الكتابة.
-            // نترك النص يحتفظ بالنقطة العشرية حتى يكتمل إدخال الرقم،
-            // ثم يقوم Binding بتحديث القيمة عند مغادرة مربع النص.
             if (enteredQuantity <= maximumQuantity + Epsilon)
-            {
                 return;
-            }
 
             isAdjustingReturnQuantity = true;
 
@@ -616,8 +647,6 @@ namespace Ocore.desktop.Views
             }
         }
 
-
-
         // ==========================================
         // عند تعديل الوحدة أو الكمية
         // ==========================================
@@ -635,7 +664,6 @@ namespace Ocore.desktop.Views
                 {
                     try
                     {
-                        // إنهاء تحرير الصف بالكامل قبل تحديث الجدول.
                         ItemsDataGrid.CommitEdit(
                             DataGridEditingUnit.Row, true);
 
@@ -653,7 +681,7 @@ namespace Ocore.desktop.Views
         }
 
         // ==========================================
-        // تحديث جميع الأسطر والإجمالي
+        // تحديث جميع الأسطر وصافي إجمالي المرتجع
         // ==========================================
 
         private void UpdateAllReturnItems()
@@ -665,7 +693,7 @@ namespace Ocore.desktop.Views
 
             try
             {
-                double total = 0;
+                double accountingTotal = 0;
 
                 if (ItemsDataGrid.ItemsSource == null)
                 {
@@ -683,15 +711,20 @@ namespace Ocore.desktop.Views
 
                     UpdateReturnItem(item);
 
-                    total += item.Total;
+                    // القيمة المعروضة لا تُستخدم في الحفظ.
+                    // يتم حسابها من لقطة الفاتورة الأصلية.
+                    UpdateReturnDisplayAmounts(item);
+
+                    accountingTotal += item.DisplayTotal;
                 }
 
-                total = Math.Round(
-                    total,
+                accountingTotal = Math.Round(
+                    accountingTotal,
                     2,
                     MidpointRounding.AwayFromZero);
 
-                ReturnTotalText.Text = total.ToString("N2");
+                ReturnTotalText.Text =
+                    accountingTotal.ToString("N2");
 
                 ItemsDataGrid.Items.Refresh();
             }
@@ -755,8 +788,6 @@ namespace Ocore.desktop.Views
                 return false;
             }
 
-            // الوحدة الصغيرة يجب أن تكون عددًا صحيحًا.
-            // وحدة العبوة تسمح بالكسور مثل نصف علبة.
             if (IsSmallReturnUnit(item) &&
                 Math.Abs(quantity - Math.Round(quantity)) > Epsilon)
             {
@@ -806,7 +837,7 @@ namespace Ocore.desktop.Views
         // ==========================================
 
         private bool TryGetRefundDetails(
-            double returnTotal,
+            double accountingTotal,
             out double refundAmount,
             out string refundPaymentMethod,
             out string errorMessage)
@@ -854,10 +885,10 @@ namespace Ocore.desktop.Views
                 2,
                 MidpointRounding.AwayFromZero);
 
-            if (refundAmount > returnTotal + Epsilon)
+            if (refundAmount > accountingTotal + Epsilon)
             {
                 errorMessage =
-                    "مبلغ الرد الفعلي لا يمكن أن يتجاوز إجمالي المرتجع.";
+                    "مبلغ الرد الفعلي لا يمكن أن يتجاوز صافي القيمة المحاسبية للمرتجع بعد الخصم والضريبة.";
 
                 return false;
             }
@@ -970,6 +1001,7 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
+                // الإجمالي الأصلي قبل الخصم والضريبة.
                 double total = selectedItems.Sum(
                     x => CalculateLineTotal(x));
 
@@ -978,12 +1010,19 @@ namespace Ocore.desktop.Views
                     2,
                     MidpointRounding.AwayFromZero);
 
+                // صافي القيمة المحاسبية بعد الخصم والضريبة.
+                double accountingTotal =
+                    returnsService.CalculateReturnAccountingTotal(
+                        currentUserId,
+                        selectedInvoiceId,
+                        selectedItems);
+
                 double refundAmount;
                 string refundPaymentMethod;
                 string refundError;
 
                 if (!TryGetRefundDetails(
-                    total,
+                    accountingTotal,
                     out refundAmount,
                     out refundPaymentMethod,
                     out refundError))
@@ -1012,8 +1051,10 @@ namespace Ocore.desktop.Views
                         invoiceNumber +
                         "\nعدد الأصناف: " +
                         selectedItems.Count +
-                        "\nإجمالي المرتجع: " +
+                        "\nإجمالي المرتجع قبل الخصم والضريبة: " +
                         total.ToString("N2") +
+                        "\nصافي القيمة المحاسبية للمرتجع: " +
+                        accountingTotal.ToString("N2") +
                         "\nالمبلغ المصروف فعليًا: " +
                         refundAmount.ToString("N2") +
                         "\nوسيلة الرد: " +
@@ -1039,7 +1080,10 @@ namespace Ocore.desktop.Views
                 MessageBox.Show(
                     "تم حفظ المرتجع بنجاح.\n\n" +
                     "رقم عملية المرتجع: " + returnId +
-                    "\nإجمالي المرتجع: " + total.ToString("N2") +
+                    "\nإجمالي المرتجع قبل الخصم والضريبة: " +
+                    total.ToString("N2") +
+                    "\nصافي القيمة المحاسبية: " +
+                    accountingTotal.ToString("N2") +
                     "\nالمبلغ المصروف فعليًا: " +
                     refundAmount.ToString("N2") +
                     "\nوسيلة الرد: " + refundMethodDisplay,
@@ -1047,8 +1091,6 @@ namespace Ocore.desktop.Views
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
 
-                // إغلاق نافذة التفاصيل وإبلاغ نافذة البحث
-                // بأن عملية المرتجع تمت بنجاح.
                 DialogResult = true;
                 Close();
             }

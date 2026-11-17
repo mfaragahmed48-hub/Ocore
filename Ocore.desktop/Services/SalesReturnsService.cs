@@ -1602,6 +1602,123 @@ namespace Ocore.desktop.Services
             }
         }
 
+
+        public double CalculateReturnAccountingTotal(
+            int userId,
+            int invoiceId,
+            List<SalesReturnItem> items)
+        {
+            if (userId <= 0)
+                throw new Exception("رقم المستخدم غير صحيح.");
+
+            if (invoiceId <= 0)
+                throw new Exception("رقم الفاتورة غير صحيح.");
+
+            if (items == null || items.Count == 0)
+                throw new Exception("يجب اختيار صنف واحد على الأقل.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                using (var transaction =
+                    connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    try
+                    {
+                        ValidateReturnPermission(
+                            connection,
+                            transaction,
+                            userId);
+
+                        using (var command = new SQLiteCommand(@"
+                    SELECT COUNT(*)
+                    FROM SalesInvoices
+                    WHERE Id = @InvoiceId
+                      AND Status = 'Completed';",
+                            connection,
+                            transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@InvoiceId", invoiceId);
+
+                            if (Convert.ToInt32(command.ExecuteScalar()) != 1)
+                            {
+                                throw new Exception(
+                                    "فاتورة البيع غير موجودة أو غير مكتملة.");
+                            }
+                        }
+
+                        var usedInvoiceItems = new HashSet<int>();
+                        decimal accountingTotal = 0m;
+
+                        foreach (var item in items)
+                        {
+                            if (item == null)
+                                throw new Exception("يوجد صنف غير صالح.");
+
+                            if (item.InvoiceItemId <= 0)
+                                throw new Exception("رقم صنف الفاتورة غير صحيح.");
+
+                            if (!usedInvoiceItems.Add(item.InvoiceItemId))
+                            {
+                                throw new Exception(
+                                    "لا يمكن إضافة الصنف نفسه أكثر من مرة في المرتجع.");
+                            }
+
+                            InvoiceReturnInfo info = GetInvoiceReturnInfo(
+                                connection,
+                                transaction,
+                                item.InvoiceItemId,
+                                invoiceId);
+
+                            PreparedReturnItem prepared = PrepareReturnItem(
+                                item,
+                                info);
+
+                            CalculateReturnTaxAndDiscount(
+                                connection,
+                                transaction,
+                                prepared,
+                                info);
+
+                            if (string.Equals(
+                                prepared.TaxStatus,
+                                "Calculated",
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                accountingTotal +=
+                                    prepared.TaxableAmount +
+                                    prepared.VatAmount +
+                                    prepared.ScheduleTaxAmount;
+                            }
+                            else
+                            {
+                                accountingTotal +=
+                                    Convert.ToDecimal(prepared.Total) -
+                                    prepared.DiscountAmount;
+                            }
+                        }
+
+                        accountingTotal = Math.Round(
+                            accountingTotal,
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                        transaction.Commit();
+
+                        return Convert.ToDouble(accountingTotal);
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
+        }
+
+
         private void SaveReturnTaxComponents(
             SQLiteConnection connection,
             SQLiteTransaction transaction,

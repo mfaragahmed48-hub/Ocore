@@ -75,12 +75,23 @@ namespace Ocore.desktop.Models
         public List<SalesReturnTaxComponent> TaxComponents { get; set; }
 
         // ==========================================
-        // الإجماليات
+        // الإجماليات الأصلية
         // ==========================================
+
         public double DiscountAmount { get; set; }
+
         public double Total { get; set; }
 
         public double PackageQuantity { get; set; }
+
+        // ==========================================
+        // قيم العرض بعد الخصم والضريبة
+        // لا تستخدم هذه الخصائص في الحفظ المحاسبي
+        // ==========================================
+
+        public double DisplayUnitPrice { get; set; }
+
+        public double DisplayTotal { get; set; }
 
         public SalesReturnItem()
         {
