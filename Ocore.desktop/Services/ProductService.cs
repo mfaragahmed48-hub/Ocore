@@ -390,6 +390,8 @@ SELECT
     p.UnitsPerPackage,
     p.SalePrice,
     p.PurchasePrice,
+    p.TaxProfileId,
+    p.TaxPriceMode,
     p.MaxDiscountPercentage,
     p.MinimumStockLevel,
     p.IsArchived,
@@ -467,7 +469,13 @@ ORDER BY p.Name;";
 
                                 SalePrice = Convert.ToDouble(reader["SalePrice"]),
                                 PurchasePrice = Convert.ToDouble(reader["PurchasePrice"]),
+                                TaxProfileId = reader["TaxProfileId"] == DBNull.Value
+    ? (int?)null
+    : Convert.ToInt32(reader["TaxProfileId"]),
 
+                                TaxPriceMode = reader["TaxPriceMode"] == DBNull.Value
+    ? "Exclusive"
+    : reader["TaxPriceMode"].ToString(),
                                 MaxDiscountPercentage = Convert.ToDouble(
                                     reader["MaxDiscountPercentage"]),
 
@@ -1173,12 +1181,7 @@ ORDER BY Name;";
                             transaction,
                             out generatedCode,
                             out generatedBarcode);
-                        ValidateProductTax(
-    connection,
-    transaction,
-    product.TaxProfileId,
-    product.TaxPriceMode,
-    false);
+    
                         using (var command = new SQLiteCommand(
 
 @"INSERT INTO Products
@@ -1193,19 +1196,9 @@ ORDER BY Name;";
    @CategoryId, @Unit,
    @SmallUnitName, @UnitsPerPackage,
    @SalePrice, @PurchasePrice,
-
-command.Parameters.AddWithValue(
-    ""@TaxProfileId"",
-    product.TaxProfileId.Value);
-
-command.Parameters.AddWithValue(
-    ""@TaxPriceMode"",
-    product.TaxPriceMode);
-
    @TaxProfileId, @TaxPriceMode,
-   0, @CreatedAt);"
-
-                            connection, transaction))
+      0, @CreatedAt);",
+    connection, transaction))
                         {
                             command.Parameters.AddWithValue(
                                 "@Code", generatedCode);
@@ -1240,6 +1233,15 @@ command.Parameters.AddWithValue(
 
                             command.Parameters.AddWithValue(
                                 "@PurchasePrice", product.PurchasePrice);
+                            command.Parameters.AddWithValue(
+    "@TaxProfileId",
+    (object)product.TaxProfileId ?? DBNull.Value);
+
+                            command.Parameters.AddWithValue(
+                                "@TaxPriceMode",
+                                string.IsNullOrWhiteSpace(product.TaxPriceMode)
+                                    ? "Exclusive"
+                                    : product.TaxPriceMode);
 
                             command.Parameters.AddWithValue(
                                 "@CreatedAt",
@@ -1358,6 +1360,7 @@ command.Parameters.AddWithValue(
 
         #region Update Product
 
+
         public void UpdateProduct(
             int currentUserId,
             Product product)
@@ -1381,6 +1384,13 @@ command.Parameters.AddWithValue(
             if (product.SalePrice < 0 || product.PurchasePrice < 0)
                 throw new ArgumentException("الأسعار لا يمكن أن تكون سالبة.");
 
+            if (!string.IsNullOrWhiteSpace(product.TaxPriceMode) &&
+                product.TaxPriceMode != "Exclusive" &&
+                product.TaxPriceMode != "Inclusive")
+            {
+                throw new ArgumentException("طريقة احتساب السعر الضريبي غير صحيحة.");
+            }
+
             using (var connection = new SQLiteConnection(connectionString))
             {
                 connection.Open();
@@ -1395,10 +1405,11 @@ command.Parameters.AddWithValue(
 
                         using (var command = new SQLiteCommand(
                             @"SELECT ProductCode, Name, CategoryId,
-                                     UnitName, SmallUnitName, UnitsPerPackage,
-                                     SalePrice, PurchasePrice
-                              FROM Products
-                              WHERE Id = @Id;",
+                             UnitName, SmallUnitName, UnitsPerPackage,
+                             SalePrice, PurchasePrice,
+                             TaxProfileId, TaxPriceMode
+                      FROM Products
+                      WHERE Id = @Id;",
                             connection, transaction))
                         {
                             command.Parameters.AddWithValue("@Id", product.Id);
@@ -1412,16 +1423,28 @@ command.Parameters.AddWithValue(
                                         Id = product.Id,
                                         ProductCode = reader["ProductCode"].ToString(),
                                         Name = reader["Name"].ToString(),
+
                                         CategoryId = reader["CategoryId"] == DBNull.Value
                                             ? (int?)null
                                             : Convert.ToInt32(reader["CategoryId"]),
+
                                         UnitName = reader["UnitName"].ToString(),
                                         SmallUnitName = reader["SmallUnitName"].ToString(),
+
                                         UnitsPerPackage = Convert.ToInt32(
                                             reader["UnitsPerPackage"]),
+
                                         SalePrice = Convert.ToDouble(reader["SalePrice"]),
                                         PurchasePrice = Convert.ToDouble(
-                                            reader["PurchasePrice"])
+                                            reader["PurchasePrice"]),
+
+                                        TaxProfileId = reader["TaxProfileId"] == DBNull.Value
+                                            ? (int?)null
+                                            : Convert.ToInt32(reader["TaxProfileId"]),
+
+                                        TaxPriceMode = reader["TaxPriceMode"] == DBNull.Value
+                                            ? "Exclusive"
+                                            : reader["TaxPriceMode"].ToString()
                                     };
                                 }
                             }
@@ -1429,6 +1452,47 @@ command.Parameters.AddWithValue(
 
                         if (oldProduct == null)
                             throw new InvalidOperationException("الصنف غير موجود.");
+
+                        // الحفاظ على التصنيف القديم إذا لم ترسل الواجهة اختيارًا جديدًا.
+                        if (!product.TaxProfileId.HasValue)
+                            product.TaxProfileId = oldProduct.TaxProfileId;
+
+                        if (string.IsNullOrWhiteSpace(product.TaxPriceMode))
+                            product.TaxPriceMode = oldProduct.TaxPriceMode;
+
+                        bool allowUnclassified = false;
+
+                        // السماح ببقاء الصنف غير مصنف فقط إذا كان تصنيفه القديم
+                        // هو نفسه التصنيف غير المصنف الموجود بالفعل في قاعدة البيانات.
+                        if (product.TaxProfileId.HasValue &&
+                            product.TaxProfileId == oldProduct.TaxProfileId)
+                        {
+                            using (var command = new SQLiteCommand(
+                                @"SELECT COUNT(*)
+          FROM TaxProfiles
+          WHERE Id = @Id
+            AND (
+                UPPER(Code) = 'UNCLASSIFIED'
+                OR UPPER(TaxType) = 'UNCLASSIFIED'
+            );",
+                                connection,
+                                transaction))
+                            {
+                                command.Parameters.AddWithValue(
+                                    "@Id", product.TaxProfileId.Value);
+
+                                allowUnclassified =
+                                    Convert.ToInt32(command.ExecuteScalar()) > 0;
+                            }
+                        }
+
+                        ValidateProductTax(
+                            connection,
+                            transaction,
+                            product.TaxProfileId,
+                            product.TaxPriceMode,
+                            allowUnclassified);
+
 
                         bool unitConversionChanged =
                             oldProduct.UnitsPerPackage != product.UnitsPerPackage ||
@@ -1445,14 +1509,14 @@ command.Parameters.AddWithValue(
                         {
                             using (var command = new SQLiteCommand(
                                 @"SELECT
-                                    (SELECT COUNT(*) FROM Batches
-                                     WHERE ProductId = @Id) +
-                                    (SELECT COUNT(*) FROM SalesInvoiceItems
-                                     WHERE ProductId = @Id) +
-                                    (SELECT COUNT(*) FROM PurchaseInvoiceItems
-                                     WHERE ProductId = @Id) +
-                                    (SELECT COUNT(*) FROM SalesReturnItems
-                                     WHERE ProductId = @Id);",
+                            (SELECT COUNT(*) FROM Batches
+                             WHERE ProductId = @Id) +
+                            (SELECT COUNT(*) FROM SalesInvoiceItems
+                             WHERE ProductId = @Id) +
+                            (SELECT COUNT(*) FROM PurchaseInvoiceItems
+                             WHERE ProductId = @Id) +
+                            (SELECT COUNT(*) FROM SalesReturnItems
+                             WHERE ProductId = @Id);",
                                 connection, transaction))
                             {
                                 command.Parameters.AddWithValue("@Id", product.Id);
@@ -1469,14 +1533,16 @@ command.Parameters.AddWithValue(
 
                         using (var command = new SQLiteCommand(
                             @"UPDATE Products
-                              SET Name = @Name,
-                                  CategoryId = @CategoryId,
-                                  UnitName = @UnitName,
-                                  SmallUnitName = @SmallUnitName,
-                                  UnitsPerPackage = @UnitsPerPackage,
-                                  SalePrice = @SalePrice,
-                                  PurchasePrice = @PurchasePrice
-                              WHERE Id = @Id;",
+                      SET Name = @Name,
+                          CategoryId = @CategoryId,
+                          UnitName = @UnitName,
+                          SmallUnitName = @SmallUnitName,
+                          UnitsPerPackage = @UnitsPerPackage,
+                          SalePrice = @SalePrice,
+                          PurchasePrice = @PurchasePrice,
+                          TaxProfileId = @TaxProfileId,
+                          TaxPriceMode = @TaxPriceMode
+                      WHERE Id = @Id;",
                             connection, transaction))
                         {
                             command.Parameters.AddWithValue(
@@ -1503,6 +1569,13 @@ command.Parameters.AddWithValue(
 
                             command.Parameters.AddWithValue(
                                 "@PurchasePrice", product.PurchasePrice);
+
+                            command.Parameters.AddWithValue(
+                                "@TaxProfileId",
+                                (object)product.TaxProfileId ?? DBNull.Value);
+
+                            command.Parameters.AddWithValue(
+                                "@TaxPriceMode", product.TaxPriceMode);
 
                             command.Parameters.AddWithValue("@Id", product.Id);
 
