@@ -168,25 +168,10 @@ namespace Ocore.desktop.Data
                             }
                         });
 
-                    int unclassifiedProfileId =
-                        GetOrCreateUnclassifiedProfile(
-                            connection,
-                            transaction);
-
-                    // الأصناف القديمة تظل غير مصنفة ضريبيًا.
-                    using (var command = new SQLiteCommand(
-                        @"UPDATE Products
-                          SET TaxProfileId = @ProfileId
-                          WHERE TaxProfileId IS NULL;",
-                        connection,
-                        transaction))
-                    {
-                        command.Parameters.AddWithValue(
-                            "@ProfileId",
-                            unclassifiedProfileId);
-
-                        command.ExecuteNonQuery();
-                    }
+                    // لا يتم إنشاء تصنيف ضريبي افتراضي تلقائيًا.
+                    // لا يتم تعديل تصنيفات الأصناف القديمة.
+                    // يتم الاحتفاظ بالجداول والأعمدة والفهارس
+                    // لضمان قراءة السجلات والفواتير التاريخية.
 
                     CreateTaxIndexes(connection, transaction);
 
@@ -379,65 +364,6 @@ ON SalesReturnItemTaxComponents(ReturnItemId);
                 transaction))
             {
                 command.ExecuteNonQuery();
-            }
-        }
-
-        private static int GetOrCreateUnclassifiedProfile(
-            SQLiteConnection connection,
-            SQLiteTransaction transaction)
-        {
-            using (var command = new SQLiteCommand(
-                @"INSERT OR IGNORE INTO TaxProfiles
-                  (
-                      Code,
-                      Name,
-                      TaxType,
-                      Description,
-                      IsActive,
-                      IsSystem,
-                      CreatedAt,
-                      UpdatedAt
-                  )
-                  VALUES
-                  (
-                      'UNCLASSIFIED',
-                      'غير مصنف ضريبيًا',
-                      'Unclassified',
-                      'يجب تحديد المعاملة الضريبية قبل البيع.',
-                      1,
-                      1,
-                      @CreatedAt,
-                      @UpdatedAt
-                  );",
-                connection,
-                transaction))
-            {
-                string now =
-                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-
-                command.Parameters.AddWithValue("@CreatedAt", now);
-                command.Parameters.AddWithValue("@UpdatedAt", now);
-
-                command.ExecuteNonQuery();
-            }
-
-            using (var command = new SQLiteCommand(
-                @"SELECT Id
-                  FROM TaxProfiles
-                  WHERE Code = 'UNCLASSIFIED'
-                  LIMIT 1;",
-                connection,
-                transaction))
-            {
-                object result = command.ExecuteScalar();
-
-                if (result == null || result == DBNull.Value)
-                {
-                    throw new InvalidOperationException(
-                        "تعذر إنشاء التصنيف الضريبي غير المصنف.");
-                }
-
-                return Convert.ToInt32(result);
             }
         }
 

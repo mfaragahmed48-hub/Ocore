@@ -274,117 +274,7 @@ namespace Ocore.desktop.Services
 
         #endregion
 
-        #region Product Tax Validation
-        private bool IsUnclassifiedTaxProfile(
-    SQLiteConnection connection,
-    SQLiteTransaction transaction,
-    int? taxProfileId)
-        {
-            if (!taxProfileId.HasValue || taxProfileId.Value <= 0)
-                return false;
-
-            using (var command = new SQLiteCommand(
-                @"SELECT COUNT(*)
-          FROM TaxProfiles
-          WHERE Id = @Id
-            AND (
-                UPPER(Code) = 'UNCLASSIFIED'
-                OR UPPER(TaxType) = 'UNCLASSIFIED'
-            );",
-                connection,
-                transaction))
-            {
-                command.Parameters.AddWithValue(
-                    "@Id",
-                    taxProfileId.Value);
-
-                return Convert.ToInt32(command.ExecuteScalar()) > 0;
-            }
-        }
-        private void ValidateProductTax(
-            SQLiteConnection connection,
-            SQLiteTransaction transaction,
-            int? taxProfileId,
-            string taxPriceMode,
-            bool allowUnclassified)
-        {
-            if (!taxProfileId.HasValue || taxProfileId.Value <= 0)
-            {
-                throw new InvalidOperationException(
-                    "يجب اختيار التصنيف الضريبي للصنف.");
-            }
-
-            if (!string.Equals(
-                taxPriceMode,
-                "Inclusive",
-                StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(
-                taxPriceMode,
-                "Exclusive",
-                StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    "طريقة احتساب السعر الضريبي غير صحيحة.");
-            }
-
-            using (var command = new SQLiteCommand(
-                @"SELECT Code, TaxType, IsActive, IsSystem
-          FROM TaxProfiles
-          WHERE Id = @Id
-          LIMIT 1;",
-                connection,
-                transaction))
-            {
-                command.Parameters.AddWithValue(
-                    "@Id",
-                    taxProfileId.Value);
-
-                using (var reader = command.ExecuteReader())
-                {
-                    if (!reader.Read())
-                    {
-                        throw new InvalidOperationException(
-                            "التصنيف الضريبي المحدد غير موجود.");
-                    }
-
-                    string code = Convert.ToString(reader["Code"]);
-                    string taxType = Convert.ToString(reader["TaxType"]);
-                    bool isActive = Convert.ToInt32(reader["IsActive"]) == 1;
-                    bool isSystem = Convert.ToInt32(reader["IsSystem"]) == 1;
-
-                    bool isUnclassified =
-                        string.Equals(
-                            code,
-                            "UNCLASSIFIED",
-                            StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(
-                            taxType,
-                            "Unclassified",
-                            StringComparison.OrdinalIgnoreCase);
-
-                    if (!isActive)
-                    {
-                        throw new InvalidOperationException(
-                            "التصنيف الضريبي المحدد غير نشط.");
-                    }
-
-                    if (isUnclassified && !allowUnclassified)
-                    {
-                        throw new InvalidOperationException(
-                            "لا يمكن إضافة صنف جديد دون تحديد معاملته الضريبية.");
-                    }
-
-                    if (isSystem && !isUnclassified)
-                    {
-                        throw new InvalidOperationException(
-                            "لا يمكن استخدام تصنيف ضريبي نظامي غير مخصص للأصناف.");
-                    }
-                }
-            }
-        }
-
-        #endregion
-
+        
         #region Get Products
 
         public List<Product> GetProductsForManagement(int currentUserId)
@@ -415,8 +305,7 @@ SELECT
     p.UnitsPerPackage,
     p.SalePrice,
     p.PurchasePrice,
-    p.TaxProfileId,
-    p.TaxPriceMode,
+    
     p.MaxDiscountPercentage,
     p.MinimumStockLevel,
     p.IsArchived,
@@ -494,13 +383,7 @@ ORDER BY p.Name;";
 
                                 SalePrice = Convert.ToDouble(reader["SalePrice"]),
                                 PurchasePrice = Convert.ToDouble(reader["PurchasePrice"]),
-                                TaxProfileId = reader["TaxProfileId"] == DBNull.Value
-    ? (int?)null
-    : Convert.ToInt32(reader["TaxProfileId"]),
-
-                                TaxPriceMode = reader["TaxPriceMode"] == DBNull.Value
-    ? "Exclusive"
-    : reader["TaxPriceMode"].ToString(),
+                                
                                 MaxDiscountPercentage = Convert.ToDouble(
                                     reader["MaxDiscountPercentage"]),
 
@@ -1192,13 +1075,7 @@ ORDER BY Name;";
                         }
 
 
-                        ValidateProductTax(
-                            connection,
-                            transaction,
-                            product.TaxProfileId,
-                            product.TaxPriceMode,
-                            true);
-
+                        
                         string generatedCode;
                         string generatedBarcode;
 
@@ -1222,7 +1099,7 @@ ORDER BY Name;";
    @CategoryId, @Unit,
    @SmallUnitName, @UnitsPerPackage,
    @SalePrice, @PurchasePrice,
-   @TaxProfileId, @TaxPriceMode,
+     NULL, 'Exclusive',
       0, @CreatedAt);",
     connection, transaction))
                         {
@@ -1259,16 +1136,7 @@ ORDER BY Name;";
 
                             command.Parameters.AddWithValue(
                                 "@PurchasePrice", product.PurchasePrice);
-                            command.Parameters.AddWithValue(
-    "@TaxProfileId",
-    (object)product.TaxProfileId ?? DBNull.Value);
-
-                            command.Parameters.AddWithValue(
-                                "@TaxPriceMode",
-                                string.IsNullOrWhiteSpace(product.TaxPriceMode)
-                                    ? "Exclusive"
-                                    : product.TaxPriceMode);
-
+                            
                             command.Parameters.AddWithValue(
                                 "@CreatedAt",
                                 DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -1388,9 +1256,9 @@ ORDER BY Name;";
 
 
         public void UpdateProduct(
-     int currentUserId,
-     Product product,
-     string unclassifiedReason = null)
+         int currentUserId,
+         Product product,
+         string unclassifiedReason = null)
         {
             if (product == null)
                 throw new ArgumentNullException(nameof(product));
@@ -1411,13 +1279,7 @@ ORDER BY Name;";
             if (product.SalePrice < 0 || product.PurchasePrice < 0)
                 throw new ArgumentException("الأسعار لا يمكن أن تكون سالبة.");
 
-            if (!string.IsNullOrWhiteSpace(product.TaxPriceMode) &&
-                product.TaxPriceMode != "Exclusive" &&
-                product.TaxPriceMode != "Inclusive")
-            {
-                throw new ArgumentException("طريقة احتساب السعر الضريبي غير صحيحة.");
-            }
-
+            
             using (var connection = new SQLiteConnection(connectionString))
             {
                 connection.Open();
@@ -1450,8 +1312,7 @@ ORDER BY Name;";
                         using (var command = new SQLiteCommand(
                             @"SELECT ProductCode, Name, CategoryId,
                              UnitName, SmallUnitName, UnitsPerPackage,
-                             SalePrice, PurchasePrice,
-                             TaxProfileId, TaxPriceMode
+                                                          SalePrice, PurchasePrice
                       FROM Products
                       WHERE Id = @Id;",
                             connection, transaction))
@@ -1480,15 +1341,8 @@ ORDER BY Name;";
 
                                         SalePrice = Convert.ToDouble(reader["SalePrice"]),
                                         PurchasePrice = Convert.ToDouble(
-                                            reader["PurchasePrice"]),
+                                           reader["PurchasePrice"])
 
-                                        TaxProfileId = reader["TaxProfileId"] == DBNull.Value
-                                            ? (int?)null
-                                            : Convert.ToInt32(reader["TaxProfileId"]),
-
-                                        TaxPriceMode = reader["TaxPriceMode"] == DBNull.Value
-                                            ? "Exclusive"
-                                            : reader["TaxPriceMode"].ToString()
                                     };
                                 }
                             }
@@ -1497,65 +1351,7 @@ ORDER BY Name;";
                         if (oldProduct == null)
                             throw new InvalidOperationException("الصنف غير موجود.");
 
-                        // الحفاظ على التصنيف القديم إذا لم ترسل الواجهة اختيارًا جديدًا.
-                        if (!product.TaxProfileId.HasValue)
-                            product.TaxProfileId = oldProduct.TaxProfileId;
-
-                        if (string.IsNullOrWhiteSpace(product.TaxPriceMode))
-                            product.TaxPriceMode = oldProduct.TaxPriceMode;
-
-                        bool allowUnclassified = false;
-
-                        bool oldIsUnclassified = IsUnclassifiedTaxProfile(
-                            connection,
-                            transaction,
-                            oldProduct.TaxProfileId);
-
-                        bool newIsUnclassified = IsUnclassifiedTaxProfile(
-                            connection,
-                            transaction,
-                            product.TaxProfileId);
-
-                        bool isReturningToUnclassified =
-                            newIsUnclassified &&
-                            !oldIsUnclassified;
-
-                        if (isReturningToUnclassified)
-                        {
-                            if (!isManager)
-                            {
-                                throw new UnauthorizedAccessException(
-                                    "إرجاع الصنف إلى غير مصنف ضريبيًا متاح للمدير فقط.");
-                            }
-
-                            if (string.IsNullOrWhiteSpace(unclassifiedReason))
-                            {
-                                throw new InvalidOperationException(
-                                    "يجب إدخال سبب إرجاع الصنف إلى غير مصنف ضريبيًا.");
-                            }
-
-                            allowUnclassified = true;
-                        }
-                        else if (
-                            product.TaxProfileId == oldProduct.TaxProfileId &&
-                            oldIsUnclassified)
-                        {
-                            allowUnclassified = true;
-                        }
-
-                        ValidateProductTax(
-                            connection,
-                            transaction,
-                            product.TaxProfileId,
-                            product.TaxPriceMode,
-                            allowUnclassified);
-                        ValidateProductTax(
-                            connection,
-                            transaction,
-                            product.TaxProfileId,
-                            product.TaxPriceMode,
-                            allowUnclassified);
-
+                        
 
                         bool unitConversionChanged =
                             oldProduct.UnitsPerPackage != product.UnitsPerPackage ||
@@ -1596,16 +1392,14 @@ ORDER BY Name;";
 
                         using (var command = new SQLiteCommand(
                             @"UPDATE Products
-                      SET Name = @Name,
+                          SET Name = @Name,
                           CategoryId = @CategoryId,
                           UnitName = @UnitName,
                           SmallUnitName = @SmallUnitName,
                           UnitsPerPackage = @UnitsPerPackage,
                           SalePrice = @SalePrice,
-                          PurchasePrice = @PurchasePrice,
-                          TaxProfileId = @TaxProfileId,
-                          TaxPriceMode = @TaxPriceMode
-                      WHERE Id = @Id;",
+                          PurchasePrice = @PurchasePrice
+                          WHERE Id = @Id;",
                             connection, transaction))
                         {
                             command.Parameters.AddWithValue(
@@ -1633,13 +1427,7 @@ ORDER BY Name;";
                             command.Parameters.AddWithValue(
                                 "@PurchasePrice", product.PurchasePrice);
 
-                            command.Parameters.AddWithValue(
-                                "@TaxProfileId",
-                                (object)product.TaxProfileId ?? DBNull.Value);
-
-                            command.Parameters.AddWithValue(
-                                "@TaxPriceMode", product.TaxPriceMode);
-
+                            
                             command.Parameters.AddWithValue("@Id", product.Id);
 
                             command.ExecuteNonQuery();
@@ -2090,138 +1878,7 @@ ORDER BY Name;";
         #endregion
 
         #region Audit
-        private void WriteTaxReclassificationAudit(
-    SQLiteConnection connection,
-    SQLiteTransaction transaction,
-    int userId,
-    int productId,
-    int? oldTaxProfileId,
-    int newTaxProfileId,
-    string reason)
-        {
-            string username;
-
-            using (var command = new SQLiteCommand(
-                @"SELECT Username
-          FROM Users
-          WHERE Id = @UserId;",
-                connection,
-                transaction))
-            {
-                command.Parameters.AddWithValue("@UserId", userId);
-
-                username = Convert.ToString(command.ExecuteScalar());
-            }
-
-            string oldProfile;
-
-            using (var command = new SQLiteCommand(
-                @"SELECT
-            Code,
-            Name
-          FROM TaxProfiles
-          WHERE Id = @Id;",
-                connection,
-                transaction))
-            {
-                command.Parameters.AddWithValue(
-                    "@Id",
-                    (object)oldTaxProfileId ?? DBNull.Value);
-
-                using (var reader = command.ExecuteReader())
-                {
-                    if (reader.Read())
-                    {
-                        oldProfile =
-                            "Code=" + Convert.ToString(reader["Code"]) +
-                            "|Name=" + Convert.ToString(reader["Name"]);
-                    }
-                    else
-                    {
-                        oldProfile = "Profile=غير محدد";
-                    }
-                }
-            }
-
-            string newProfile;
-
-            using (var command = new SQLiteCommand(
-                @"SELECT
-            Code,
-            Name
-          FROM TaxProfiles
-          WHERE Id = @Id;",
-                connection,
-                transaction))
-            {
-                command.Parameters.AddWithValue(
-                    "@Id",
-                    newTaxProfileId);
-
-                using (var reader = command.ExecuteReader())
-                {
-                    if (!reader.Read())
-                        throw new InvalidOperationException(
-                            "التصنيف الضريبي الجديد غير موجود.");
-
-                    newProfile =
-                        "Code=" + Convert.ToString(reader["Code"]) +
-                        "|Name=" + Convert.ToString(reader["Name"]);
-                }
-            }
-
-            string oldValues =
-                "ProductId=" + productId +
-                "|" + oldProfile;
-
-            string newValues =
-                "ProductId=" + productId +
-                "|" + newProfile +
-                "|ManagerUsername=" + username;
-
-            using (var command = new SQLiteCommand(
-                @"INSERT INTO TaxAuditLogs
-          (
-              UserId,
-              ActionType,
-              EntityType,
-              EntityId,
-              OldValues,
-              NewValues,
-              Reason,
-              DeviceName,
-              CreatedAt
-          )
-          VALUES
-          (
-              @UserId,
-              'ReturnToUnclassified',
-              'Product',
-              @EntityId,
-              @OldValues,
-              @NewValues,
-              @Reason,
-              @DeviceName,
-              @CreatedAt
-          );",
-                connection,
-                transaction))
-            {
-                command.Parameters.AddWithValue("@UserId", userId);
-                command.Parameters.AddWithValue("@EntityId", productId);
-                command.Parameters.AddWithValue("@OldValues", oldValues);
-                command.Parameters.AddWithValue("@NewValues", newValues);
-                command.Parameters.AddWithValue("@Reason", reason.Trim());
-                command.Parameters.AddWithValue(
-                    "@DeviceName",
-                    Environment.MachineName);
-                command.Parameters.AddWithValue(
-                    "@CreatedAt",
-                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-
-                command.ExecuteNonQuery();
-            }
-        }
+        
         private void WriteProductAudit(
             SQLiteConnection connection,
             SQLiteTransaction transaction,
