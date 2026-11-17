@@ -28,6 +28,14 @@ namespace Ocore.desktop.Models
 
         public double PurchasePrice { get; set; }
 
+        // التصنيف الضريبي للصنف
+        // null أو التصنيف غير المصنف يعني عدم جاهزية الصنف للبيع ضريبيًا.
+        public int? TaxProfileId { get; set; }
+
+        // Exclusive = السعر غير شامل الضريبة
+        // Inclusive = السعر شامل الضريبة
+        public string TaxPriceMode { get; set; } = "Exclusive";
+
         // أقصى نسبة خصم مسموح بها لهذا الصنف
         // صفر يعني عدم السماح بأي خصم
         public double MaxDiscountPercentage { get; set; } = 0;
