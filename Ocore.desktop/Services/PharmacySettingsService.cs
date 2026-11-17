@@ -68,7 +68,7 @@ namespace Ocore.desktop.Services
             }
         }
 
-        // قراءة بيانات الصيدلية وإعدادات الطابعة الحرارية من قاعدة البيانات
+        // قراءة بيانات الصيدلية وإعدادات الضرائب والطابعة
         private PharmacySettings ReadSettings(SQLiteConnection connection)
         {
             string sql = @"
@@ -81,6 +81,9 @@ namespace Ocore.desktop.Services
                     ManagerName,
                     LogoPath,
                     UpdatedAt,
+
+                    VatRegistrationStatus,
+                    TaxInvoiceEnabled,
 
                     ThermalPrinterName,
                     ThermalPrintMode,
@@ -110,6 +113,12 @@ namespace Ocore.desktop.Services
                         LogoPath = Convert.ToString(reader["LogoPath"]),
                         UpdatedAt = Convert.ToString(reader["UpdatedAt"]),
 
+                        VatRegistrationStatus =
+                            Convert.ToString(reader["VatRegistrationStatus"]),
+
+                        TaxInvoiceEnabled =
+                            Convert.ToInt32(reader["TaxInvoiceEnabled"]) != 0,
+
                         ThermalPrinterName =
                             Convert.ToString(reader["ThermalPrinterName"]),
 
@@ -137,7 +146,7 @@ namespace Ocore.desktop.Services
             return new PharmacySettings();
         }
 
-        // حفظ إعدادات الصيدلية وإعدادات الطابعة الحرارية
+        // حفظ إعدادات الصيدلية وإعدادات الضرائب والطابعة
         public void SaveSettings(
             int userId,
             PharmacySettings settings)
@@ -163,6 +172,9 @@ namespace Ocore.desktop.Services
 
             settings.LogoPath =
                 (settings.LogoPath ?? string.Empty).Trim();
+
+            settings.VatRegistrationStatus =
+                (settings.VatRegistrationStatus ?? "Unknown").Trim();
 
             // تنظيف إعدادات الطابعة
             settings.ThermalPrinterName =
@@ -209,6 +221,9 @@ namespace Ocore.desktop.Services
                                 LogoPath = @LogoPath,
                                 UpdatedAt = @UpdatedAt,
 
+                                VatRegistrationStatus = @VatRegistrationStatus,
+                                TaxInvoiceEnabled = @TaxInvoiceEnabled,
+
                                 ThermalPrinterName = @ThermalPrinterName,
                                 ThermalPrintMode = @ThermalPrintMode,
                                 ThermalPaperWidth = @ThermalPaperWidth,
@@ -243,6 +258,14 @@ namespace Ocore.desktop.Services
                             command.Parameters.AddWithValue(
                                 "@UpdatedAt",
                                 DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                            command.Parameters.AddWithValue(
+                                "@VatRegistrationStatus",
+                                settings.VatRegistrationStatus);
+
+                            command.Parameters.AddWithValue(
+                                "@TaxInvoiceEnabled",
+                                settings.TaxInvoiceEnabled ? 1 : 0);
 
                             command.Parameters.AddWithValue(
                                 "@ThermalPrinterName",

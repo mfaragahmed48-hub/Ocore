@@ -1,4 +1,6 @@
 ﻿
+using System;
+
 namespace Ocore.desktop.Models
 {
     public class PharmacySettings
@@ -18,6 +20,11 @@ namespace Ocore.desktop.Models
         public string LogoPath { get; set; }
 
         public string UpdatedAt { get; set; }
+
+        // Tax Settings
+        public string VatRegistrationStatus { get; set; }
+
+        public bool TaxInvoiceEnabled { get; set; }
 
         // Thermal Printer Settings
         public string ThermalPrinterName { get; set; }
@@ -44,6 +51,9 @@ namespace Ocore.desktop.Models
             ManagerName = string.Empty;
             LogoPath = string.Empty;
             UpdatedAt = string.Empty;
+
+            VatRegistrationStatus = "Unknown";
+            TaxInvoiceEnabled = false;
 
             ThermalPrinterName = string.Empty;
             ThermalPrintMode = "WindowsDriver";
