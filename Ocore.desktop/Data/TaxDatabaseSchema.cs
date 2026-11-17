@@ -18,6 +18,10 @@ namespace Ocore.desktop.Data
                 {
                     CreateTaxTables(connection, transaction);
 
+                    CreateInvoiceTaxComponentTable(
+                        connection,
+                        transaction);
+
                     EnsureColumns(
                         connection,
                         transaction,
@@ -271,6 +275,51 @@ CREATE TABLE IF NOT EXISTS TaxAuditLogs
 
     FOREIGN KEY (UserId) REFERENCES Users(Id)
 );
+
+";
+
+            using (var command = new SQLiteCommand(
+                sql,
+                connection,
+                transaction))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateInvoiceTaxComponentTable(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction)
+        {
+            string sql = @"
+
+CREATE TABLE IF NOT EXISTS SalesInvoiceItemTaxComponents
+(
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    InvoiceItemId INTEGER NOT NULL,
+
+    TaxProfileRateId INTEGER NULL,
+
+    ComponentCode TEXT NOT NULL DEFAULT '',
+    ComponentName TEXT NOT NULL DEFAULT '',
+    ComponentType TEXT NOT NULL DEFAULT 'VAT',
+
+    RatePercent REAL NOT NULL DEFAULT 0,
+
+    CalculationOrder INTEGER NOT NULL DEFAULT 1,
+    IsCompound INTEGER NOT NULL DEFAULT 0,
+
+    TaxableBase REAL NOT NULL DEFAULT 0,
+    TaxAmount REAL NOT NULL DEFAULT 0,
+
+    FOREIGN KEY (InvoiceItemId)
+        REFERENCES SalesInvoiceItems(Id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS IX_SalesInvoiceItemTaxComponents_InvoiceItemId
+ON SalesInvoiceItemTaxComponents(InvoiceItemId);
 
 ";
 
