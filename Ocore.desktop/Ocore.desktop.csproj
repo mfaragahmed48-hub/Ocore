@@ -196,6 +196,7 @@
     <Compile Include="Services\SalesReturnsService.cs" />
     <Compile Include="Services\SalesService.cs" />
     <Compile Include="Services\SupplierService.cs" />
+<Compile Include="Services\TaxProfileService.cs" />
     <Compile Include="Services\ThermalPrinterService.cs" />
     <Compile Include="Services\ThermalReceiptRenderer.cs" />
     <Compile Include="Services\UserService.cs" />
