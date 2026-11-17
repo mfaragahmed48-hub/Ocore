@@ -421,8 +421,7 @@ namespace Ocore.desktop.Services
                         }
                     }
 
-                    // تكوين قائمة تحقق تشمل كل السجلات القديمة
-                    // والسجلات الجديدة دون حذف أي سجل سابق.
+                    // الاحتفاظ بكل السجلات القديمة وإضافة الجديدة للتحقق.
                     var combinedRates = existingRates
                         .Select(CloneRate)
                         .ToList();
@@ -444,7 +443,7 @@ namespace Ocore.desktop.Services
                         combinedRates,
                         profile.TaxType);
 
-                    // إنشاء التصنيف الجديد
+                    // إنشاء التصنيف الجديد.
                     if (profile.Id == 0)
                     {
                         using (var command = new SQLiteCommand(
@@ -555,8 +554,7 @@ namespace Ocore.desktop.Services
                             now);
                     }
 
-                    // إدخال النسب الجديدة فقط.
-                    // لا يوجد حذف أو إعادة إنشاء للنسب القديمة.
+                    // إضافة النسب الجديدة فقط مع تحديث أرقامها في الذاكرة.
                     SaveRates(
                         connection,
                         transaction,
@@ -1044,6 +1042,17 @@ namespace Ocore.desktop.Services
                         now);
 
                     command.ExecuteNonQuery();
+
+                    // الاحتفاظ برقم السجل الجديد في الذاكرة.
+                    rate.Id = Convert.ToInt32(
+                        connection.LastInsertRowId);
+
+                    rate.TaxProfileId = profileId;
+                    rate.CreatedBy = currentUserId;
+                    rate.CreatedAt = DateTime.ParseExact(
+                        now,
+                        "yyyy-MM-dd HH:mm:ss",
+                        CultureInfo.InvariantCulture);
                 }
             }
         }
