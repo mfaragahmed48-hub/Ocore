@@ -365,6 +365,7 @@ namespace Ocore.desktop.Services
         }
 
 
+
         public double GetPreviousReturnsTotal(
             int userId,
             int invoiceId)
@@ -384,15 +385,24 @@ namespace Ocore.desktop.Services
                 using (var command = new SQLiteCommand(@"
             SELECT COALESCE(
                 SUM(
-                    COALESCE(Total, 0)
-                    - COALESCE(DiscountAmount, 0)
-                    + COALESCE(TaxTotal, 0)
+                    CASE
+                        WHEN LOWER(COALESCE(sri.TaxStatus, 'Legacy')) = 'calculated'
+                        THEN
+                            COALESCE(sri.TaxableAmount, 0)
+                            + COALESCE(sri.VatAmount, 0)
+                            + COALESCE(sri.ScheduleTaxAmount, 0)
+                        ELSE
+                            COALESCE(sri.Total, 0)
+                            - COALESCE(sri.DiscountAmount, 0)
+                    END
                 ),
                 0
             )
-            FROM SalesReturns
-            WHERE InvoiceId = @InvoiceId
-              AND Status = 'Completed';",
+            FROM SalesReturnItems sri
+            INNER JOIN SalesReturns sr
+                ON sr.Id = sri.ReturnId
+            WHERE sr.InvoiceId = @InvoiceId
+              AND sr.Status = 'Completed';",
                     connection))
                 {
                     command.Parameters.AddWithValue(
@@ -1282,6 +1292,41 @@ namespace Ocore.desktop.Services
                                 : hasCalculatedTax
                                     ? "Calculated"
                                     : "Legacy";
+
+                        decimal returnAccountingTotal = 0m;
+
+                        foreach (var prepared in preparedItems)
+                        {
+                            if (string.Equals(
+                                prepared.TaxStatus,
+                                "Calculated",
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                returnAccountingTotal +=
+                                    prepared.TaxableAmount +
+                                    prepared.VatAmount +
+                                    prepared.ScheduleTaxAmount;
+                            }
+                            else
+                            {
+                                returnAccountingTotal +=
+                                    Convert.ToDecimal(prepared.Total) -
+                                    prepared.DiscountAmount;
+                            }
+                        }
+
+                        returnAccountingTotal = Math.Round(
+                            returnAccountingTotal,
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                        if (Convert.ToDecimal(refundAmount) >
+                            returnAccountingTotal + 0.00000001m)
+                        {
+                            throw new Exception(
+                                "مبلغ الرد الفعلي لا يمكن أن يكون أكبر من صافي القيمة المحاسبية للمرتجع.");
+                        }
+
 
                         if (double.IsNaN(returnTotal) ||
                             double.IsInfinity(returnTotal))

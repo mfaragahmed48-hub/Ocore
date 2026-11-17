@@ -177,10 +177,15 @@ namespace Ocore.desktop.Views
                     if (item == null)
                         continue;
 
+
                     bool calculated =
                         string.Equals(
-                            item.TaxStatus,
+                            returnDetails.TaxStatus,
                             "Calculated",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(
+                            returnDetails.TaxStatus,
+                            "Mixed",
                             StringComparison.OrdinalIgnoreCase);
 
                     double itemValue;
