@@ -472,11 +472,48 @@ LIMIT 1;";
             }
         }
 
+
         private void CloseButton_Click(
             object sender,
             RoutedEventArgs e)
         {
             Close();
+        }
+
+        private void ManageTaxesButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            try
+            {
+                // إعادة التحقق من صلاحية المدير قبل فتح النافذة
+                if (!IsCurrentUserManager())
+                {
+                    MessageBox.Show(
+                        "إدارة الضرائب متاحة لمدير النظام فقط.",
+                        "صلاحيات غير كافية",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    ManageTaxesButton.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                var window = new TaxManagementWindow(currentUserId)
+                {
+                    Owner = this
+                };
+
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "تعذر فتح إدارة الضرائب:\n" + ex.Message,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
     }
 }
