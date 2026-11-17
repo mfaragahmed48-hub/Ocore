@@ -1399,7 +1399,24 @@ ORDER BY Name;";
                 {
                     try
                     {
-                        CheckManagerPermission(connection, currentUserId);
+                        string currentUserRole = GetActiveUserRole(
+     connection,
+     currentUserId);
+
+                        bool isManager = string.Equals(
+                            currentUserRole,
+                            "Manager",
+                            StringComparison.OrdinalIgnoreCase);
+
+                        bool hasEditPermission = permissionService.HasPermission(
+                            currentUserRole,
+                            "Products.Edit");
+
+                        if (!isManager && !hasEditPermission)
+                        {
+                            throw new UnauthorizedAccessException(
+                                "ليس لديك صلاحية تعديل بيانات الأصناف.");
+                        }
 
                         Product oldProduct = null;
 

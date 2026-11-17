@@ -15,16 +15,23 @@ namespace Ocore.desktop.Views
     {
         private readonly int currentUserId;
         private readonly ProductService productService;
+        private readonly PermissionService permissionService;
+        private readonly UserService userService;
 
         private List<Product> allProducts;
         private bool isManager;
+        private bool canEditProducts;
 
         public ProductsManagementWindow(int userId)
         {
             InitializeComponent();
 
             currentUserId = userId;
+
             productService = new ProductService();
+            permissionService = new PermissionService();
+            userService = new UserService();
+
             allProducts = new List<Product>();
 
             Loaded += ProductsManagementWindow_Loaded;
@@ -63,8 +70,31 @@ namespace Ocore.desktop.Views
             {
                 isManager = productService.IsManager(currentUserId);
 
+                // المدير يمتلك صلاحية تعديل الأصناف دائمًا.
+                // باقي المستخدمين يخضعون لصلاحية Products.Edit.
+                canEditProducts = isManager;
+
+                if (!isManager)
+                {
+                    var currentUser = userService.GetAllUsers()
+                        .FirstOrDefault(user => user.Id == currentUserId);
+
+                    if (currentUser == null || !currentUser.IsActive)
+                    {
+                        throw new UnauthorizedAccessException(
+                            "المستخدم غير موجود أو حسابه موقوف.");
+                    }
+
+                    canEditProducts =
+                        permissionService.HasPermission(
+                            currentUser.Role,
+                            "Products.Edit");
+                }
+
                 EditProductButton.Visibility =
-                    isManager ? Visibility.Visible : Visibility.Collapsed;
+                    canEditProducts
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
 
                 ArchiveProductButton.Visibility =
                     isManager ? Visibility.Visible : Visibility.Collapsed;
@@ -190,7 +220,7 @@ namespace Ocore.desktop.Views
                 hasSelection && !selectedProduct.IsArchived;
 
             EditProductButton.IsEnabled =
-                isManager && hasSelection;
+                canEditProducts && hasSelection;
 
             SetDiscountLimitButton.IsEnabled =
                 isManager && hasSelection;
@@ -257,10 +287,10 @@ namespace Ocore.desktop.Views
             object sender,
             RoutedEventArgs e)
         {
-            if (!isManager)
+            if (!canEditProducts)
             {
                 MessageBox.Show(
-                    "تعديل بيانات الأصناف متاح للمدير فقط.",
+                    "ليس لديك صلاحية تعديل بيانات الأصناف.",
                     "الصلاحيات",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -560,7 +590,7 @@ namespace Ocore.desktop.Views
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "حدث خطأ أثناء تحديد حد الخصم:\n" + ex.Message,
+                    "حدث خطأ أثناء تحديد الحد الأقصى للخصم:\n" + ex.Message,
                     "خطأ",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
