@@ -180,7 +180,7 @@ namespace Ocore.desktop.Services
                           @number, @userId, @customerId, @shiftId,
                           0, @discountType, @discountValue,
                           0, 0, 0, 0, 'Unpaid', 0,
-                          0, 0, 0, 0, 'Calculated',
+                          0, 0, 0, 0, 'Legacy',
                           'Completed', @createdAt
                       );",
                             connection, transaction))
@@ -428,49 +428,7 @@ namespace Ocore.desktop.Services
                             discountValue,
                             requestedGeneralDiscountCents);
 
-                        // حساب الضريبة بعد تطبيق الخصومات.
-                        var taxCalculationService = new TaxCalculationService();
-
-                        decimal invoiceTaxableAmount = 0m;
-                        decimal invoiceVatAmount = 0m;
-                        decimal invoiceScheduleTaxAmount = 0m;
-
-                        foreach (var line in preparedItems)
-                        {
-                            long finalDiscountCents =
-                                line.ItemDiscountCents + line.GeneralDiscountCents;
-
-                            long amountAfterDiscountCents =
-                                line.LineTotalCents - finalDiscountCents;
-
-                            if (amountAfterDiscountCents < 0)
-                                throw new InvalidOperationException(
-                                    "المبلغ بعد الخصم غير صحيح للصنف " +
-                                    line.Product.Name + ".");
-
-                            line.TaxResult = taxCalculationService.CalculateLine(
-                                connection,
-                                transaction,
-                                line.Product.TaxProfileId,
-                                line.Product.TaxPriceMode,
-                                FromMoneyCents(amountAfterDiscountCents),
-                                invoiceDate);
-
-                            if (line.TaxResult == null)
-                                throw new InvalidOperationException(
-                                    "تعذر حساب الضريبة للصنف " +
-                                    line.Product.Name + ".");
-
-                            invoiceTaxableAmount +=
-                                line.TaxResult.TaxableAmount;
-
-                            invoiceVatAmount +=
-                                line.TaxResult.VatAmount;
-
-                            invoiceScheduleTaxAmount +=
-                                line.TaxResult.ScheduleTaxAmount;
-                        }
-
+                        
                         bool hasAnyDiscount = false;
                         long totalItemDiscountCents = 0;
                         long totalGeneralDiscountCents = 0;
@@ -504,12 +462,7 @@ namespace Ocore.desktop.Services
                         double discountAmount =
                             FromMoneyCents(totalDiscountCents);
 
-                        decimal invoiceTaxTotal =
-                            invoiceVatAmount + invoiceScheduleTaxAmount;
-
-                        double netTotal = RoundMoney(
-                            (double)(invoiceTaxableAmount + invoiceTaxTotal));
-
+                        double netTotal = RoundMoney(subtotal - discountAmount);
                         double cashPaymentAmount = 0;
                         double cardPaymentAmount = 0;
                         double instaPayPaymentAmount = 0;
@@ -633,34 +586,31 @@ namespace Ocore.desktop.Services
                                     "الخصم النهائي للصنف " + line.Product.Name +
                                     " تجاوز الحد الأقصى المسموح به.");
 
-                            if (line.TaxResult == null)
-                                throw new InvalidOperationException(
-                                    "لم يتم حساب ضريبة الصنف " +
-                                    line.Product.Name + ".");
-
+                            
                             long invoiceItemId;
 
                             using (var command = new SQLiteCommand(
-                                @"INSERT INTO SalesInvoiceItems
-                          (
-                              InvoiceId, ProductId, ItemName, UnitName,
-                              Quantity, UnitPrice, Total, PackageQuantity,
-                              DiscountPercentage, DiscountAmount,
-                              TaxProfileId, TaxProfileCode, TaxProfileName,
-                              TaxType, TaxRate, TaxPriceMode,
-                              TaxableAmount, VatAmount, ScheduleTaxAmount,
-                              TaxStatus
-                          )
-                          VALUES
-                          (
-                              @invoiceId, @productId, @name, @unitName,
-                              @quantity, @price, @total, @packageQuantity,
-                              @discountPercentage, @discountAmount,
-                              @taxProfileId, @taxProfileCode, @taxProfileName,
-                              @taxType, @taxRate, @taxPriceMode,
-                              @taxableAmount, @vatAmount, @scheduleTaxAmount,
-                              'Calculated'
-                          );",
+    @"INSERT INTO SalesInvoiceItems
+(
+    InvoiceId, ProductId, ItemName, UnitName,
+    Quantity, UnitPrice, Total, PackageQuantity,
+    DiscountPercentage, DiscountAmount,
+    TaxProfileId, TaxProfileCode, TaxProfileName,
+    TaxType, TaxRate, TaxPriceMode,
+    TaxableAmount, VatAmount, ScheduleTaxAmount,
+    TaxStatus
+)
+VALUES
+(
+    @invoiceId, @productId, @name, @unitName,
+    @quantity, @price, @total, @packageQuantity,
+    @discountPercentage, @discountAmount,
+    NULL, '', '', '', 0, 'Exclusive',
+    0, 0, 0,
+    'Legacy'
+);",
+
+
                                 connection, transaction))
                             {
                                 command.Parameters.AddWithValue("@invoiceId", invoiceId);
@@ -677,28 +627,7 @@ namespace Ocore.desktop.Services
                                 command.Parameters.AddWithValue(
                                     "@discountAmount", finalDiscountAmount);
 
-                                command.Parameters.AddWithValue(
-                                    "@taxProfileId", line.TaxResult.TaxProfileId);
-                                command.Parameters.AddWithValue(
-                                    "@taxProfileCode", line.TaxResult.TaxProfileCode);
-                                command.Parameters.AddWithValue(
-                                    "@taxProfileName", line.TaxResult.TaxProfileName);
-                                command.Parameters.AddWithValue(
-                                    "@taxType", line.TaxResult.TaxType);
-                                command.Parameters.AddWithValue(
-                                    "@taxRate", (double)line.TaxResult.TaxRate);
-                                command.Parameters.AddWithValue(
-                                    "@taxPriceMode", line.TaxResult.TaxPriceMode);
-                                command.Parameters.AddWithValue(
-                                    "@taxableAmount",
-                                    (double)line.TaxResult.TaxableAmount);
-                                command.Parameters.AddWithValue(
-                                    "@vatAmount",
-                                    (double)line.TaxResult.VatAmount);
-                                command.Parameters.AddWithValue(
-                                    "@scheduleTaxAmount",
-                                    (double)line.TaxResult.ScheduleTaxAmount);
-
+                                
                                 command.ExecuteNonQuery();
                             }
 
@@ -708,73 +637,7 @@ namespace Ocore.desktop.Services
                                 invoiceItemId = Convert.ToInt64(command.ExecuteScalar());
                             }
 
-                            // حفظ المكونات الضريبية بالتفصيل كما حُسبت وقت البيع.
-                            foreach (var component in line.TaxResult.Components)
-                            {
-                                using (var command = new SQLiteCommand(
-                                    @"INSERT INTO SalesInvoiceItemTaxComponents
-                              (
-                                  InvoiceItemId, TaxProfileRateId,
-                                  ComponentCode, ComponentName,
-                                  ComponentType, RatePercent,
-                                  CalculationOrder, IsCompound,
-                                  TaxableBase, TaxAmount
-                              )
-                              VALUES
-                              (
-                                  @invoiceItemId, @rateId,
-                                  @componentCode, @componentName,
-                                  @componentType, @ratePercent,
-                                  @calculationOrder, @isCompound,
-                                  @taxableBase, @taxAmount
-                              );",
-                                    connection, transaction))
-                                {
-                                    command.Parameters.AddWithValue(
-                                        "@invoiceItemId", invoiceItemId);
-
-                                    command.Parameters.AddWithValue(
-                                        "@rateId",
-                                        component.RateId > 0
-                                            ? (object)component.RateId
-                                            : DBNull.Value);
-
-                                    command.Parameters.AddWithValue(
-                                        "@componentCode",
-                                        component.ComponentCode ?? string.Empty);
-
-                                    command.Parameters.AddWithValue(
-                                        "@componentName",
-                                        component.ComponentName ?? string.Empty);
-
-                                    command.Parameters.AddWithValue(
-                                        "@componentType",
-                                        component.ComponentType ?? string.Empty);
-
-                                    command.Parameters.AddWithValue(
-                                        "@ratePercent",
-                                        (double)component.RatePercent);
-
-                                    command.Parameters.AddWithValue(
-                                        "@calculationOrder",
-                                        component.CalculationOrder);
-
-                                    command.Parameters.AddWithValue(
-                                        "@isCompound",
-                                        component.IsCompound ? 1 : 0);
-
-                                    command.Parameters.AddWithValue(
-                                        "@taxableBase",
-                                        (double)component.TaxableBase);
-
-                                    command.Parameters.AddWithValue(
-                                        "@taxAmount",
-                                        (double)component.TaxAmount);
-
-                                    command.ExecuteNonQuery();
-                                }
-                            }
-
+                            
                             // الخصم من التشغيلات التي حددها المستخدم فقط.
                             DeductFromSelectedBatches(
                                 connection,
@@ -798,11 +661,11 @@ namespace Ocore.desktop.Services
                           RemainingAmount = @remainingAmount,
                           PaymentStatus = @paymentStatus,
                           Total = @netTotal,
-                          TaxableAmount = @taxableAmount,
-                          VatAmount = @vatAmount,
-                          ScheduleTaxAmount = @scheduleTaxAmount,
-                          TaxTotal = @taxTotal,
-                          TaxStatus = 'Calculated'
+                          TaxableAmount = 0,
+VatAmount = 0,
+ScheduleTaxAmount = 0,
+TaxTotal = 0,
+TaxStatus = 'Legacy'
                       WHERE Id = @id;",
                             connection, transaction))
                         {
@@ -820,14 +683,7 @@ namespace Ocore.desktop.Services
                             command.Parameters.AddWithValue("@remainingAmount", remainingAmount);
                             command.Parameters.AddWithValue("@paymentStatus", paymentStatus);
 
-                            command.Parameters.AddWithValue(
-                                "@taxableAmount", (double)invoiceTaxableAmount);
-                            command.Parameters.AddWithValue(
-                                "@vatAmount", (double)invoiceVatAmount);
-                            command.Parameters.AddWithValue(
-                                "@scheduleTaxAmount", (double)invoiceScheduleTaxAmount);
-                            command.Parameters.AddWithValue(
-                                "@taxTotal", (double)invoiceTaxTotal);
+                            
 
                             command.Parameters.AddWithValue("@id", invoiceId);
                             command.ExecuteNonQuery();
@@ -2114,7 +1970,7 @@ namespace Ocore.desktop.Services
               Id, Name, UnitName, SmallUnitName,
               UnitsPerPackage, SalePrice, IsArchived,
               MaxDiscountPercentage,
-              TaxProfileId, TaxPriceMode
+              
           FROM Products
           WHERE Id = @id;",
                 connection, transaction))
@@ -2139,15 +1995,7 @@ namespace Ocore.desktop.Services
                         MaxDiscountPercentage =
                             ReadDouble(reader["MaxDiscountPercentage"], 0),
 
-                        TaxProfileId =
-                            reader["TaxProfileId"] == DBNull.Value
-                                ? (int?)null
-                                : Convert.ToInt32(reader["TaxProfileId"]),
-
-                        TaxPriceMode =
-                            reader["TaxPriceMode"] == DBNull.Value
-                                ? "Exclusive"
-                                : reader["TaxPriceMode"].ToString()
+                        
                     };
                 }
             }
@@ -2205,8 +2053,8 @@ namespace Ocore.desktop.Services
 
         private class ProductSaleInfo
         {
-            public int? TaxProfileId { get; set; }
-            public string TaxPriceMode { get; set; }
+           
+            
             public int Id { get; set; }
             public string Name { get; set; }
             public string UnitName { get; set; }
@@ -2219,7 +2067,7 @@ namespace Ocore.desktop.Services
 
         private class PreparedSaleLine
         {
-            public TaxCalculationResult TaxResult { get; set; }
+            
             public ProductSaleInfo Product { get; set; }
             public SaleInvoiceItem OriginalItem { get; set; }
             public string UnitName { get; set; }
