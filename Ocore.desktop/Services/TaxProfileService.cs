@@ -251,27 +251,38 @@ namespace Ocore.desktop.Services
                         rates.Add(new TaxProfileRate
                         {
                             Id = Convert.ToInt32(reader["Id"]),
+
                             TaxProfileId = Convert.ToInt32(
                                 reader["TaxProfileId"]),
+
                             ComponentCode = Convert.ToString(
                                 reader["ComponentCode"]),
+
                             ComponentName = Convert.ToString(
                                 reader["ComponentName"]),
+
                             ComponentType = Convert.ToString(
                                 reader["ComponentType"]),
+
                             RatePercent = Convert.ToDouble(
                                 reader["RatePercent"]),
+
                             CalculationOrder = Convert.ToInt32(
                                 reader["CalculationOrder"]),
+
                             IsCompound = Convert.ToInt32(
                                 reader["IsCompound"]) == 1,
+
                             EffectiveFrom = effectiveFrom,
                             EffectiveTo = effectiveTo,
+
                             IsActive = Convert.ToInt32(
                                 reader["IsActive"]) == 1,
+
                             CreatedBy = reader["CreatedBy"] == DBNull.Value
                                 ? (int?)null
                                 : Convert.ToInt32(reader["CreatedBy"]),
+
                             CreatedAt = ParseDate(reader["CreatedAt"])
                         });
                     }
@@ -280,6 +291,10 @@ namespace Ocore.desktop.Services
 
             return rates;
         }
+
+        // =========================================================
+        // حفظ التصنيف الضريبي مع الحفاظ على التاريخ الكامل للنسب
+        // =========================================================
 
         public int SaveProfile(
             TaxProfile profile,
@@ -320,8 +335,6 @@ namespace Ocore.desktop.Services
                         }
                     }
 
-                    ValidateRates(profile.Rates, profile.TaxType);
-
                     string now = DateTime.Now.ToString(
                         "yyyy-MM-dd HH:mm:ss",
                         CultureInfo.InvariantCulture);
@@ -330,6 +343,108 @@ namespace Ocore.desktop.Services
                     string name = profile.Name.Trim();
                     string description = profile.Description ?? "";
 
+                    var submittedRates = profile.Rates ??
+                        new List<TaxProfileRate>();
+
+                    var existingRates = oldProfile == null
+                        ? new List<TaxProfileRate>()
+                        : oldProfile.Rates;
+
+                    var existingById = existingRates.ToDictionary(
+                        x => x.Id);
+
+                    var newRates = new List<TaxProfileRate>();
+
+                    var ratesToClose =
+                        new List<Tuple<TaxProfileRate, DateTime>>();
+
+                    var submittedIds = new HashSet<int>();
+
+                    foreach (var rate in submittedRates)
+                    {
+                        if (rate == null)
+                        {
+                            throw new ArgumentException(
+                                "يوجد مكون ضريبي غير صالح.");
+                        }
+
+                        if (rate.Id <= 0)
+                        {
+                            newRates.Add(rate);
+                            continue;
+                        }
+
+                        if (!submittedIds.Add(rate.Id))
+                        {
+                            throw new ArgumentException(
+                                "تم إرسال نفس سجل النسبة أكثر من مرة.");
+                        }
+
+                        TaxProfileRate savedRate;
+
+                        if (!existingById.TryGetValue(
+                            rate.Id,
+                            out savedRate))
+                        {
+                            throw new InvalidOperationException(
+                                "يوجد سجل نسبة لا ينتمي إلى هذا التصنيف.");
+                        }
+
+                        EnsureRateImmutableFields(
+                            savedRate,
+                            rate);
+
+                        bool endDateChanged =
+                            savedRate.EffectiveTo != rate.EffectiveTo;
+
+                        if (endDateChanged)
+                        {
+                            if (savedRate.EffectiveTo.HasValue ||
+                                !rate.EffectiveTo.HasValue)
+                            {
+                                throw new InvalidOperationException(
+                                    "لا يمكن تغيير تاريخ نهاية نسبة محفوظة. " +
+                                    "يسمح فقط بإغلاق فترة مفتوحة.");
+                            }
+
+                            if (rate.EffectiveTo.Value.Date <
+                                savedRate.EffectiveFrom.Date)
+                            {
+                                throw new ArgumentException(
+                                    "تاريخ نهاية السريان لا يمكن أن يسبق تاريخ البداية.");
+                            }
+
+                            ratesToClose.Add(
+                                Tuple.Create(
+                                    savedRate,
+                                    rate.EffectiveTo.Value.Date));
+                        }
+                    }
+
+                    // تكوين قائمة تحقق تشمل كل السجلات القديمة
+                    // والسجلات الجديدة دون حذف أي سجل سابق.
+                    var combinedRates = existingRates
+                        .Select(CloneRate)
+                        .ToList();
+
+                    foreach (var closing in ratesToClose)
+                    {
+                        var target = combinedRates.First(
+                            x => x.Id == closing.Item1.Id);
+
+                        target.EffectiveTo = closing.Item2;
+                    }
+
+                    foreach (var rate in newRates)
+                    {
+                        combinedRates.Add(rate);
+                    }
+
+                    ValidateRates(
+                        combinedRates,
+                        profile.TaxType);
+
+                    // إنشاء التصنيف الجديد
                     if (profile.Id == 0)
                     {
                         using (var command = new SQLiteCommand(
@@ -350,18 +465,30 @@ namespace Ocore.desktop.Services
                         {
                             command.Parameters.AddWithValue("@Code", code);
                             command.Parameters.AddWithValue("@Name", name);
+
                             command.Parameters.AddWithValue(
-                                "@TaxType", profile.TaxType);
+                                "@TaxType",
+                                profile.TaxType);
+
                             command.Parameters.AddWithValue(
-                                "@Description", description);
+                                "@Description",
+                                description);
+
                             command.Parameters.AddWithValue(
-                                "@IsActive", profile.IsActive ? 1 : 0);
+                                "@IsActive",
+                                profile.IsActive ? 1 : 0);
+
                             command.Parameters.AddWithValue(
-                                "@CreatedBy", currentUserId);
+                                "@CreatedBy",
+                                currentUserId);
+
                             command.Parameters.AddWithValue(
-                                "@CreatedAt", now);
+                                "@CreatedAt",
+                                now);
+
                             command.Parameters.AddWithValue(
-                                "@UpdatedAt", now);
+                                "@UpdatedAt",
+                                now);
 
                             command.ExecuteNonQuery();
                         }
@@ -386,16 +513,26 @@ namespace Ocore.desktop.Services
                         {
                             command.Parameters.AddWithValue("@Code", code);
                             command.Parameters.AddWithValue("@Name", name);
+
                             command.Parameters.AddWithValue(
-                                "@TaxType", profile.TaxType);
+                                "@TaxType",
+                                profile.TaxType);
+
                             command.Parameters.AddWithValue(
-                                "@Description", description);
+                                "@Description",
+                                description);
+
                             command.Parameters.AddWithValue(
-                                "@IsActive", profile.IsActive ? 1 : 0);
+                                "@IsActive",
+                                profile.IsActive ? 1 : 0);
+
                             command.Parameters.AddWithValue(
-                                "@UpdatedAt", now);
+                                "@UpdatedAt",
+                                now);
+
                             command.Parameters.AddWithValue(
-                                "@Id", profile.Id);
+                                "@Id",
+                                profile.Id);
 
                             if (command.ExecuteNonQuery() != 1)
                             {
@@ -403,28 +540,35 @@ namespace Ocore.desktop.Services
                                     "تعذر تحديث التصنيف الضريبي.");
                             }
                         }
-
-                        using (var command = new SQLiteCommand(
-                            @"DELETE FROM TaxProfileRates
-                              WHERE TaxProfileId = @ProfileId;",
-                            connection,
-                            transaction))
-                        {
-                            command.Parameters.AddWithValue(
-                                "@ProfileId",
-                                profile.Id);
-
-                            command.ExecuteNonQuery();
-                        }
                     }
 
+                    // إغلاق الفترات المفتوحة المطلوبة فقط.
+                    foreach (var closing in ratesToClose)
+                    {
+                        CloseRatePeriod(
+                            connection,
+                            transaction,
+                            closing.Item1,
+                            closing.Item2,
+                            currentUserId,
+                            reason,
+                            now);
+                    }
+
+                    // إدخال النسب الجديدة فقط.
+                    // لا يوجد حذف أو إعادة إنشاء للنسب القديمة.
                     SaveRates(
                         connection,
                         transaction,
                         profile.Id,
-                        profile.Rates,
+                        newRates,
                         currentUserId,
                         now);
+
+                    profile.Code = code;
+                    profile.Name = name;
+                    profile.Description = description;
+                    profile.Rates = combinedRates;
 
                     string oldValues = oldProfile == null
                         ? ""
@@ -493,26 +637,172 @@ namespace Ocore.desktop.Services
             }
         }
 
+        // =========================================================
+        // أدوات الحفاظ على سجلات النسب
+        // =========================================================
+
+        private TaxProfileRate CloneRate(TaxProfileRate rate)
+        {
+            return new TaxProfileRate
+            {
+                Id = rate.Id,
+                TaxProfileId = rate.TaxProfileId,
+                ComponentCode = rate.ComponentCode,
+                ComponentName = rate.ComponentName,
+                ComponentType = rate.ComponentType,
+                RatePercent = rate.RatePercent,
+                CalculationOrder = rate.CalculationOrder,
+                IsCompound = rate.IsCompound,
+                EffectiveFrom = rate.EffectiveFrom,
+                EffectiveTo = rate.EffectiveTo,
+                IsActive = rate.IsActive,
+                CreatedBy = rate.CreatedBy,
+                CreatedAt = rate.CreatedAt
+            };
+        }
+
+        private void EnsureRateImmutableFields(
+            TaxProfileRate saved,
+            TaxProfileRate submitted)
+        {
+            bool changed =
+                !string.Equals(
+                    saved.ComponentCode,
+                    submitted.ComponentCode,
+                    StringComparison.OrdinalIgnoreCase) ||
+
+                !string.Equals(
+                    saved.ComponentName,
+                    submitted.ComponentName,
+                    StringComparison.Ordinal) ||
+
+                !string.Equals(
+                    saved.ComponentType,
+                    submitted.ComponentType,
+                    StringComparison.Ordinal) ||
+
+                saved.RatePercent != submitted.RatePercent ||
+
+                saved.CalculationOrder != submitted.CalculationOrder ||
+
+                saved.IsCompound != submitted.IsCompound ||
+
+                saved.EffectiveFrom.Date != submitted.EffectiveFrom.Date ||
+
+                saved.IsActive != submitted.IsActive;
+
+            if (changed)
+            {
+                throw new InvalidOperationException(
+                    "لا يمكن تعديل بيانات نسبة ضريبية محفوظة. " +
+                    "أضف سجل نسبة جديدًا بتاريخ سريان جديد.");
+            }
+        }
+
+        private void CloseRatePeriod(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            TaxProfileRate rate,
+            DateTime effectiveTo,
+            int currentUserId,
+            string reason,
+            string now)
+        {
+            string oldValues =
+                "RateId=" + rate.Id +
+                "|ComponentCode=" + rate.ComponentCode +
+                "|RatePercent=" +
+                rate.RatePercent.ToString(
+                    CultureInfo.InvariantCulture) +
+                "|EffectiveFrom=" +
+                rate.EffectiveFrom.ToString("yyyy-MM-dd") +
+                "|EffectiveTo=مفتوح";
+
+            string newValues =
+                "RateId=" + rate.Id +
+                "|ComponentCode=" + rate.ComponentCode +
+                "|RatePercent=" +
+                rate.RatePercent.ToString(
+                    CultureInfo.InvariantCulture) +
+                "|EffectiveFrom=" +
+                rate.EffectiveFrom.ToString("yyyy-MM-dd") +
+                "|EffectiveTo=" +
+                effectiveTo.ToString("yyyy-MM-dd");
+
+            using (var command = new SQLiteCommand(
+                @"UPDATE TaxProfileRates
+                  SET EffectiveTo = @EffectiveTo
+                  WHERE Id = @Id
+                    AND TaxProfileId = @ProfileId
+                    AND (EffectiveTo IS NULL OR EffectiveTo = '');",
+                connection,
+                transaction))
+            {
+                command.Parameters.AddWithValue(
+                    "@EffectiveTo",
+                    effectiveTo.ToString(
+                        "yyyy-MM-dd",
+                        CultureInfo.InvariantCulture));
+
+                command.Parameters.AddWithValue("@Id", rate.Id);
+
+                command.Parameters.AddWithValue(
+                    "@ProfileId",
+                    rate.TaxProfileId);
+
+                if (command.ExecuteNonQuery() != 1)
+                {
+                    throw new InvalidOperationException(
+                        "تعذر إغلاق فترة سريان النسبة. " +
+                        "ربما تم تعديلها بالفعل.");
+                }
+            }
+
+            WriteAudit(
+                connection,
+                transaction,
+                currentUserId,
+                "CloseRatePeriod",
+                "TaxProfileRate",
+                rate.Id,
+                oldValues,
+                newValues,
+                reason,
+                now);
+        }
+
+        // =========================================================
+        // التحقق من بيانات التصنيف
+        // =========================================================
+
         private void ValidateProfile(TaxProfile profile)
         {
             if (profile == null)
                 throw new ArgumentNullException("profile");
 
             if (string.IsNullOrWhiteSpace(profile.Code))
+            {
                 throw new ArgumentException(
                     "يجب إدخال كود التصنيف الضريبي.");
+            }
 
             if (string.IsNullOrWhiteSpace(profile.Name))
+            {
                 throw new ArgumentException(
                     "يجب إدخال اسم التصنيف الضريبي.");
+            }
 
             if (profile.Code.Trim().Length > 50)
+            {
                 throw new ArgumentException(
                     "كود التصنيف الضريبي طويل جدًا.");
+            }
 
             if (profile.Name.Trim().Length > 150)
+            {
                 throw new ArgumentException(
                     "اسم التصنيف الضريبي طويل جدًا.");
+            }
 
             string[] allowedTypes =
             {
@@ -538,6 +828,10 @@ namespace Ocore.desktop.Services
             }
         }
 
+        // =========================================================
+        // التحقق من النسب والفترات الزمنية
+        // =========================================================
+
         private void ValidateRates(
             List<TaxProfileRate> rates,
             string taxType)
@@ -554,16 +848,22 @@ namespace Ocore.desktop.Services
             foreach (var rate in rates)
             {
                 if (rate == null)
+                {
                     throw new ArgumentException(
                         "يوجد مكون ضريبي غير صالح.");
+                }
 
                 if (string.IsNullOrWhiteSpace(rate.ComponentCode))
+                {
                     throw new ArgumentException(
                         "يجب إدخال كود المكون الضريبي.");
+                }
 
                 if (string.IsNullOrWhiteSpace(rate.ComponentName))
+                {
                     throw new ArgumentException(
                         "يجب إدخال اسم المكون الضريبي.");
+                }
 
                 if (rate.RatePercent < 0 ||
                     double.IsNaN(rate.RatePercent) ||
@@ -574,8 +874,10 @@ namespace Ocore.desktop.Services
                 }
 
                 if (rate.CalculationOrder < 1)
+                {
                     throw new ArgumentException(
                         "ترتيب الحساب يجب أن يبدأ من 1.");
+                }
 
                 if (rate.ComponentType != "VAT" &&
                     rate.ComponentType != "Schedule")
@@ -585,8 +887,10 @@ namespace Ocore.desktop.Services
                 }
 
                 if (rate.EffectiveFrom == DateTime.MinValue)
+                {
                     throw new ArgumentException(
                         "يجب تحديد تاريخ بداية سريان النسبة.");
+                }
 
                 if (rate.EffectiveTo.HasValue &&
                     rate.EffectiveTo.Value.Date <
@@ -598,7 +902,8 @@ namespace Ocore.desktop.Services
             }
 
             var orderedRates = rates
-                .OrderBy(x => x.ComponentCode.Trim().ToUpperInvariant())
+                .OrderBy(
+                    x => x.ComponentCode.Trim().ToUpperInvariant())
                 .ThenBy(x => x.EffectiveFrom.Date)
                 .ToList();
 
@@ -627,6 +932,10 @@ namespace Ocore.desktop.Services
             }
         }
 
+        // =========================================================
+        // إضافة سجلات النسب الجديدة فقط
+        // =========================================================
+
         private void SaveRates(
             SQLiteConnection connection,
             SQLiteTransaction transaction,
@@ -640,6 +949,12 @@ namespace Ocore.desktop.Services
 
             foreach (var rate in rates)
             {
+                if (rate.Id > 0)
+                {
+                    throw new InvalidOperationException(
+                        "لا يمكن إعادة إدخال نسبة محفوظة كسجل جديد.");
+                }
+
                 using (var command = new SQLiteCommand(
                     @"INSERT INTO TaxProfileRates
                       (
@@ -675,24 +990,39 @@ namespace Ocore.desktop.Services
                     transaction))
                 {
                     command.Parameters.AddWithValue(
-                        "@ProfileId", profileId);
+                        "@ProfileId",
+                        profileId);
+
                     command.Parameters.AddWithValue(
-                        "@ComponentCode", rate.ComponentCode.Trim());
+                        "@ComponentCode",
+                        rate.ComponentCode.Trim());
+
                     command.Parameters.AddWithValue(
-                        "@ComponentName", rate.ComponentName.Trim());
+                        "@ComponentName",
+                        rate.ComponentName.Trim());
+
                     command.Parameters.AddWithValue(
-                        "@ComponentType", rate.ComponentType);
+                        "@ComponentType",
+                        rate.ComponentType);
+
                     command.Parameters.AddWithValue(
-                        "@RatePercent", rate.RatePercent);
+                        "@RatePercent",
+                        rate.RatePercent);
+
                     command.Parameters.AddWithValue(
-                        "@CalculationOrder", rate.CalculationOrder);
+                        "@CalculationOrder",
+                        rate.CalculationOrder);
+
                     command.Parameters.AddWithValue(
-                        "@IsCompound", rate.IsCompound ? 1 : 0);
+                        "@IsCompound",
+                        rate.IsCompound ? 1 : 0);
+
                     command.Parameters.AddWithValue(
                         "@EffectiveFrom",
                         rate.EffectiveFrom.ToString(
                             "yyyy-MM-dd",
                             CultureInfo.InvariantCulture));
+
                     command.Parameters.AddWithValue(
                         "@EffectiveTo",
                         rate.EffectiveTo.HasValue
@@ -700,17 +1030,27 @@ namespace Ocore.desktop.Services
                                 "yyyy-MM-dd",
                                 CultureInfo.InvariantCulture)
                             : "");
+
                     command.Parameters.AddWithValue(
-                        "@IsActive", rate.IsActive ? 1 : 0);
+                        "@IsActive",
+                        rate.IsActive ? 1 : 0);
+
                     command.Parameters.AddWithValue(
-                        "@CreatedBy", currentUserId);
+                        "@CreatedBy",
+                        currentUserId);
+
                     command.Parameters.AddWithValue(
-                        "@CreatedAt", now);
+                        "@CreatedAt",
+                        now);
 
                     command.ExecuteNonQuery();
                 }
             }
         }
+
+        // =========================================================
+        // تعطيل التصنيف الضريبي
+        // =========================================================
 
         public void DeactivateProfile(
             int profileId,
@@ -733,18 +1073,26 @@ namespace Ocore.desktop.Services
                         profileId);
 
                     if (profile == null)
+                    {
                         throw new InvalidOperationException(
                             "التصنيف الضريبي غير موجود.");
+                    }
 
                     if (profile.IsSystem)
+                    {
                         throw new InvalidOperationException(
                             "لا يمكن تعطيل التصنيف النظامي.");
+                    }
 
                     if (!profile.IsActive)
                     {
                         transaction.Commit();
                         return;
                     }
+
+                    string now = DateTime.Now.ToString(
+                        "yyyy-MM-dd HH:mm:ss",
+                        CultureInfo.InvariantCulture);
 
                     using (var command = new SQLiteCommand(
                         @"UPDATE TaxProfiles
@@ -757,10 +1105,11 @@ namespace Ocore.desktop.Services
                     {
                         command.Parameters.AddWithValue(
                             "@UpdatedAt",
-                            DateTime.Now.ToString(
-                                "yyyy-MM-dd HH:mm:ss",
-                                CultureInfo.InvariantCulture));
-                        command.Parameters.AddWithValue("@Id", profileId);
+                            now);
+
+                        command.Parameters.AddWithValue(
+                            "@Id",
+                            profileId);
 
                         command.ExecuteNonQuery();
                     }
@@ -775,9 +1124,7 @@ namespace Ocore.desktop.Services
                         BuildProfileSnapshot(profile),
                         "IsActive=0",
                         reason,
-                        DateTime.Now.ToString(
-                            "yyyy-MM-dd HH:mm:ss",
-                            CultureInfo.InvariantCulture));
+                        now);
 
                     transaction.Commit();
                 }
@@ -788,6 +1135,10 @@ namespace Ocore.desktop.Services
                 }
             }
         }
+
+        // =========================================================
+        // إنشاء لقطة بيانات للتدقيق
+        // =========================================================
 
         private string BuildProfileSnapshot(TaxProfile profile)
         {
@@ -825,6 +1176,10 @@ namespace Ocore.desktop.Services
                 "|IsActive=" + profile.IsActive +
                 "|Rates=" + rates;
         }
+
+        // =========================================================
+        // سجل التدقيق
+        // =========================================================
 
         private void WriteAudit(
             SQLiteConnection connection,
@@ -866,20 +1221,41 @@ namespace Ocore.desktop.Services
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@UserId", userId);
-                command.Parameters.AddWithValue("@ActionType", actionType);
-                command.Parameters.AddWithValue("@EntityType", entityType);
-                command.Parameters.AddWithValue("@EntityId", entityId);
                 command.Parameters.AddWithValue(
-                    "@OldValues", oldValues ?? "");
+                    "@UserId",
+                    userId);
+
                 command.Parameters.AddWithValue(
-                    "@NewValues", newValues ?? "");
+                    "@ActionType",
+                    actionType);
+
                 command.Parameters.AddWithValue(
-                    "@Reason", reason ?? "");
+                    "@EntityType",
+                    entityType);
+
                 command.Parameters.AddWithValue(
-                    "@DeviceName", Environment.MachineName);
+                    "@EntityId",
+                    entityId);
+
                 command.Parameters.AddWithValue(
-                    "@CreatedAt", createdAt);
+                    "@OldValues",
+                    oldValues ?? "");
+
+                command.Parameters.AddWithValue(
+                    "@NewValues",
+                    newValues ?? "");
+
+                command.Parameters.AddWithValue(
+                    "@Reason",
+                    reason ?? "");
+
+                command.Parameters.AddWithValue(
+                    "@DeviceName",
+                    Environment.MachineName);
+
+                command.Parameters.AddWithValue(
+                    "@CreatedAt",
+                    createdAt);
 
                 command.ExecuteNonQuery();
             }
