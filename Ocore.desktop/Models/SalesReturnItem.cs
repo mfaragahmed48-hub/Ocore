@@ -57,7 +57,27 @@ namespace Ocore.desktop.Models
         // الكمية المحولة إلى وحدة البيع الأصلية
         public double Quantity { get; set; }
 
+        // ==========================================
+        // بيانات الضريبة المستردة من الفاتورة الأصلية
+        // ==========================================
+
+        public double TaxableAmount { get; set; }
+
+        public double VatAmount { get; set; }
+
+        public double ScheduleTaxAmount { get; set; }
+
+        public double TaxTotal { get; set; }
+
+        public string TaxStatus { get; set; }
+
+        // مكونات الضريبة المستردة
+        public List<SalesReturnTaxComponent> TaxComponents { get; set; }
+
+        // ==========================================
         // الإجماليات
+        // ==========================================
+
         public double Total { get; set; }
 
         public double PackageQuantity { get; set; }
@@ -65,6 +85,40 @@ namespace Ocore.desktop.Models
         public SalesReturnItem()
         {
             ReturnUnits = new List<string>();
+
+            TaxStatus = string.Empty;
+
+            TaxComponents =
+                new List<SalesReturnTaxComponent>();
+        }
+    }
+
+    // يمثل مكونًا ضريبيًا مستردًا من بند الفاتورة الأصلية
+    public class SalesReturnTaxComponent
+    {
+        public int OriginalRateId { get; set; }
+
+        public string ComponentCode { get; set; }
+
+        public string ComponentName { get; set; }
+
+        public string ComponentType { get; set; }
+
+        public double RatePercent { get; set; }
+
+        public int CalculationOrder { get; set; }
+
+        public bool IsCompound { get; set; }
+
+        public double TaxableBase { get; set; }
+
+        public double TaxAmount { get; set; }
+
+        public SalesReturnTaxComponent()
+        {
+            ComponentCode = string.Empty;
+            ComponentName = string.Empty;
+            ComponentType = string.Empty;
         }
     }
 }

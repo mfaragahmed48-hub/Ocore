@@ -28,7 +28,22 @@ namespace Ocore.desktop.Models
 
         public double DiscountAmount { get; set; }
 
-        // صافي الفاتورة بعد الخصم
+        // إجمالي القيمة الخاضعة للضريبة بعد الخصم
+        public double TaxableAmount { get; set; }
+
+        // ضريبة القيمة المضافة
+        public double VatAmount { get; set; }
+
+        // ضريبة الجدول
+        public double ScheduleTaxAmount { get; set; }
+
+        // إجمالي الضرائب
+        public double TaxTotal { get; set; }
+
+        // حالة حساب الضريبة
+        public string TaxStatus { get; set; }
+
+        // صافي الفاتورة بعد الخصم والضرائب
         public double NetTotal { get; set; }
 
         // إجمالي المدفوع والمتبقي
@@ -52,6 +67,7 @@ namespace Ocore.desktop.Models
             CustomerName = string.Empty;
             Status = string.Empty;
             DiscountType = string.Empty;
+            TaxStatus = string.Empty;
             PaymentStatus = string.Empty;
 
             Items = new List<SaleInvoiceItem>();

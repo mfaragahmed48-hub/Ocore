@@ -46,6 +46,7 @@ namespace Ocore.desktop.Services
                 string.Empty);
         }
 
+
         public string SaveInvoice(
             int userId,
             List<SaleInvoiceItem> items,
@@ -140,15 +141,17 @@ namespace Ocore.desktop.Services
                         if (customerId.HasValue)
                             ValidateCustomer(connection, transaction, customerId.Value);
 
+                        DateTime invoiceDate = DateTime.Now;
+
                         string invoiceNumber =
                             "INV-" +
-                            DateTime.Now.ToString(
+                            invoiceDate.ToString(
                                 "yyyyMMdd-HHmmss",
                                 CultureInfo.InvariantCulture) +
                             "-" +
                             Guid.NewGuid().ToString("N").Substring(0, 8);
 
-                        string createdAt = DateTime.Now.ToString(
+                        string createdAt = invoiceDate.ToString(
                             "yyyy-MM-dd HH:mm:ss",
                             CultureInfo.InvariantCulture);
 
@@ -163,20 +166,23 @@ namespace Ocore.desktop.Services
 
                         using (var command = new SQLiteCommand(
                             @"INSERT INTO SalesInvoices
-                              (
-                                  InvoiceNumber, UserId, CustomerId, ShiftId,
-                                  Subtotal, DiscountType, DiscountValue,
-                                  DiscountAmount, NetTotal, PaidAmount,
-                                  RemainingAmount, PaymentStatus, Total,
-                                  Status, CreatedAt
-                              )
-                              VALUES
-                              (
-                                  @number, @userId, @customerId, @shiftId,
-                                  0, @discountType, @discountValue,
-                                  0, 0, 0, 0, 'Unpaid', 0,
-                                  'Completed', @createdAt
-                              );",
+                      (
+                          InvoiceNumber, UserId, CustomerId, ShiftId,
+                          Subtotal, DiscountType, DiscountValue,
+                          DiscountAmount, NetTotal, PaidAmount,
+                          RemainingAmount, PaymentStatus, Total,
+                          TaxableAmount, VatAmount, ScheduleTaxAmount,
+                          TaxTotal, TaxStatus,
+                          Status, CreatedAt
+                      )
+                      VALUES
+                      (
+                          @number, @userId, @customerId, @shiftId,
+                          0, @discountType, @discountValue,
+                          0, 0, 0, 0, 'Unpaid', 0,
+                          0, 0, 0, 0, 'Calculated',
+                          'Completed', @createdAt
+                      );",
                             connection, transaction))
                         {
                             command.Parameters.AddWithValue("@number", invoiceNumber);
@@ -296,7 +302,6 @@ namespace Ocore.desktop.Services
                                 double.IsInfinity(packageQuantity))
                                 throw new InvalidOperationException("كمية البيع غير صحيحة.");
 
-                            // التحقق من اكتمال التوزيع اليدوي قبل تجهيز الفاتورة.
                             ValidateBatchAllocations(
                                 item,
                                 packageQuantity,
@@ -362,7 +367,6 @@ namespace Ocore.desktop.Services
                                 GeneralDiscountCents = 0
                             });
 
-                            // جمع إجمالي كل صنف مرة واحدة فقط.
                             subtotal += lineTotal;
 
                             if (double.IsNaN(subtotal) ||
@@ -388,8 +392,6 @@ namespace Ocore.desktop.Services
                             throw new InvalidOperationException(
                                 "إجمالي الخصومات اليدوية غير صحيح.");
 
-                        // الخصم النسبي يُحسب على صافي الفاتورة
-                        // بعد الخصومات اليدوية، وليس على الإجمالي الأصلي.
                         double requestedGeneralDiscount;
 
                         if (string.Equals(
@@ -426,6 +428,49 @@ namespace Ocore.desktop.Services
                             discountValue,
                             requestedGeneralDiscountCents);
 
+                        // حساب الضريبة بعد تطبيق الخصومات.
+                        var taxCalculationService = new TaxCalculationService();
+
+                        decimal invoiceTaxableAmount = 0m;
+                        decimal invoiceVatAmount = 0m;
+                        decimal invoiceScheduleTaxAmount = 0m;
+
+                        foreach (var line in preparedItems)
+                        {
+                            long finalDiscountCents =
+                                line.ItemDiscountCents + line.GeneralDiscountCents;
+
+                            long amountAfterDiscountCents =
+                                line.LineTotalCents - finalDiscountCents;
+
+                            if (amountAfterDiscountCents < 0)
+                                throw new InvalidOperationException(
+                                    "المبلغ بعد الخصم غير صحيح للصنف " +
+                                    line.Product.Name + ".");
+
+                            line.TaxResult = taxCalculationService.CalculateLine(
+                                connection,
+                                transaction,
+                                line.Product.TaxProfileId,
+                                line.Product.TaxPriceMode,
+                                FromMoneyCents(amountAfterDiscountCents),
+                                invoiceDate);
+
+                            if (line.TaxResult == null)
+                                throw new InvalidOperationException(
+                                    "تعذر حساب الضريبة للصنف " +
+                                    line.Product.Name + ".");
+
+                            invoiceTaxableAmount +=
+                                line.TaxResult.TaxableAmount;
+
+                            invoiceVatAmount +=
+                                line.TaxResult.VatAmount;
+
+                            invoiceScheduleTaxAmount +=
+                                line.TaxResult.ScheduleTaxAmount;
+                        }
+
                         bool hasAnyDiscount = false;
                         long totalItemDiscountCents = 0;
                         long totalGeneralDiscountCents = 0;
@@ -459,8 +504,11 @@ namespace Ocore.desktop.Services
                         double discountAmount =
                             FromMoneyCents(totalDiscountCents);
 
-                        double netTotal = FromMoneyCents(
-                            subtotalCents - totalDiscountCents);
+                        decimal invoiceTaxTotal =
+                            invoiceVatAmount + invoiceScheduleTaxAmount;
+
+                        double netTotal = RoundMoney(
+                            (double)(invoiceTaxableAmount + invoiceTaxTotal));
 
                         double cashPaymentAmount = 0;
                         double cardPaymentAmount = 0;
@@ -585,21 +633,34 @@ namespace Ocore.desktop.Services
                                     "الخصم النهائي للصنف " + line.Product.Name +
                                     " تجاوز الحد الأقصى المسموح به.");
 
+                            if (line.TaxResult == null)
+                                throw new InvalidOperationException(
+                                    "لم يتم حساب ضريبة الصنف " +
+                                    line.Product.Name + ".");
+
                             long invoiceItemId;
 
                             using (var command = new SQLiteCommand(
                                 @"INSERT INTO SalesInvoiceItems
-                                  (
-                                      InvoiceId, ProductId, ItemName, UnitName,
-                                      Quantity, UnitPrice, Total, PackageQuantity,
-                                      DiscountPercentage, DiscountAmount
-                                  )
-                                  VALUES
-                                  (
-                                      @invoiceId, @productId, @name, @unitName,
-                                      @quantity, @price, @total, @packageQuantity,
-                                      @discountPercentage, @discountAmount
-                                  );",
+                          (
+                              InvoiceId, ProductId, ItemName, UnitName,
+                              Quantity, UnitPrice, Total, PackageQuantity,
+                              DiscountPercentage, DiscountAmount,
+                              TaxProfileId, TaxProfileCode, TaxProfileName,
+                              TaxType, TaxRate, TaxPriceMode,
+                              TaxableAmount, VatAmount, ScheduleTaxAmount,
+                              TaxStatus
+                          )
+                          VALUES
+                          (
+                              @invoiceId, @productId, @name, @unitName,
+                              @quantity, @price, @total, @packageQuantity,
+                              @discountPercentage, @discountAmount,
+                              @taxProfileId, @taxProfileCode, @taxProfileName,
+                              @taxType, @taxRate, @taxPriceMode,
+                              @taxableAmount, @vatAmount, @scheduleTaxAmount,
+                              'Calculated'
+                          );",
                                 connection, transaction))
                             {
                                 command.Parameters.AddWithValue("@invoiceId", invoiceId);
@@ -615,6 +676,29 @@ namespace Ocore.desktop.Services
                                     "@discountPercentage", manualDiscountPercentage);
                                 command.Parameters.AddWithValue(
                                     "@discountAmount", finalDiscountAmount);
+
+                                command.Parameters.AddWithValue(
+                                    "@taxProfileId", line.TaxResult.TaxProfileId);
+                                command.Parameters.AddWithValue(
+                                    "@taxProfileCode", line.TaxResult.TaxProfileCode);
+                                command.Parameters.AddWithValue(
+                                    "@taxProfileName", line.TaxResult.TaxProfileName);
+                                command.Parameters.AddWithValue(
+                                    "@taxType", line.TaxResult.TaxType);
+                                command.Parameters.AddWithValue(
+                                    "@taxRate", (double)line.TaxResult.TaxRate);
+                                command.Parameters.AddWithValue(
+                                    "@taxPriceMode", line.TaxResult.TaxPriceMode);
+                                command.Parameters.AddWithValue(
+                                    "@taxableAmount",
+                                    (double)line.TaxResult.TaxableAmount);
+                                command.Parameters.AddWithValue(
+                                    "@vatAmount",
+                                    (double)line.TaxResult.VatAmount);
+                                command.Parameters.AddWithValue(
+                                    "@scheduleTaxAmount",
+                                    (double)line.TaxResult.ScheduleTaxAmount);
+
                                 command.ExecuteNonQuery();
                             }
 
@@ -622,6 +706,73 @@ namespace Ocore.desktop.Services
                                 "SELECT last_insert_rowid();", connection, transaction))
                             {
                                 invoiceItemId = Convert.ToInt64(command.ExecuteScalar());
+                            }
+
+                            // حفظ المكونات الضريبية بالتفصيل كما حُسبت وقت البيع.
+                            foreach (var component in line.TaxResult.Components)
+                            {
+                                using (var command = new SQLiteCommand(
+                                    @"INSERT INTO SalesInvoiceItemTaxComponents
+                              (
+                                  InvoiceItemId, TaxProfileRateId,
+                                  ComponentCode, ComponentName,
+                                  ComponentType, RatePercent,
+                                  CalculationOrder, IsCompound,
+                                  TaxableBase, TaxAmount
+                              )
+                              VALUES
+                              (
+                                  @invoiceItemId, @rateId,
+                                  @componentCode, @componentName,
+                                  @componentType, @ratePercent,
+                                  @calculationOrder, @isCompound,
+                                  @taxableBase, @taxAmount
+                              );",
+                                    connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue(
+                                        "@invoiceItemId", invoiceItemId);
+
+                                    command.Parameters.AddWithValue(
+                                        "@rateId",
+                                        component.RateId > 0
+                                            ? (object)component.RateId
+                                            : DBNull.Value);
+
+                                    command.Parameters.AddWithValue(
+                                        "@componentCode",
+                                        component.ComponentCode ?? string.Empty);
+
+                                    command.Parameters.AddWithValue(
+                                        "@componentName",
+                                        component.ComponentName ?? string.Empty);
+
+                                    command.Parameters.AddWithValue(
+                                        "@componentType",
+                                        component.ComponentType ?? string.Empty);
+
+                                    command.Parameters.AddWithValue(
+                                        "@ratePercent",
+                                        (double)component.RatePercent);
+
+                                    command.Parameters.AddWithValue(
+                                        "@calculationOrder",
+                                        component.CalculationOrder);
+
+                                    command.Parameters.AddWithValue(
+                                        "@isCompound",
+                                        component.IsCompound ? 1 : 0);
+
+                                    command.Parameters.AddWithValue(
+                                        "@taxableBase",
+                                        (double)component.TaxableBase);
+
+                                    command.Parameters.AddWithValue(
+                                        "@taxAmount",
+                                        (double)component.TaxAmount);
+
+                                    command.ExecuteNonQuery();
+                                }
                             }
 
                             // الخصم من التشغيلات التي حددها المستخدم فقط.
@@ -636,18 +787,23 @@ namespace Ocore.desktop.Services
 
                         using (var command = new SQLiteCommand(
                             @"UPDATE SalesInvoices
-                              SET
-                                  CustomerId = @customerId,
-                                  Subtotal = @subtotal,
-                                  DiscountType = @discountType,
-                                  DiscountValue = @discountValue,
-                                  DiscountAmount = @discountAmount,
-                                  NetTotal = @netTotal,
-                                  PaidAmount = @paidAmount,
-                                  RemainingAmount = @remainingAmount,
-                                  PaymentStatus = @paymentStatus,
-                                  Total = @netTotal
-                              WHERE Id = @id;",
+                      SET
+                          CustomerId = @customerId,
+                          Subtotal = @subtotal,
+                          DiscountType = @discountType,
+                          DiscountValue = @discountValue,
+                          DiscountAmount = @discountAmount,
+                          NetTotal = @netTotal,
+                          PaidAmount = @paidAmount,
+                          RemainingAmount = @remainingAmount,
+                          PaymentStatus = @paymentStatus,
+                          Total = @netTotal,
+                          TaxableAmount = @taxableAmount,
+                          VatAmount = @vatAmount,
+                          ScheduleTaxAmount = @scheduleTaxAmount,
+                          TaxTotal = @taxTotal,
+                          TaxStatus = 'Calculated'
+                      WHERE Id = @id;",
                             connection, transaction))
                         {
                             command.Parameters.AddWithValue(
@@ -663,6 +819,16 @@ namespace Ocore.desktop.Services
                             command.Parameters.AddWithValue("@paidAmount", paidAmount);
                             command.Parameters.AddWithValue("@remainingAmount", remainingAmount);
                             command.Parameters.AddWithValue("@paymentStatus", paymentStatus);
+
+                            command.Parameters.AddWithValue(
+                                "@taxableAmount", (double)invoiceTaxableAmount);
+                            command.Parameters.AddWithValue(
+                                "@vatAmount", (double)invoiceVatAmount);
+                            command.Parameters.AddWithValue(
+                                "@scheduleTaxAmount", (double)invoiceScheduleTaxAmount);
+                            command.Parameters.AddWithValue(
+                                "@taxTotal", (double)invoiceTaxTotal);
+
                             command.Parameters.AddWithValue("@id", invoiceId);
                             command.ExecuteNonQuery();
                         }
@@ -708,17 +874,17 @@ namespace Ocore.desktop.Services
                         {
                             using (var command = new SQLiteCommand(
                                 @"INSERT INTO CustomerAccountTransactions
-                                  (
-                                      CustomerId, TransactionType, Amount,
-                                      ReferenceType, ReferenceId, PaymentMethod,
-                                      ReferenceNumber, Notes, UserId, CreatedAt
-                                  )
-                                  VALUES
-                                  (
-                                      @customerId, 'SaleInvoice', @amount,
-                                      'SalesInvoice', @invoiceId, '',
-                                      '', @notes, @userId, @createdAt
-                                  );",
+                          (
+                              CustomerId, TransactionType, Amount,
+                              ReferenceType, ReferenceId, PaymentMethod,
+                              ReferenceNumber, Notes, UserId, CreatedAt
+                          )
+                          VALUES
+                          (
+                              @customerId, 'SaleInvoice', @amount,
+                              'SalesInvoice', @invoiceId, '',
+                              '', @notes, @userId, @createdAt
+                          );",
                                 connection, transaction))
                             {
                                 command.Parameters.AddWithValue("@customerId", customerId.Value);
@@ -1270,6 +1436,7 @@ namespace Ocore.desktop.Services
                     "يجب اختيار طريقة دفع صحيحة للمبلغ المدفوع.");
         }
 
+
         public SaleInvoiceDetails GetInvoiceByNumber(
             int userId,
             string invoiceNumber)
@@ -1286,18 +1453,37 @@ namespace Ocore.desktop.Services
 
                 var details = new SaleInvoiceDetails();
 
+                // ==========================================
+                // تحميل بيانات الفاتورة وإجماليات الضرائب
+                // ==========================================
+
                 using (var command = new SQLiteCommand(
                     @"SELECT
-                          si.Id, si.InvoiceNumber, si.Total, si.Status,
-                          si.CreatedAt, si.Subtotal, si.DiscountType,
-                          si.DiscountValue, si.DiscountAmount, si.NetTotal,
-                          si.PaidAmount, si.RemainingAmount, si.PaymentStatus,
-                          u.FullName, COALESCE(c.Name, '') AS CustomerName
-                      FROM SalesInvoices si
-                      INNER JOIN Users u ON u.Id = si.UserId
-                      LEFT JOIN Customers c ON c.Id = si.CustomerId
-                      WHERE si.InvoiceNumber = @number
-                      LIMIT 1;",
+                  si.Id,
+                  si.InvoiceNumber,
+                  si.Total,
+                  si.Status,
+                  si.CreatedAt,
+                  si.Subtotal,
+                  si.DiscountType,
+                  si.DiscountValue,
+                  si.DiscountAmount,
+                  si.NetTotal,
+                  si.PaidAmount,
+                  si.RemainingAmount,
+                  si.PaymentStatus,
+                  si.TaxableAmount,
+                  si.VatAmount,
+                  si.ScheduleTaxAmount,
+                  si.TaxTotal,
+                  si.TaxStatus,
+                  u.FullName,
+                  COALESCE(c.Name, '') AS CustomerName
+              FROM SalesInvoices si
+              INNER JOIN Users u ON u.Id = si.UserId
+              LEFT JOIN Customers c ON c.Id = si.CustomerId
+              WHERE si.InvoiceNumber = @number
+              LIMIT 1;",
                     connection))
                 {
                     command.Parameters.AddWithValue("@number", invoiceNumber);
@@ -1313,36 +1499,90 @@ namespace Ocore.desktop.Services
                         details.Status = reader["Status"].ToString();
                         details.EmployeeName = reader["FullName"].ToString();
                         details.CustomerName = reader["CustomerName"].ToString();
-                        details.Subtotal = ReadDouble(reader["Subtotal"], details.Total);
+
+                        details.Subtotal =
+                            ReadDouble(reader["Subtotal"], details.Total);
+
                         details.DiscountType =
                             reader["DiscountType"] == DBNull.Value
                                 ? string.Empty
                                 : reader["DiscountType"].ToString();
-                        details.DiscountValue = ReadDouble(reader["DiscountValue"], 0);
-                        details.DiscountAmount = ReadDouble(reader["DiscountAmount"], 0);
-                        details.NetTotal = ReadDouble(reader["NetTotal"], details.Total);
-                        details.PaidAmount = ReadDouble(reader["PaidAmount"], 0);
-                        details.RemainingAmount = ReadDouble(reader["RemainingAmount"], 0);
+
+                        details.DiscountValue =
+                            ReadDouble(reader["DiscountValue"], 0);
+
+                        details.DiscountAmount =
+                            ReadDouble(reader["DiscountAmount"], 0);
+
+                        details.NetTotal =
+                            ReadDouble(reader["NetTotal"], details.Total);
+
+                        details.PaidAmount =
+                            ReadDouble(reader["PaidAmount"], 0);
+
+                        details.RemainingAmount =
+                            ReadDouble(reader["RemainingAmount"], 0);
+
                         details.PaymentStatus =
                             reader["PaymentStatus"] == DBNull.Value
                                 ? "Legacy"
                                 : reader["PaymentStatus"].ToString();
-                        details.CreatedAt = ParseDate(reader["CreatedAt"].ToString());
+
+                        details.CreatedAt =
+                            ParseDate(reader["CreatedAt"].ToString());
+
+                        // إجماليات الضرائب المحفوظة وقت إصدار الفاتورة
+                        details.TaxableAmount =
+                            ReadDouble(reader["TaxableAmount"], 0);
+
+                        details.VatAmount =
+                            ReadDouble(reader["VatAmount"], 0);
+
+                        details.ScheduleTaxAmount =
+                            ReadDouble(reader["ScheduleTaxAmount"], 0);
+
+                        details.TaxTotal =
+                            ReadDouble(reader["TaxTotal"], 0);
+
+                        details.TaxStatus =
+                            reader["TaxStatus"] == DBNull.Value
+                                ? "Legacy"
+                                : reader["TaxStatus"].ToString();
                     }
                 }
 
-                // تحميل بنود الفاتورة مع الاحتفاظ بمعرف كل بند
-                // لربط التشغيلات المصروفة به.
+                // ==========================================
+                // تحميل بنود الفاتورة والبيانات الضريبية
+                // ==========================================
+
                 var invoiceItemsById =
                     new Dictionary<int, SaleInvoiceItem>();
 
                 using (var command = new SQLiteCommand(
-                    @"SELECT Id, ProductId, ItemName, UnitName, Quantity,
-                             UnitPrice, Total, PackageQuantity,
-                             DiscountPercentage, DiscountAmount
-                      FROM SalesInvoiceItems
-                      WHERE InvoiceId = @invoiceId
-                      ORDER BY Id ASC;",
+                    @"SELECT
+                  Id,
+                  ProductId,
+                  ItemName,
+                  UnitName,
+                  Quantity,
+                  UnitPrice,
+                  Total,
+                  PackageQuantity,
+                  DiscountPercentage,
+                  DiscountAmount,
+                  TaxProfileId,
+                  TaxProfileCode,
+                  TaxProfileName,
+                  TaxType,
+                  TaxPriceMode,
+                  TaxRate,
+                  TaxableAmount,
+                  VatAmount,
+                  ScheduleTaxAmount,
+                  TaxStatus
+              FROM SalesInvoiceItems
+              WHERE InvoiceId = @invoiceId
+              ORDER BY Id ASC;",
                     connection))
                 {
                     command.Parameters.AddWithValue("@invoiceId", details.Id);
@@ -1354,41 +1594,120 @@ namespace Ocore.desktop.Services
                             int invoiceItemId =
                                 Convert.ToInt32(reader["Id"]);
 
+                            int? taxProfileId =
+                                reader["TaxProfileId"] == DBNull.Value
+                                    ? (int?)null
+                                    : Convert.ToInt32(reader["TaxProfileId"]);
+
                             var invoiceItem = new SaleInvoiceItem
                             {
                                 InvoiceItemId = invoiceItemId,
-                                ProductId = Convert.ToInt32(reader["ProductId"]),
-                                ItemName = reader["ItemName"].ToString(),
-                                UnitName = reader["UnitName"].ToString(),
-                                Quantity = Convert.ToDouble(reader["Quantity"]),
-                                UnitPrice = Convert.ToDouble(reader["UnitPrice"]),
-                                Total = Convert.ToDouble(reader["Total"]),
-                                PackageQuantity = Convert.ToDouble(reader["PackageQuantity"]),
-                                DiscountPercentage = ReadDouble(reader["DiscountPercentage"], 0),
-                                DiscountAmount = ReadDouble(reader["DiscountAmount"], 0)
+
+                                ProductId =
+                                    Convert.ToInt32(reader["ProductId"]),
+
+                                ItemName =
+                                    reader["ItemName"].ToString(),
+
+                                UnitName =
+                                    reader["UnitName"].ToString(),
+
+                                Quantity =
+                                    ReadDouble(reader["Quantity"], 0),
+
+                                UnitPrice =
+                                    ReadDouble(reader["UnitPrice"], 0),
+
+                                Total =
+                                    ReadDouble(reader["Total"], 0),
+
+                                PackageQuantity =
+                                    ReadDouble(reader["PackageQuantity"], 0),
+
+                                DiscountPercentage =
+                                    ReadDouble(reader["DiscountPercentage"], 0),
+
+                                DiscountAmount =
+                                    ReadDouble(reader["DiscountAmount"], 0),
+
+                                // بيانات التصنيف الضريبي وقت البيع
+                                TaxProfileId = taxProfileId,
+
+                                TaxProfileCode =
+                                    reader["TaxProfileCode"] == DBNull.Value
+                                        ? string.Empty
+                                        : reader["TaxProfileCode"].ToString(),
+
+                                TaxProfileName =
+                                    reader["TaxProfileName"] == DBNull.Value
+                                        ? string.Empty
+                                        : reader["TaxProfileName"].ToString(),
+
+                                TaxType =
+                                    reader["TaxType"] == DBNull.Value
+                                        ? string.Empty
+                                        : reader["TaxType"].ToString(),
+
+                                TaxPriceMode =
+                                    reader["TaxPriceMode"] == DBNull.Value
+                                        ? string.Empty
+                                        : reader["TaxPriceMode"].ToString(),
+
+                                TaxRate =
+                                    ReadDouble(reader["TaxRate"], 0),
+
+                                TaxableAmount =
+                                    ReadDouble(reader["TaxableAmount"], 0),
+
+                                VatAmount =
+                                    ReadDouble(reader["VatAmount"], 0),
+
+                                ScheduleTaxAmount =
+                                    ReadDouble(reader["ScheduleTaxAmount"], 0),
+
+                                TaxTotal =
+                                    ReadDouble(reader["VatAmount"], 0) +
+                                    ReadDouble(reader["ScheduleTaxAmount"], 0),
+
+                                TaxStatus =
+                                    reader["TaxStatus"] == DBNull.Value
+                                        ? "Legacy"
+                                        : reader["TaxStatus"].ToString()
                             };
 
                             details.Items.Add(invoiceItem);
-                            invoiceItemsById.Add(invoiceItemId, invoiceItem);
+
+                            invoiceItemsById.Add(
+                                invoiceItemId,
+                                invoiceItem);
                         }
                     }
                 }
 
-                // تحميل التشغيلات والكميات المصروفة لكل بند.
+                // ==========================================
+                // تحميل مكونات الضرائب لكل بند
+                // ==========================================
+
                 using (var command = new SQLiteCommand(
                     @"SELECT
-                          a.InvoiceItemId,
-                          a.BatchId,
-                          a.Quantity,
-                          COALESCE(b.BatchNumber, '') AS BatchNumber,
-                          COALESCE(b.ExpiryDate, '') AS ExpiryDate
-                      FROM SalesInvoiceBatchAllocations a
-                      INNER JOIN SalesInvoiceItems i
-                          ON i.Id = a.InvoiceItemId
-                      LEFT JOIN Batches b
-                          ON b.Id = a.BatchId
-                      WHERE i.InvoiceId = @invoiceId
-                      ORDER BY a.Id ASC;",
+                  InvoiceItemId,
+                  TaxProfileRateId,
+                  ComponentCode,
+                  ComponentName,
+                  ComponentType,
+                  RatePercent,
+                  CalculationOrder,
+                  IsCompound,
+                  TaxableBase,
+                  TaxAmount
+              FROM SalesInvoiceItemTaxComponents
+              WHERE InvoiceItemId IN
+                  (
+                      SELECT Id
+                      FROM SalesInvoiceItems
+                      WHERE InvoiceId = @invoiceId
+                  )
+              ORDER BY InvoiceItemId ASC, CalculationOrder ASC, Id ASC;",
                     connection))
                 {
                     command.Parameters.AddWithValue("@invoiceId", details.Id);
@@ -1403,34 +1722,72 @@ namespace Ocore.desktop.Services
                             SaleInvoiceItem invoiceItem;
 
                             if (!invoiceItemsById.TryGetValue(
-                                invoiceItemId, out invoiceItem))
+                                invoiceItemId,
+                                out invoiceItem))
+                            {
                                 continue;
+                            }
 
-                            invoiceItem.BatchAllocations.Add(
-                                new SaleInvoiceBatchAllocation
+                            invoiceItem.TaxComponents.Add(
+                                new SaleInvoiceItemTaxComponent
                                 {
-                                    BatchId = Convert.ToInt32(reader["BatchId"]),
-                                    BatchNumber =
-                                        reader["BatchNumber"] == DBNull.Value
+                                    RateId =
+    reader["TaxProfileRateId"] == DBNull.Value
+        ? 0
+        : Convert.ToInt32(reader["TaxProfileRateId"]),
+                                    ComponentCode =
+                                        reader["ComponentCode"] == DBNull.Value
                                             ? string.Empty
-                                            : reader["BatchNumber"].ToString(),
-                                    ExpiryDate =
-                                        reader["ExpiryDate"] == DBNull.Value
+                                            : reader["ComponentCode"].ToString(),
+
+                                    ComponentName =
+                                        reader["ComponentName"] == DBNull.Value
                                             ? string.Empty
-                                            : reader["ExpiryDate"].ToString(),
-                                    AllocatedQuantity =
-                                        ReadDouble(reader["Quantity"], 0)
+                                            : reader["ComponentName"].ToString(),
+
+                                    ComponentType =
+                                        reader["ComponentType"] == DBNull.Value
+                                            ? string.Empty
+                                            : reader["ComponentType"].ToString(),
+
+                                    RatePercent =
+                                        ReadDouble(reader["RatePercent"], 0),
+
+                                    CalculationOrder =
+    reader["CalculationOrder"] == DBNull.Value
+        ? 0
+        : Convert.ToInt32(reader["CalculationOrder"]),
+                                    IsCompound =
+    reader["IsCompound"] != DBNull.Value &&
+    Convert.ToInt32(reader["IsCompound"]) != 0,
+                                    TaxableBase =
+                                        ReadDouble(reader["TaxableBase"], 0),
+
+                                    TaxAmount =
+                                        ReadDouble(reader["TaxAmount"], 0)
                                 });
                         }
                     }
                 }
 
+                // ==========================================
+                // تحميل التشغيلات والكميات المصروفة لكل بند
+                // ==========================================
+
                 using (var command = new SQLiteCommand(
-                    @"SELECT Id, PaymentMethod, Amount, ReferenceNumber,
-                             Notes, CreatedAt
-                      FROM SalesInvoicePayments
-                      WHERE InvoiceId = @invoiceId
-                      ORDER BY Id ASC;",
+                    @"SELECT
+                  a.InvoiceItemId,
+                  a.BatchId,
+                  a.Quantity,
+                  COALESCE(b.BatchNumber, '') AS BatchNumber,
+                  COALESCE(b.ExpiryDate, '') AS ExpiryDate
+              FROM SalesInvoiceBatchAllocations a
+              INNER JOIN SalesInvoiceItems i
+                  ON i.Id = a.InvoiceItemId
+              LEFT JOIN Batches b
+                  ON b.Id = a.BatchId
+              WHERE i.InvoiceId = @invoiceId
+              ORDER BY a.Id ASC;",
                     connection))
                 {
                     command.Parameters.AddWithValue("@invoiceId", details.Id);
@@ -1439,24 +1796,91 @@ namespace Ocore.desktop.Services
                     {
                         while (reader.Read())
                         {
-                            details.Payments.Add(new SaleInvoicePaymentDetails
+                            int invoiceItemId =
+                                Convert.ToInt32(reader["InvoiceItemId"]);
+
+                            SaleInvoiceItem invoiceItem;
+
+                            if (!invoiceItemsById.TryGetValue(
+                                invoiceItemId,
+                                out invoiceItem))
                             {
-                                Id = Convert.ToInt64(reader["Id"]),
-                                PaymentMethod =
-                                    reader["PaymentMethod"] == DBNull.Value
-                                        ? string.Empty
-                                        : reader["PaymentMethod"].ToString(),
-                                Amount = ReadDouble(reader["Amount"], 0),
-                                ReferenceNumber =
-                                    reader["ReferenceNumber"] == DBNull.Value
-                                        ? string.Empty
-                                        : reader["ReferenceNumber"].ToString(),
-                                Notes =
-                                    reader["Notes"] == DBNull.Value
-                                        ? string.Empty
-                                        : reader["Notes"].ToString(),
-                                CreatedAt = ParseDate(reader["CreatedAt"].ToString())
-                            });
+                                continue;
+                            }
+
+                            invoiceItem.BatchAllocations.Add(
+                                new SaleInvoiceBatchAllocation
+                                {
+                                    BatchId =
+                                        Convert.ToInt32(reader["BatchId"]),
+
+                                    BatchNumber =
+                                        reader["BatchNumber"] == DBNull.Value
+                                            ? string.Empty
+                                            : reader["BatchNumber"].ToString(),
+
+                                    ExpiryDate =
+                                        reader["ExpiryDate"] == DBNull.Value
+                                            ? string.Empty
+                                            : reader["ExpiryDate"].ToString(),
+
+                                    AllocatedQuantity =
+                                        ReadDouble(reader["Quantity"], 0)
+                                });
+                        }
+                    }
+                }
+
+                // ==========================================
+                // تحميل المدفوعات
+                // ==========================================
+
+                using (var command = new SQLiteCommand(
+                    @"SELECT
+                  Id,
+                  PaymentMethod,
+                  Amount,
+                  ReferenceNumber,
+                  Notes,
+                  CreatedAt
+              FROM SalesInvoicePayments
+              WHERE InvoiceId = @invoiceId
+              ORDER BY Id ASC;",
+                    connection))
+                {
+                    command.Parameters.AddWithValue("@invoiceId", details.Id);
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            details.Payments.Add(
+                                new SaleInvoicePaymentDetails
+                                {
+                                    Id =
+                                        Convert.ToInt64(reader["Id"]),
+
+                                    PaymentMethod =
+                                        reader["PaymentMethod"] == DBNull.Value
+                                            ? string.Empty
+                                            : reader["PaymentMethod"].ToString(),
+
+                                    Amount =
+                                        ReadDouble(reader["Amount"], 0),
+
+                                    ReferenceNumber =
+                                        reader["ReferenceNumber"] == DBNull.Value
+                                            ? string.Empty
+                                            : reader["ReferenceNumber"].ToString(),
+
+                                    Notes =
+                                        reader["Notes"] == DBNull.Value
+                                            ? string.Empty
+                                            : reader["Notes"].ToString(),
+
+                                    CreatedAt =
+                                        ParseDate(reader["CreatedAt"].ToString())
+                                });
                         }
                     }
                 }
@@ -1687,11 +2111,12 @@ namespace Ocore.desktop.Services
         {
             using (var command = new SQLiteCommand(
                 @"SELECT
-                      Id, Name, UnitName, SmallUnitName,
-                      UnitsPerPackage, SalePrice, IsArchived,
-                      MaxDiscountPercentage
-                  FROM Products
-                  WHERE Id = @id;",
+              Id, Name, UnitName, SmallUnitName,
+              UnitsPerPackage, SalePrice, IsArchived,
+              MaxDiscountPercentage,
+              TaxProfileId, TaxPriceMode
+          FROM Products
+          WHERE Id = @id;",
                 connection, transaction))
             {
                 command.Parameters.AddWithValue("@id", productId);
@@ -1710,13 +2135,23 @@ namespace Ocore.desktop.Services
                         UnitsPerPackage = Convert.ToInt32(reader["UnitsPerPackage"]),
                         SalePrice = Convert.ToDouble(reader["SalePrice"]),
                         IsArchived = Convert.ToInt32(reader["IsArchived"]) == 1,
+
                         MaxDiscountPercentage =
-                            ReadDouble(reader["MaxDiscountPercentage"], 0)
+                            ReadDouble(reader["MaxDiscountPercentage"], 0),
+
+                        TaxProfileId =
+                            reader["TaxProfileId"] == DBNull.Value
+                                ? (int?)null
+                                : Convert.ToInt32(reader["TaxProfileId"]),
+
+                        TaxPriceMode =
+                            reader["TaxPriceMode"] == DBNull.Value
+                                ? "Exclusive"
+                                : reader["TaxPriceMode"].ToString()
                     };
                 }
             }
         }
-
         private void WriteAuditLog(
             SQLiteConnection connection,
             SQLiteTransaction transaction,
@@ -1770,6 +2205,8 @@ namespace Ocore.desktop.Services
 
         private class ProductSaleInfo
         {
+            public int? TaxProfileId { get; set; }
+            public string TaxPriceMode { get; set; }
             public int Id { get; set; }
             public string Name { get; set; }
             public string UnitName { get; set; }
@@ -1782,6 +2219,7 @@ namespace Ocore.desktop.Services
 
         private class PreparedSaleLine
         {
+            public TaxCalculationResult TaxResult { get; set; }
             public ProductSaleInfo Product { get; set; }
             public SaleInvoiceItem OriginalItem { get; set; }
             public string UnitName { get; set; }

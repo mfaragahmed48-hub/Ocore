@@ -22,6 +22,10 @@ namespace Ocore.desktop.Data
                         connection,
                         transaction);
 
+                    CreateReturnTaxComponentTable(
+                        connection,
+                        transaction);
+
                     EnsureColumns(
                         connection,
                         transaction,
@@ -131,6 +135,7 @@ namespace Ocore.desktop.Data
                         "SalesReturns",
                         new Dictionary<string, string>
                         {
+                            { "DiscountAmount", "REAL NOT NULL DEFAULT 0" },
                             { "TaxableAmount", "REAL NOT NULL DEFAULT 0" },
                             { "VatAmount", "REAL NOT NULL DEFAULT 0" },
                             {
@@ -150,6 +155,7 @@ namespace Ocore.desktop.Data
                         "SalesReturnItems",
                         new Dictionary<string, string>
                         {
+                            { "DiscountAmount", "REAL NOT NULL DEFAULT 0" },
                             { "TaxableAmount", "REAL NOT NULL DEFAULT 0" },
                             { "VatAmount", "REAL NOT NULL DEFAULT 0" },
                             {
@@ -167,8 +173,7 @@ namespace Ocore.desktop.Data
                             connection,
                             transaction);
 
-                    // الأصناف الموجودة قبل تفعيل النظام لا يتم تصنيفها
-                    // تلقائيًا كمعفاة أو خاضعة لنسبة معينة.
+                    // الأصناف القديمة تظل غير مصنفة ضريبيًا.
                     using (var command = new SQLiteCommand(
                         @"UPDATE Products
                           SET TaxProfileId = @ProfileId
@@ -320,6 +325,51 @@ CREATE TABLE IF NOT EXISTS SalesInvoiceItemTaxComponents
 
 CREATE INDEX IF NOT EXISTS IX_SalesInvoiceItemTaxComponents_InvoiceItemId
 ON SalesInvoiceItemTaxComponents(InvoiceItemId);
+
+";
+
+            using (var command = new SQLiteCommand(
+                sql,
+                connection,
+                transaction))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateReturnTaxComponentTable(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction)
+        {
+            string sql = @"
+
+CREATE TABLE IF NOT EXISTS SalesReturnItemTaxComponents
+(
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    ReturnItemId INTEGER NOT NULL,
+
+    TaxProfileRateId INTEGER NULL,
+
+    ComponentCode TEXT NOT NULL DEFAULT '',
+    ComponentName TEXT NOT NULL DEFAULT '',
+    ComponentType TEXT NOT NULL DEFAULT 'VAT',
+
+    RatePercent REAL NOT NULL DEFAULT 0,
+
+    CalculationOrder INTEGER NOT NULL DEFAULT 1,
+    IsCompound INTEGER NOT NULL DEFAULT 0,
+
+    TaxableBase REAL NOT NULL DEFAULT 0,
+    TaxAmount REAL NOT NULL DEFAULT 0,
+
+    FOREIGN KEY (ReturnItemId)
+        REFERENCES SalesReturnItems(Id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS IX_SalesReturnItemTaxComponents_ReturnItemId
+ON SalesReturnItemTaxComponents(ReturnItemId);
 
 ";
 

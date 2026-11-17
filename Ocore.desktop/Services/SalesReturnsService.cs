@@ -519,6 +519,8 @@ namespace Ocore.desktop.Services
             int invoiceItemId,
             int invoiceId)
         {
+            InvoiceReturnInfo info;
+
             using (var command = new SQLiteCommand(@"
                 SELECT
                     sii.Id,
@@ -528,6 +530,11 @@ namespace Ocore.desktop.Services
                     sii.Quantity,
                     sii.UnitPrice,
                     sii.PackageQuantity,
+                    COALESCE(sii.DiscountAmount, 0) AS DiscountAmount,
+                    COALESCE(sii.TaxableAmount, 0) AS TaxableAmount,
+                    COALESCE(sii.VatAmount, 0) AS VatAmount,
+                    COALESCE(sii.ScheduleTaxAmount, 0) AS ScheduleTaxAmount,
+                    COALESCE(sii.TaxStatus, 'Legacy') AS TaxStatus,
                     COALESCE(p.UnitName, sii.UnitName) AS PackageUnitName,
                     COALESCE(p.SmallUnitName, '') AS SmallUnitName,
                     COALESCE(p.UnitsPerPackage, 0) AS UnitsPerPackage,
@@ -562,7 +569,7 @@ namespace Ocore.desktop.Services
                             "أحد الأصناف لا يتبع فاتورة البيع المحددة.");
                     }
 
-                    return new InvoiceReturnInfo
+                    info = new InvoiceReturnInfo
                     {
                         ProductId = Convert.ToInt32(reader["ProductId"]),
                         ItemName = Convert.ToString(reader["ItemName"]),
@@ -573,10 +580,77 @@ namespace Ocore.desktop.Services
                         OriginalUnitPrice = Convert.ToDouble(reader["UnitPrice"]),
                         OriginalPackageQuantity = Convert.ToDouble(reader["PackageQuantity"]),
                         UnitsPerPackage = Convert.ToDouble(reader["UnitsPerPackage"]),
-                        ReturnedPackageQuantity = Convert.ToDouble(reader["ReturnedPackageQuantity"])
+                        ReturnedPackageQuantity = Convert.ToDouble(reader["ReturnedPackageQuantity"]),
+                        OriginalDiscountAmount = Convert.ToDecimal(reader["DiscountAmount"]),
+                        OriginalTaxableAmount = Convert.ToDecimal(reader["TaxableAmount"]),
+                        OriginalVatAmount = Convert.ToDecimal(reader["VatAmount"]),
+                        OriginalScheduleTaxAmount = Convert.ToDecimal(reader["ScheduleTaxAmount"]),
+                        TaxStatus = Convert.ToString(reader["TaxStatus"]),
+                        TaxComponents = new List<InvoiceTaxComponentInfo>()
                     };
                 }
             }
+
+            info.TaxComponents = GetInvoiceTaxComponents(
+                connection,
+                transaction,
+                invoiceItemId);
+
+            return info;
+        }
+
+        private List<InvoiceTaxComponentInfo> GetInvoiceTaxComponents(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            int invoiceItemId)
+        {
+            var components = new List<InvoiceTaxComponentInfo>();
+
+            using (var command = new SQLiteCommand(@"
+                SELECT
+                    TaxProfileRateId,
+                    ComponentCode,
+                    ComponentName,
+                    ComponentType,
+                    RatePercent,
+                    CalculationOrder,
+                    IsCompound,
+                    TaxableBase,
+                    TaxAmount
+                FROM SalesInvoiceItemTaxComponents
+                WHERE InvoiceItemId = @InvoiceItemId
+                ORDER BY CalculationOrder, Id;",
+                connection, transaction))
+            {
+                command.Parameters.AddWithValue(
+                    "@InvoiceItemId", invoiceItemId);
+
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        components.Add(new InvoiceTaxComponentInfo
+                        {
+                            RateId =
+                                reader["TaxProfileRateId"] == DBNull.Value
+                                    ? 0
+                                    : Convert.ToInt32(reader["TaxProfileRateId"]),
+
+                            ComponentCode = Convert.ToString(reader["ComponentCode"]),
+                            ComponentName = Convert.ToString(reader["ComponentName"]),
+                            ComponentType = Convert.ToString(reader["ComponentType"]),
+                            RatePercent = Convert.ToDecimal(reader["RatePercent"]),
+                            CalculationOrder = Convert.ToInt32(reader["CalculationOrder"]),
+                            IsCompound =
+                                Convert.ToInt32(reader["IsCompound"]) != 0,
+                            TaxableBase = Convert.ToDecimal(reader["TaxableBase"]),
+                            TaxAmount = Convert.ToDecimal(reader["TaxAmount"])
+                        });
+                    }
+                }
+            }
+
+            return components;
         }
 
         private PreparedReturnItem PrepareReturnItem(
@@ -722,8 +796,301 @@ namespace Ocore.desktop.Services
                 ReturnUnitName = selectedUnit,
                 ReturnUnitQuantity = selectedQuantity,
                 ReturnUnitPrice = selectedUnitPrice,
-                Total = lineTotal
+                Total = lineTotal,
+                TaxComponents = new List<SalesReturnTaxComponent>()
             };
+        }
+
+        private void CalculateReturnTaxAndDiscount(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            PreparedReturnItem prepared,
+            InvoiceReturnInfo original)
+        {
+            decimal cumulativePackageQuantity =
+                Convert.ToDecimal(
+                    original.ReturnedPackageQuantity +
+                    prepared.PackageQuantity);
+
+            decimal originalPackageQuantity =
+                Convert.ToDecimal(original.OriginalPackageQuantity);
+
+            if (originalPackageQuantity <= 0)
+                throw new Exception("كمية الصنف الأصلية غير صحيحة.");
+
+            // الخصم يُسترد من قيمة الخصم الأصلية حتى للفواتير القديمة.
+            decimal previousDiscount = GetPreviousReturnedAmount(
+                connection,
+                transaction,
+                prepared.InvoiceItemId,
+                "DiscountAmount");
+
+            prepared.DiscountAmount = CalculateCumulativeAmount(
+                original.OriginalDiscountAmount,
+                originalPackageQuantity,
+                cumulativePackageQuantity,
+                previousDiscount);
+
+            bool hasCalculatedTax = string.Equals(
+                original.TaxStatus,
+                "Calculated",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (!hasCalculatedTax)
+            {
+                prepared.TaxableAmount = 0;
+                prepared.VatAmount = 0;
+                prepared.ScheduleTaxAmount = 0;
+                prepared.TaxStatus = "Legacy";
+                return;
+            }
+
+            decimal previousTaxable = GetPreviousReturnedAmount(
+                connection,
+                transaction,
+                prepared.InvoiceItemId,
+                "TaxableAmount");
+
+            decimal previousVat = GetPreviousReturnedAmount(
+                connection,
+                transaction,
+                prepared.InvoiceItemId,
+                "VatAmount");
+
+            decimal previousScheduleTax = GetPreviousReturnedAmount(
+                connection,
+                transaction,
+                prepared.InvoiceItemId,
+                "ScheduleTaxAmount");
+
+            prepared.TaxableAmount = CalculateCumulativeAmount(
+                original.OriginalTaxableAmount,
+                originalPackageQuantity,
+                cumulativePackageQuantity,
+                previousTaxable);
+
+            prepared.VatAmount = CalculateCumulativeAmount(
+                original.OriginalVatAmount,
+                originalPackageQuantity,
+                cumulativePackageQuantity,
+                previousVat);
+
+            prepared.ScheduleTaxAmount = CalculateCumulativeAmount(
+                original.OriginalScheduleTaxAmount,
+                originalPackageQuantity,
+                cumulativePackageQuantity,
+                previousScheduleTax);
+
+            prepared.TaxStatus = "Calculated";
+
+            foreach (var originalComponent in original.TaxComponents)
+            {
+                decimal previousComponentBase =
+                    GetPreviousReturnedComponentAmount(
+                        connection,
+                        transaction,
+                        prepared.InvoiceItemId,
+                        originalComponent,
+                        "TaxableBase");
+
+                decimal previousComponentTax =
+                    GetPreviousReturnedComponentAmount(
+                        connection,
+                        transaction,
+                        prepared.InvoiceItemId,
+                        originalComponent,
+                        "TaxAmount");
+
+                decimal returnedBase = CalculateCumulativeAmount(
+                    originalComponent.TaxableBase,
+                    originalPackageQuantity,
+                    cumulativePackageQuantity,
+                    previousComponentBase);
+
+                decimal returnedTax = CalculateCumulativeAmount(
+                    originalComponent.TaxAmount,
+                    originalPackageQuantity,
+                    cumulativePackageQuantity,
+                    previousComponentTax);
+
+                prepared.TaxComponents.Add(
+                    new SalesReturnTaxComponent
+                    {
+                        OriginalRateId = originalComponent.RateId,
+                        ComponentCode = originalComponent.ComponentCode,
+                        ComponentName = originalComponent.ComponentName,
+                        ComponentType = originalComponent.ComponentType,
+                        RatePercent = Convert.ToDouble(originalComponent.RatePercent),
+                        CalculationOrder = originalComponent.CalculationOrder,
+                        IsCompound = originalComponent.IsCompound,
+                        TaxableBase = Convert.ToDouble(returnedBase),
+                        TaxAmount = Convert.ToDouble(returnedTax)
+                    });
+            }
+        }
+
+        private decimal GetPreviousReturnedAmount(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            int invoiceItemId,
+            string columnName)
+        {
+            // أسماء الأعمدة هنا ثابتة ومحددة داخل الخدمة.
+            if (columnName != "DiscountAmount" &&
+                columnName != "TaxableAmount" &&
+                columnName != "VatAmount" &&
+                columnName != "ScheduleTaxAmount")
+            {
+                throw new ArgumentException(
+                    "اسم عمود المرتجع غير مسموح.",
+                    nameof(columnName));
+            }
+
+            string sql = @"
+                SELECT COALESCE(SUM(sri." + columnName + @"), 0)
+                FROM SalesReturnItems sri
+                INNER JOIN SalesReturns sr
+                    ON sr.Id = sri.ReturnId
+                WHERE sri.InvoiceItemId = @InvoiceItemId
+                  AND sr.Status = 'Completed';";
+
+            using (var command = new SQLiteCommand(
+                sql, connection, transaction))
+            {
+                command.Parameters.AddWithValue(
+                    "@InvoiceItemId", invoiceItemId);
+
+                object result = command.ExecuteScalar();
+
+                return result == null || result == DBNull.Value
+                    ? 0m
+                    : Convert.ToDecimal(result);
+            }
+        }
+
+        private decimal GetPreviousReturnedComponentAmount(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            int invoiceItemId,
+            InvoiceTaxComponentInfo component,
+            string columnName)
+        {
+            if (columnName != "TaxableBase" &&
+                columnName != "TaxAmount")
+            {
+                throw new ArgumentException(
+                    "اسم عمود مكون الضريبة غير مسموح.",
+                    nameof(columnName));
+            }
+
+            string matchCondition;
+
+            if (component.RateId > 0)
+            {
+                matchCondition =
+                    "rtc.TaxProfileRateId = @RateId";
+            }
+            else
+            {
+                matchCondition = @"
+                    rtc.TaxProfileRateId IS NULL
+                    AND rtc.ComponentCode = @ComponentCode
+                    AND rtc.ComponentType = @ComponentType
+                    AND rtc.CalculationOrder = @CalculationOrder";
+            }
+
+            string sql = @"
+                SELECT COALESCE(SUM(rtc." + columnName + @"), 0)
+                FROM SalesReturnItemTaxComponents rtc
+                INNER JOIN SalesReturnItems sri
+                    ON sri.Id = rtc.ReturnItemId
+                INNER JOIN SalesReturns sr
+                    ON sr.Id = sri.ReturnId
+                WHERE sri.InvoiceItemId = @InvoiceItemId
+                  AND sr.Status = 'Completed'
+                  AND " + matchCondition + ";";
+
+            using (var command = new SQLiteCommand(
+                sql, connection, transaction))
+            {
+                command.Parameters.AddWithValue(
+                    "@InvoiceItemId", invoiceItemId);
+
+                if (component.RateId > 0)
+                {
+                    command.Parameters.AddWithValue(
+                        "@RateId", component.RateId);
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(
+                        "@ComponentCode", component.ComponentCode ?? "");
+
+                    command.Parameters.AddWithValue(
+                        "@ComponentType", component.ComponentType ?? "");
+
+                    command.Parameters.AddWithValue(
+                        "@CalculationOrder", component.CalculationOrder);
+                }
+
+                object result = command.ExecuteScalar();
+
+                return result == null || result == DBNull.Value
+                    ? 0m
+                    : Convert.ToDecimal(result);
+            }
+        }
+
+        private decimal CalculateCumulativeAmount(
+            decimal originalAmount,
+            decimal originalPackageQuantity,
+            decimal cumulativeReturnedQuantity,
+            decimal previouslyReturnedAmount)
+        {
+            if (originalAmount <= 0 ||
+                originalPackageQuantity <= 0)
+            {
+                return 0m;
+            }
+
+            if (cumulativeReturnedQuantity < 0)
+                cumulativeReturnedQuantity = 0;
+
+            if (cumulativeReturnedQuantity > originalPackageQuantity)
+                cumulativeReturnedQuantity = originalPackageQuantity;
+
+            decimal cumulativeTarget = Math.Round(
+                originalAmount *
+                cumulativeReturnedQuantity /
+                originalPackageQuantity,
+                2,
+                MidpointRounding.AwayFromZero);
+
+            decimal currentAmount =
+                cumulativeTarget - previouslyReturnedAmount;
+
+            if (currentAmount < 0)
+                currentAmount = 0;
+
+            decimal maximumRemaining =
+                originalAmount - previouslyReturnedAmount;
+
+            if (maximumRemaining < 0)
+                maximumRemaining = 0;
+
+            if (currentAmount > maximumRemaining)
+                currentAmount = maximumRemaining;
+
+            return Math.Round(
+                currentAmount,
+                2,
+                MidpointRounding.AwayFromZero);
+        }
+
+        private decimal GetReturnTaxTotal(
+            PreparedReturnItem item)
+        {
+            return item.VatAmount + item.ScheduleTaxAmount;
         }
 
         public int SaveReturn(
@@ -817,7 +1184,16 @@ namespace Ocore.desktop.Services
 
                         var usedInvoiceItems = new HashSet<int>();
                         var preparedItems = new List<PreparedReturnItem>();
+
                         double returnTotal = 0;
+
+                        decimal returnDiscountAmount = 0m;
+                        decimal returnTaxableAmount = 0m;
+                        decimal returnVatAmount = 0m;
+                        decimal returnScheduleTaxAmount = 0m;
+
+                        bool hasCalculatedTax = false;
+                        bool hasLegacyTax = false;
 
                         foreach (var item in items)
                         {
@@ -843,14 +1219,61 @@ namespace Ocore.desktop.Services
                             PreparedReturnItem prepared =
                                 PrepareReturnItem(item, info);
 
+                            CalculateReturnTaxAndDiscount(
+                                connection,
+                                transaction,
+                                prepared,
+                                info);
+
                             preparedItems.Add(prepared);
+
                             returnTotal += prepared.Total;
+
+                            returnDiscountAmount += prepared.DiscountAmount;
+                            returnTaxableAmount += prepared.TaxableAmount;
+                            returnVatAmount += prepared.VatAmount;
+                            returnScheduleTaxAmount += prepared.ScheduleTaxAmount;
+
+                            if (prepared.TaxStatus == "Calculated")
+                                hasCalculatedTax = true;
+                            else
+                                hasLegacyTax = true;
                         }
 
                         returnTotal = Math.Round(
                             returnTotal,
                             2,
                             MidpointRounding.AwayFromZero);
+
+                        returnDiscountAmount = Math.Round(
+                            returnDiscountAmount,
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                        returnTaxableAmount = Math.Round(
+                            returnTaxableAmount,
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                        returnVatAmount = Math.Round(
+                            returnVatAmount,
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                        returnScheduleTaxAmount = Math.Round(
+                            returnScheduleTaxAmount,
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                        decimal returnTaxTotal =
+                            returnVatAmount + returnScheduleTaxAmount;
+
+                        string returnTaxStatus =
+                            hasCalculatedTax && hasLegacyTax
+                                ? "Mixed"
+                                : hasCalculatedTax
+                                    ? "Calculated"
+                                    : "Legacy";
 
                         if (double.IsNaN(returnTotal) ||
                             double.IsInfinity(returnTotal))
@@ -908,6 +1331,12 @@ namespace Ocore.desktop.Services
                                 UserId,
                                 ShiftId,
                                 Total,
+                                DiscountAmount,
+                                TaxableAmount,
+                                VatAmount,
+                                ScheduleTaxAmount,
+                                TaxTotal,
+                                TaxStatus,
                                 RefundAmount,
                                 RefundPaymentMethod,
                                 Reason,
@@ -921,6 +1350,12 @@ namespace Ocore.desktop.Services
                                 @UserId,
                                 @ShiftId,
                                 @Total,
+                                @DiscountAmount,
+                                @TaxableAmount,
+                                @VatAmount,
+                                @ScheduleTaxAmount,
+                                @TaxTotal,
+                                @TaxStatus,
                                 @RefundAmount,
                                 @RefundPaymentMethod,
                                 @Reason,
@@ -936,6 +1371,12 @@ namespace Ocore.desktop.Services
                             command.Parameters.AddWithValue("@UserId", userId);
                             command.Parameters.AddWithValue("@ShiftId", shiftId);
                             command.Parameters.AddWithValue("@Total", returnTotal);
+                            command.Parameters.AddWithValue("@DiscountAmount", Convert.ToDouble(returnDiscountAmount));
+                            command.Parameters.AddWithValue("@TaxableAmount", Convert.ToDouble(returnTaxableAmount));
+                            command.Parameters.AddWithValue("@VatAmount", Convert.ToDouble(returnVatAmount));
+                            command.Parameters.AddWithValue("@ScheduleTaxAmount", Convert.ToDouble(returnScheduleTaxAmount));
+                            command.Parameters.AddWithValue("@TaxTotal", Convert.ToDouble(returnTaxTotal));
+                            command.Parameters.AddWithValue("@TaxStatus", returnTaxStatus);
                             command.Parameters.AddWithValue("@RefundAmount", refundAmount);
                             command.Parameters.AddWithValue("@RefundPaymentMethod", refundPaymentMethod);
                             command.Parameters.AddWithValue("@Reason", (reason ?? "").Trim());
@@ -962,7 +1403,12 @@ namespace Ocore.desktop.Services
                                     PackageQuantity,
                                     ReturnUnitName,
                                     ReturnUnitQuantity,
-                                    ReturnUnitPrice
+                                    ReturnUnitPrice,
+                                    DiscountAmount,
+                                    TaxableAmount,
+                                    VatAmount,
+                                    ScheduleTaxAmount,
+                                    TaxStatus
                                 )
                                 VALUES
                                 (
@@ -977,7 +1423,12 @@ namespace Ocore.desktop.Services
                                     @PackageQuantity,
                                     @ReturnUnitName,
                                     @ReturnUnitQuantity,
-                                    @ReturnUnitPrice
+                                    @ReturnUnitPrice,
+                                    @DiscountAmount,
+                                    @TaxableAmount,
+                                    @VatAmount,
+                                    @ScheduleTaxAmount,
+                                    @TaxStatus
                                 );
 
                                 SELECT last_insert_rowid();",
@@ -995,9 +1446,20 @@ namespace Ocore.desktop.Services
                                 command.Parameters.AddWithValue("@ReturnUnitName", item.ReturnUnitName);
                                 command.Parameters.AddWithValue("@ReturnUnitQuantity", item.ReturnUnitQuantity);
                                 command.Parameters.AddWithValue("@ReturnUnitPrice", item.ReturnUnitPrice);
+                                command.Parameters.AddWithValue("@DiscountAmount", Convert.ToDouble(item.DiscountAmount));
+                                command.Parameters.AddWithValue("@TaxableAmount", Convert.ToDouble(item.TaxableAmount));
+                                command.Parameters.AddWithValue("@VatAmount", Convert.ToDouble(item.VatAmount));
+                                command.Parameters.AddWithValue("@ScheduleTaxAmount", Convert.ToDouble(item.ScheduleTaxAmount));
+                                command.Parameters.AddWithValue("@TaxStatus", item.TaxStatus);
 
                                 returnItemId = Convert.ToInt32(command.ExecuteScalar());
                             }
+
+                            SaveReturnTaxComponents(
+                                connection,
+                                transaction,
+                                returnItemId,
+                                item.TaxComponents);
 
                             RestoreOriginalBatches(
                                 connection,
@@ -1056,6 +1518,14 @@ namespace Ocore.desktop.Services
                                 returnTotal.ToString(
                                     "0.00",
                                     CultureInfo.InvariantCulture) +
+                                "، الخصم المسترد " +
+                                returnDiscountAmount.ToString(
+                                    "0.00",
+                                    CultureInfo.InvariantCulture) +
+                                "، الضريبة المستردة " +
+                                returnTaxTotal.ToString(
+                                    "0.00",
+                                    CultureInfo.InvariantCulture) +
                                 refundDetails);
 
                             command.Parameters.AddWithValue(
@@ -1075,6 +1545,84 @@ namespace Ocore.desktop.Services
                         transaction.Rollback();
                         throw;
                     }
+                }
+            }
+        }
+
+        private void SaveReturnTaxComponents(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            int returnItemId,
+            List<SalesReturnTaxComponent> components)
+        {
+            if (components == null || components.Count == 0)
+                return;
+
+            foreach (var component in components)
+            {
+                using (var command = new SQLiteCommand(@"
+                    INSERT INTO SalesReturnItemTaxComponents
+                    (
+                        ReturnItemId,
+                        TaxProfileRateId,
+                        ComponentCode,
+                        ComponentName,
+                        ComponentType,
+                        RatePercent,
+                        CalculationOrder,
+                        IsCompound,
+                        TaxableBase,
+                        TaxAmount
+                    )
+                    VALUES
+                    (
+                        @ReturnItemId,
+                        @RateId,
+                        @ComponentCode,
+                        @ComponentName,
+                        @ComponentType,
+                        @RatePercent,
+                        @CalculationOrder,
+                        @IsCompound,
+                        @TaxableBase,
+                        @TaxAmount
+                    );",
+                    connection, transaction))
+                {
+                    command.Parameters.AddWithValue(
+                        "@ReturnItemId", returnItemId);
+
+                    command.Parameters.AddWithValue(
+                        "@RateId",
+                        component.OriginalRateId > 0
+                            ? (object)component.OriginalRateId
+                            : DBNull.Value);
+
+                    command.Parameters.AddWithValue(
+                        "@ComponentCode", component.ComponentCode ?? "");
+
+                    command.Parameters.AddWithValue(
+                        "@ComponentName", component.ComponentName ?? "");
+
+                    command.Parameters.AddWithValue(
+                        "@ComponentType", component.ComponentType ?? "VAT");
+
+                    command.Parameters.AddWithValue(
+                        "@RatePercent", Convert.ToDouble(component.RatePercent));
+
+                    command.Parameters.AddWithValue(
+                        "@CalculationOrder", component.CalculationOrder);
+
+                    command.Parameters.AddWithValue(
+                        "@IsCompound", component.IsCompound ? 1 : 0);
+
+                    command.Parameters.AddWithValue(
+                        "@TaxableBase", component.TaxableBase);
+
+                    command.Parameters.AddWithValue(
+                        "@TaxAmount", component.TaxAmount);
+
+                    command.ExecuteNonQuery();
                 }
             }
         }
@@ -1255,6 +1803,28 @@ namespace Ocore.desktop.Services
             public double OriginalPackageQuantity { get; set; }
             public double UnitsPerPackage { get; set; }
             public double ReturnedPackageQuantity { get; set; }
+
+            public decimal OriginalDiscountAmount { get; set; }
+            public decimal OriginalTaxableAmount { get; set; }
+            public decimal OriginalVatAmount { get; set; }
+            public decimal OriginalScheduleTaxAmount { get; set; }
+
+            public string TaxStatus { get; set; }
+
+            public List<InvoiceTaxComponentInfo> TaxComponents { get; set; }
+        }
+
+        private class InvoiceTaxComponentInfo
+        {
+            public int RateId { get; set; }
+            public string ComponentCode { get; set; }
+            public string ComponentName { get; set; }
+            public string ComponentType { get; set; }
+            public decimal RatePercent { get; set; }
+            public int CalculationOrder { get; set; }
+            public bool IsCompound { get; set; }
+            public decimal TaxableBase { get; set; }
+            public decimal TaxAmount { get; set; }
         }
 
         private class PreparedReturnItem
@@ -1270,6 +1840,14 @@ namespace Ocore.desktop.Services
             public double ReturnUnitQuantity { get; set; }
             public double ReturnUnitPrice { get; set; }
             public double Total { get; set; }
+
+            public decimal DiscountAmount { get; set; }
+            public decimal TaxableAmount { get; set; }
+            public decimal VatAmount { get; set; }
+            public decimal ScheduleTaxAmount { get; set; }
+            public string TaxStatus { get; set; }
+
+            public List<SalesReturnTaxComponent> TaxComponents { get; set; }
         }
 
         private class ReturnAllocation

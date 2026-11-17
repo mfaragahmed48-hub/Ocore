@@ -20,8 +20,10 @@ namespace Ocore.desktop.Services
                 throw new ArgumentNullException(nameof(connection));
 
             if (taxProfileId == null || taxProfileId.Value <= 0)
+            {
                 throw new InvalidOperationException(
                     "الصنف غير مرتبط بتصنيف ضريبي.");
+            }
 
             if (double.IsNaN(amountAfterDiscount) ||
                 double.IsInfinity(amountAfterDiscount) ||
@@ -48,9 +50,20 @@ namespace Ocore.desktop.Services
                     "طريقة احتساب الضريبة للصنف غير صحيحة.");
             }
 
-            decimal amount = Convert.ToDecimal(
-                amountAfterDiscount,
-                CultureInfo.InvariantCulture);
+            decimal amount;
+
+            try
+            {
+                amount = Convert.ToDecimal(
+                    amountAfterDiscount,
+                    CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    "تعذر تحويل قيمة الصنف إلى قيمة مالية صحيحة.",
+                    ex);
+            }
 
             amount = RoundMoney(amount);
 
@@ -83,14 +96,23 @@ namespace Ocore.desktop.Services
                             "التصنيف الضريبي المرتبط بالصنف غير موجود.");
                     }
 
-                    profileCode = Convert.ToString(reader["Code"]);
-                    profileName = Convert.ToString(reader["Name"]);
-                    taxType = Convert.ToString(reader["TaxType"]);
+                    profileCode = Convert.ToString(
+                        reader["Code"]);
+
+                    profileName = Convert.ToString(
+                        reader["Name"]);
+
+                    taxType = Convert.ToString(
+                        reader["TaxType"]);
 
                     profileIsActive =
                         Convert.ToInt32(reader["IsActive"]) == 1;
                 }
             }
+
+            profileCode = (profileCode ?? "").Trim();
+            profileName = (profileName ?? "").Trim();
+            taxType = (taxType ?? "").Trim();
 
             if (!profileIsActive)
             {
@@ -100,9 +122,9 @@ namespace Ocore.desktop.Services
             }
 
             if (string.Equals(
-                profileCode,
-                "UNCLASSIFIED",
-                StringComparison.OrdinalIgnoreCase) ||
+                    profileCode,
+                    "UNCLASSIFIED",
+                    StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(
                     taxType,
                     "Unclassified",
@@ -114,10 +136,30 @@ namespace Ocore.desktop.Services
                     "يجب تحديد معاملته الضريبية قبل البيع.");
             }
 
-            if (taxType != "Exempt" &&
-                taxType != "Standard" &&
-                taxType != "Reduced" &&
-                taxType != "Schedule")
+            bool isExempt = string.Equals(
+                taxType,
+                "Exempt",
+                StringComparison.OrdinalIgnoreCase);
+
+            bool isStandard = string.Equals(
+                taxType,
+                "Standard",
+                StringComparison.OrdinalIgnoreCase);
+
+            bool isReduced = string.Equals(
+                taxType,
+                "Reduced",
+                StringComparison.OrdinalIgnoreCase);
+
+            bool isSchedule = string.Equals(
+                taxType,
+                "Schedule",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (!isExempt &&
+                !isStandard &&
+                !isReduced &&
+                !isSchedule)
             {
                 throw new InvalidOperationException(
                     "نوع التصنيف الضريبي غير معروف.");
@@ -125,7 +167,7 @@ namespace Ocore.desktop.Services
 
             var rates = new List<TaxCalculationRate>();
 
-            if (taxType != "Exempt")
+            if (!isExempt)
             {
                 string effectiveDate = taxDate.ToString(
                     "yyyy-MM-dd",
@@ -166,13 +208,35 @@ namespace Ocore.desktop.Services
                         while (reader.Read())
                         {
                             string componentType =
-                                Convert.ToString(reader["ComponentType"]);
+                                Convert.ToString(
+                                    reader["ComponentType"]);
 
-                            if (componentType != "VAT" &&
-                                componentType != "Schedule")
+                            componentType =
+                                (componentType ?? "").Trim();
+
+                            if (!string.Equals(
+                                    componentType,
+                                    "VAT",
+                                    StringComparison.OrdinalIgnoreCase) &&
+                                !string.Equals(
+                                    componentType,
+                                    "Schedule",
+                                    StringComparison.OrdinalIgnoreCase))
                             {
                                 throw new InvalidOperationException(
                                     "يوجد مكون ضريبي بنوع غير صحيح.");
+                            }
+
+                            if (string.Equals(
+                                componentType,
+                                "VAT",
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                componentType = "VAT";
+                            }
+                            else
+                            {
+                                componentType = "Schedule";
                             }
 
                             decimal rate = Convert.ToDecimal(
@@ -189,16 +253,23 @@ namespace Ocore.desktop.Services
                             rates.Add(new TaxCalculationRate
                             {
                                 Id = Convert.ToInt32(reader["Id"]),
+
                                 ComponentCode = Convert.ToString(
                                     reader["ComponentCode"]),
+
                                 ComponentName = Convert.ToString(
                                     reader["ComponentName"]),
+
                                 ComponentType = componentType,
+
                                 RatePercent = rate,
+
                                 CalculationOrder = Convert.ToInt32(
                                     reader["CalculationOrder"]),
-                                IsCompound = Convert.ToInt32(
-                                    reader["IsCompound"]) == 1
+
+                                IsCompound =
+                                    Convert.ToInt32(
+                                        reader["IsCompound"]) == 1
                             });
                         }
                     }
@@ -218,16 +289,21 @@ namespace Ocore.desktop.Services
             var result = new TaxCalculationResult
             {
                 TaxProfileId = taxProfileId.Value,
+
                 TaxProfileCode = profileCode,
+
                 TaxProfileName = profileName,
+
                 TaxType = taxType,
+
                 TaxPriceMode = isInclusive
                     ? "Inclusive"
                     : "Exclusive",
+
                 TaxableAmount = amount
             };
 
-            if (taxType == "Exempt" || amount == 0)
+            if (isExempt || amount == 0)
             {
                 result.TaxableAmount = amount;
                 return result;
@@ -236,7 +312,7 @@ namespace Ocore.desktop.Services
             decimal taxableBase = amount;
 
             // استخراج الوعاء الضريبي من السعر الشامل.
-            // يتم حساب معامل الضريبة المركبة دون تقريب وسيط.
+            // يتم استخدام المعاملات الدقيقة أثناء استخراج الوعاء.
             if (isInclusive)
             {
                 decimal accumulatedTaxFactor = 0m;
@@ -264,11 +340,12 @@ namespace Ocore.desktop.Services
                         "تعذر استخراج الوعاء الضريبي من السعر الشامل.");
                 }
 
-                taxableBase = amount / totalFactor;
+                taxableBase = RoundMoney(
+                    amount / totalFactor);
             }
 
-            decimal vatTotal = 0m;
-            decimal scheduleTotal = 0m;
+            // حساب مكونات الضريبة بالتتابع.
+            // الضريبة المركبة تعتمد على الضرائب السابقة بعد التقريب.
             decimal accumulatedTax = 0m;
 
             foreach (var rate in rates)
@@ -278,8 +355,11 @@ namespace Ocore.desktop.Services
                         ? taxableBase + accumulatedTax
                         : taxableBase;
 
+                componentBase = RoundMoney(componentBase);
+
                 decimal rawTaxAmount =
-                    componentBase * rate.RatePercent / 100m;
+                    componentBase *
+                    rate.RatePercent / 100m;
 
                 decimal componentTaxAmount =
                     RoundMoney(rawTaxAmount);
@@ -288,48 +368,114 @@ namespace Ocore.desktop.Services
                     new TaxComponentCalculation
                     {
                         RateId = rate.Id,
+
                         ComponentCode = rate.ComponentCode,
+
                         ComponentName = rate.ComponentName,
+
                         ComponentType = rate.ComponentType,
+
                         RatePercent = rate.RatePercent,
+
                         CalculationOrder = rate.CalculationOrder,
+
                         IsCompound = rate.IsCompound,
-                        TaxableBase = RoundMoney(componentBase),
+
+                        TaxableBase = componentBase,
+
                         TaxAmount = componentTaxAmount
                     });
 
-                accumulatedTax += rawTaxAmount;
-
-                if (rate.ComponentType == "VAT")
-                    vatTotal += componentTaxAmount;
-                else
-                    scheduleTotal += componentTaxAmount;
+                accumulatedTax += componentTaxAmount;
 
                 result.TaxRate += rate.RatePercent;
             }
 
+            // السعر الشامل يجب أن يظل مساويًا للمبلغ الأصلي.
+            // تتم معالجة فرق التقريب في آخر مكون ضريبي.
+            if (isInclusive && result.Components.Count > 0)
+            {
+                decimal calculatedTax = 0m;
+
+                foreach (var component in result.Components)
+                {
+                    calculatedTax += component.TaxAmount;
+                }
+
+                decimal expectedTax = RoundMoney(
+                    amount - taxableBase);
+
+                decimal roundingDifference = RoundMoney(
+                    expectedTax - calculatedTax);
+
+                if (roundingDifference != 0m)
+                {
+                    int lastIndex =
+                        result.Components.Count - 1;
+
+                    var lastComponent =
+                        result.Components[lastIndex];
+
+                    decimal adjustedTaxAmount = RoundMoney(
+                        lastComponent.TaxAmount +
+                        roundingDifference);
+
+                    if (adjustedTaxAmount < 0)
+                    {
+                        throw new InvalidOperationException(
+                            "تعذر تسوية فروق تقريب مكونات الضريبة.");
+                    }
+
+                    lastComponent.TaxAmount =
+                        adjustedTaxAmount;
+                }
+            }
+
+            // إعادة تجميع الضرائب من القيم النهائية المحفوظة.
+            decimal vatTotal = 0m;
+            decimal scheduleTotal = 0m;
+
+            foreach (var component in result.Components)
+            {
+                if (component.ComponentType == "VAT")
+                {
+                    vatTotal += component.TaxAmount;
+                }
+                else if (component.ComponentType == "Schedule")
+                {
+                    scheduleTotal += component.TaxAmount;
+                }
+            }
+
             result.VatAmount = RoundMoney(vatTotal);
-            result.ScheduleTaxAmount = RoundMoney(scheduleTotal);
+
+            result.ScheduleTaxAmount = RoundMoney(
+                scheduleTotal);
 
             result.TaxTotal = RoundMoney(
                 result.VatAmount +
                 result.ScheduleTaxAmount);
 
-            if (isInclusive)
-            {
-                // السعر الأصلي شامل الضريبة؛ لا نضيف الضريبة مرة أخرى.
-                result.TaxableAmount = RoundMoney(
-                    amount - result.TaxTotal);
-            }
-            else
-            {
-                result.TaxableAmount = RoundMoney(taxableBase);
-            }
+            result.TaxableAmount = taxableBase;
 
-            if (result.TaxableAmount < 0)
+            if (result.TaxableAmount < 0 ||
+                result.TaxTotal < 0)
             {
                 throw new InvalidOperationException(
                     "نتيجة حساب الوعاء الضريبي غير صحيحة.");
+            }
+
+            if (isInclusive)
+            {
+                decimal reconstructedAmount = RoundMoney(
+                    result.TaxableAmount +
+                    result.TaxTotal);
+
+                if (reconstructedAmount != amount)
+                {
+                    throw new InvalidOperationException(
+                        "تعذر مطابقة إجمالي السعر الشامل مع مكونات الضريبة.");
+                }
             }
 
             return result;
@@ -367,15 +513,23 @@ namespace Ocore.desktop.Services
         public decimal TaxTotal { get; set; }
 
         public List<TaxComponentCalculation> Components
-        { get; set; }
+        {
+            get;
+            set;
+        }
 
         public TaxCalculationResult()
         {
             TaxProfileCode = string.Empty;
+
             TaxProfileName = string.Empty;
+
             TaxType = string.Empty;
+
             TaxPriceMode = "Exclusive";
-            Components = new List<TaxComponentCalculation>();
+
+            Components =
+                new List<TaxComponentCalculation>();
         }
     }
 

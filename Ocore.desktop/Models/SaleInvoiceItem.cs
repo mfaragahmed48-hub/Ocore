@@ -28,6 +28,15 @@ namespace Ocore.desktop.Models
         {
             BatchAllocations =
                 new ObservableCollection<SaleInvoiceBatchAllocation>();
+
+            TaxProfileCode = string.Empty;
+            TaxProfileName = string.Empty;
+            TaxType = string.Empty;
+            TaxPriceMode = string.Empty;
+            TaxStatus = string.Empty;
+
+            TaxComponents =
+                new List<SaleInvoiceItemTaxComponent>();
         }
 
         public int InvoiceItemId { get; set; }
@@ -44,7 +53,48 @@ namespace Ocore.desktop.Models
 
         public int UnitsPerPackage { get; set; } = 1;
 
-        // التشغيلات التي يحدد المستخدم كمية الصرف منها يدويًا.
+        // ==========================================
+        // البيانات الضريبية المحفوظة وقت إصدار الفاتورة
+        // ==========================================
+
+        public int? TaxProfileId { get; set; }
+
+        public string TaxProfileCode { get; set; }
+
+        public string TaxProfileName { get; set; }
+
+        public string TaxType { get; set; }
+
+        public string TaxPriceMode { get; set; }
+
+        public double TaxRate { get; set; }
+
+        // الوعاء الضريبي بعد الخصم
+        public double TaxableAmount { get; set; }
+
+        // ضريبة القيمة المضافة
+        public double VatAmount { get; set; }
+
+        // ضريبة الجدول
+        public double ScheduleTaxAmount { get; set; }
+
+        // إجمالي الضرائب
+        public double TaxTotal { get; set; }
+
+        // حالة حساب الضريبة
+        public string TaxStatus { get; set; }
+
+        // مكونات الضرائب المحفوظة لهذا البند
+        public List<SaleInvoiceItemTaxComponent> TaxComponents
+        {
+            get;
+            set;
+        }
+
+        // ==========================================
+        // التشغيلات
+        // ==========================================
+
         public ObservableCollection<SaleInvoiceBatchAllocation>
             BatchAllocations
         {
@@ -65,6 +115,10 @@ namespace Ocore.desktop.Models
                 NotifyBatchAllocationChanged();
             }
         }
+
+        // ==========================================
+        // الخصومات
+        // ==========================================
 
         public double MaxDiscountPercentage
         {
@@ -147,6 +201,10 @@ namespace Ocore.desktop.Models
             }
         }
 
+        // ==========================================
+        // بيانات الوحدة والكمية
+        // ==========================================
+
         public string UnitName
         {
             get { return unitName; }
@@ -215,6 +273,10 @@ namespace Ocore.desktop.Models
             }
         }
 
+        // ==========================================
+        // حساب توزيع التشغيلات
+        // ==========================================
+
         // إجمالي الكمية التي وزعها المستخدم على التشغيلات.
         public double AllocatedQuantity
         {
@@ -257,6 +319,10 @@ namespace Ocore.desktop.Models
             }
         }
 
+        // ==========================================
+        // إشعارات التغيير
+        // ==========================================
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private void OnPropertyChanged(
@@ -273,6 +339,10 @@ namespace Ocore.desktop.Models
             OnPropertyChanged(nameof(RemainingAllocationQuantity));
             OnPropertyChanged(nameof(IsBatchAllocationComplete));
         }
+
+        // ==========================================
+        // الاشتراك في تغييرات التشغيلات
+        // ==========================================
 
         private void SubscribeToBatchAllocations()
         {
@@ -359,6 +429,38 @@ namespace Ocore.desktop.Models
             {
                 NotifyBatchAllocationChanged();
             }
+        }
+    }
+
+    // ==========================================
+    // مكون ضريبي واحد داخل بند الفاتورة
+    // ==========================================
+
+    public class SaleInvoiceItemTaxComponent
+    {
+        public int RateId { get; set; }
+
+        public string ComponentCode { get; set; }
+
+        public string ComponentName { get; set; }
+
+        public string ComponentType { get; set; }
+
+        public double RatePercent { get; set; }
+
+        public int CalculationOrder { get; set; }
+
+        public bool IsCompound { get; set; }
+
+        public double TaxableBase { get; set; }
+
+        public double TaxAmount { get; set; }
+
+        public SaleInvoiceItemTaxComponent()
+        {
+            ComponentCode = string.Empty;
+            ComponentName = string.Empty;
+            ComponentType = string.Empty;
         }
     }
 
