@@ -22,6 +22,44 @@ namespace Ocore.desktop.Services
         }
 
         // ==========================================
+        // أدوات قراءة آمنة
+        // ==========================================
+
+        private double ReadDouble(SQLiteDataReader reader, string column)
+        {
+            int index = reader.GetOrdinal(column);
+
+            if (reader.IsDBNull(index))
+                return 0;
+
+            return Convert.ToDouble(reader.GetValue(index));
+        }
+
+        private int ReadInt(SQLiteDataReader reader, string column)
+        {
+            int index = reader.GetOrdinal(column);
+
+            if (reader.IsDBNull(index))
+                return 0;
+
+            return Convert.ToInt32(reader.GetValue(index));
+        }
+
+        private string ReadString(SQLiteDataReader reader, string column)
+        {
+            int index = reader.GetOrdinal(column);
+
+            return reader.IsDBNull(index)
+                ? ""
+                : Convert.ToString(reader.GetValue(index));
+        }
+
+        private bool ReadBool(SQLiteDataReader reader, string column)
+        {
+            return ReadInt(reader, column) != 0;
+        }
+
+        // ==========================================
         // جلب سجل مرتجعات البيع
         // ==========================================
 
@@ -110,16 +148,13 @@ namespace Ocore.desktop.Services
 
                             items.Add(new SalesReturnHistoryItem
                             {
-                                Id = Convert.ToInt32(reader["Id"]),
-                                ReturnNumber = Convert.ToString(
-                                    reader["ReturnNumber"]),
-                                InvoiceNumber = Convert.ToString(
-                                    reader["InvoiceNumber"]),
-                                EmployeeName = Convert.ToString(
-                                    reader["EmployeeName"]),
-                                Total = Convert.ToDouble(reader["Total"]),
-                                Reason = Convert.ToString(reader["Reason"]),
-                                Status = Convert.ToString(reader["Status"]),
+                                Id = ReadInt(reader, "Id"),
+                                ReturnNumber = ReadString(reader, "ReturnNumber"),
+                                InvoiceNumber = ReadString(reader, "InvoiceNumber"),
+                                EmployeeName = ReadString(reader, "EmployeeName"),
+                                Total = ReadDouble(reader, "Total"),
+                                Reason = ReadString(reader, "Reason"),
+                                Status = ReadString(reader, "Status"),
                                 CreatedAt = createdAt.ToString(
                                     "yyyy-MM-dd HH:mm",
                                     CultureInfo.InvariantCulture)
@@ -161,6 +196,14 @@ namespace Ocore.desktop.Services
                         sr.UserId,
                         u.FullName AS EmployeeName,
                         sr.Total,
+                        COALESCE(sr.DiscountAmount, 0) AS DiscountAmount,
+                        COALESCE(sr.TaxableAmount, 0) AS TaxableAmount,
+                        COALESCE(sr.VatAmount, 0) AS VatAmount,
+                        COALESCE(sr.ScheduleTaxAmount, 0) AS ScheduleTaxAmount,
+                        COALESCE(sr.TaxTotal, 0) AS TaxTotal,
+COALESCE(sr.TaxStatus, 'Legacy') AS TaxStatus,
+COALESCE(sr.RefundAmount, 0) AS RefundAmount,
+COALESCE(sr.RefundPaymentMethod, '') AS RefundPaymentMethod,
                         sr.Reason,
                         sr.Status,
                         sr.CreatedAt
@@ -189,25 +232,32 @@ namespace Ocore.desktop.Services
                             DateTimeStyles.None,
                             out createdAt);
 
-                        details.Id = Convert.ToInt32(reader["Id"]);
-                        details.ReturnNumber = Convert.ToString(
-                            reader["ReturnNumber"]);
-                        details.InvoiceId = Convert.ToInt32(
-                            reader["InvoiceId"]);
-                        details.InvoiceNumber = Convert.ToString(
-                            reader["InvoiceNumber"]);
-                        details.UserId = Convert.ToInt32(
-                            reader["UserId"]);
-                        details.EmployeeName = Convert.ToString(
-                            reader["EmployeeName"]);
-                        details.Total = Convert.ToDouble(reader["Total"]);
-                        details.Reason = Convert.ToString(reader["Reason"]);
-                        details.Status = Convert.ToString(reader["Status"]);
+                        details.Id = ReadInt(reader, "Id");
+                        details.ReturnNumber = ReadString(reader, "ReturnNumber");
+                        details.InvoiceId = ReadInt(reader, "InvoiceId");
+                        details.InvoiceNumber = ReadString(reader, "InvoiceNumber");
+                        details.UserId = ReadInt(reader, "UserId");
+                        details.EmployeeName = ReadString(reader, "EmployeeName");
+
+                        details.Total = ReadDouble(reader, "Total");
+                        details.DiscountAmount = ReadDouble(reader, "DiscountAmount");
+                        details.TaxableAmount = ReadDouble(reader, "TaxableAmount");
+                        details.VatAmount = ReadDouble(reader, "VatAmount");
+                        details.ScheduleTaxAmount = ReadDouble(reader, "ScheduleTaxAmount");
+                        details.TaxTotal = ReadDouble(reader, "TaxTotal");
+                        details.TaxStatus = ReadString(reader, "TaxStatus");
+                        details.RefundAmount = ReadDouble(reader, "RefundAmount");
+                        details.RefundPaymentMethod = ReadString(reader, "RefundPaymentMethod");
+                        details.Reason = ReadString(reader, "Reason");
+                        details.Status = ReadString(reader, "Status");
                         details.CreatedAt = createdAt;
                     }
                 }
 
-                // قراءة الوحدة والكمية والسعر الفعلي للمرتجع
+                // ==========================================
+                // قراءة بنود المرتجع
+                // ==========================================
+
                 string itemsSql = @"
                     SELECT
                         sri.Id,
@@ -222,7 +272,12 @@ namespace Ocore.desktop.Services
                         sri.PackageQuantity,
                         sri.ReturnUnitName,
                         sri.ReturnUnitQuantity,
-                        sri.ReturnUnitPrice
+                        sri.ReturnUnitPrice,
+                        COALESCE(sri.DiscountAmount, 0) AS DiscountAmount,
+                        COALESCE(sri.TaxableAmount, 0) AS TaxableAmount,
+                        COALESCE(sri.VatAmount, 0) AS VatAmount,
+                        COALESCE(sri.ScheduleTaxAmount, 0) AS ScheduleTaxAmount,
+                        COALESCE(sri.TaxStatus, 'Legacy') AS TaxStatus
                     FROM SalesReturnItems sri
                     WHERE sri.ReturnId = @ReturnId
                     ORDER BY sri.Id;";
@@ -236,31 +291,22 @@ namespace Ocore.desktop.Services
                         while (reader.Read())
                         {
                             string originalUnitName =
-                                Convert.ToString(reader["UnitName"]);
+                                ReadString(reader, "UnitName");
 
                             double originalQuantity =
-                                Convert.ToDouble(reader["Quantity"]);
+                                ReadDouble(reader, "Quantity");
 
                             double originalUnitPrice =
-                                Convert.ToDouble(reader["UnitPrice"]);
+                                ReadDouble(reader, "UnitPrice");
 
                             string returnUnitName =
-                                reader["ReturnUnitName"] == DBNull.Value
-                                    ? ""
-                                    : Convert.ToString(
-                                        reader["ReturnUnitName"]);
+                                ReadString(reader, "ReturnUnitName");
 
                             double returnUnitQuantity =
-                                reader["ReturnUnitQuantity"] == DBNull.Value
-                                    ? 0
-                                    : Convert.ToDouble(
-                                        reader["ReturnUnitQuantity"]);
+                                ReadDouble(reader, "ReturnUnitQuantity");
 
                             double returnUnitPrice =
-                                reader["ReturnUnitPrice"] == DBNull.Value
-                                    ? 0
-                                    : Convert.ToDouble(
-                                        reader["ReturnUnitPrice"]);
+                                ReadDouble(reader, "ReturnUnitPrice");
 
                             // توافق مع سجلات المرتجعات القديمة
                             if (string.IsNullOrWhiteSpace(returnUnitName))
@@ -272,29 +318,123 @@ namespace Ocore.desktop.Services
                             if (returnUnitPrice <= 0)
                                 returnUnitPrice = originalUnitPrice;
 
-                            details.Items.Add(new SalesReturnItem
+                            var item = new SalesReturnItem
                             {
-                                Id = Convert.ToInt32(reader["Id"]),
-                                ReturnId = Convert.ToInt32(reader["ReturnId"]),
-                                InvoiceItemId = Convert.ToInt32(
-                                    reader["InvoiceItemId"]),
-                                ProductId = Convert.ToInt32(
-                                    reader["ProductId"]),
-                                ItemName = Convert.ToString(reader["ItemName"]),
+                                Id = ReadInt(reader, "Id"),
+                                ReturnId = ReadInt(reader, "ReturnId"),
+                                InvoiceItemId = ReadInt(reader, "InvoiceItemId"),
+                                ProductId = ReadInt(reader, "ProductId"),
+                                ItemName = ReadString(reader, "ItemName"),
 
-                                // تعرض الشاشة بيانات وحدة المرتجع الفعلية
                                 UnitName = returnUnitName,
                                 Quantity = returnUnitQuantity,
                                 UnitPrice = returnUnitPrice,
 
-                                Total = Convert.ToDouble(reader["Total"]),
-                                PackageQuantity = Convert.ToDouble(
-                                    reader["PackageQuantity"]),
+                                Total = ReadDouble(reader, "Total"),
+                                PackageQuantity = ReadDouble(reader, "PackageQuantity"),
 
                                 ReturnUnitName = returnUnitName,
                                 ReturnUnitQuantity = returnUnitQuantity,
-                                ReturnUnitPrice = returnUnitPrice
-                            });
+                                ReturnUnitPrice = returnUnitPrice,
+
+                                DiscountAmount = ReadDouble(reader, "DiscountAmount"),
+                                TaxableAmount = ReadDouble(reader, "TaxableAmount"),
+                                VatAmount = ReadDouble(reader, "VatAmount"),
+                                ScheduleTaxAmount = ReadDouble(reader, "ScheduleTaxAmount"),
+                                TaxStatus = ReadString(reader, "TaxStatus")
+                            };
+
+                            item.TaxTotal =
+                                item.VatAmount + item.ScheduleTaxAmount;
+
+                            details.Items.Add(item);
+                        }
+                    }
+                }
+
+                // ==========================================
+                // قراءة مكونات الضريبة لكل بند
+                // ==========================================
+
+                string componentsSql = @"
+                    SELECT
+                        c.ReturnItemId,
+                        c.TaxProfileRateId,
+                        c.ComponentCode,
+                        c.ComponentName,
+                        c.ComponentType,
+                        c.RatePercent,
+                        c.CalculationOrder,
+                        c.IsCompound,
+                        c.TaxableBase,
+                        c.TaxAmount
+                    FROM SalesReturnItemTaxComponents c
+                    INNER JOIN SalesReturnItems sri
+                        ON sri.Id = c.ReturnItemId
+                    WHERE sri.ReturnId = @ReturnId
+                    ORDER BY
+                        c.ReturnItemId,
+                        c.CalculationOrder,
+                        c.Id;";
+
+                using (var command = new SQLiteCommand(
+                    componentsSql, connection))
+                {
+                    command.Parameters.AddWithValue("@ReturnId", returnId);
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        var itemsById =
+                            new Dictionary<int, SalesReturnItem>();
+
+                        foreach (SalesReturnItem item in details.Items)
+                        {
+                            itemsById[item.Id] = item;
+                        }
+
+                        while (reader.Read())
+                        {
+                            int returnItemId =
+                                ReadInt(reader, "ReturnItemId");
+
+                            SalesReturnItem item;
+
+                            if (!itemsById.TryGetValue(
+                                returnItemId, out item))
+                            {
+                                continue;
+                            }
+
+                            item.TaxComponents.Add(
+                                new SalesReturnTaxComponent
+                                {
+                                    OriginalRateId = ReadInt(
+                                        reader, "TaxProfileRateId"),
+
+                                    ComponentCode = ReadString(
+                                        reader, "ComponentCode"),
+
+                                    ComponentName = ReadString(
+                                        reader, "ComponentName"),
+
+                                    ComponentType = ReadString(
+                                        reader, "ComponentType"),
+
+                                    RatePercent = ReadDouble(
+                                        reader, "RatePercent"),
+
+                                    CalculationOrder = ReadInt(
+                                        reader, "CalculationOrder"),
+
+                                    IsCompound = ReadBool(
+                                        reader, "IsCompound"),
+
+                                    TaxableBase = ReadDouble(
+                                        reader, "TaxableBase"),
+
+                                    TaxAmount = ReadDouble(
+                                        reader, "TaxAmount")
+                                });
                         }
                     }
                 }

@@ -77,7 +77,7 @@ namespace Ocore.desktop.Models
         // ==========================================
         // الإجماليات
         // ==========================================
-
+        public double DiscountAmount { get; set; }
         public double Total { get; set; }
 
         public double PackageQuantity { get; set; }

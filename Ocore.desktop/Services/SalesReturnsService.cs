@@ -364,6 +364,7 @@ namespace Ocore.desktop.Services
             return items;
         }
 
+
         public double GetPreviousReturnsTotal(
             int userId,
             int invoiceId)
@@ -381,10 +382,17 @@ namespace Ocore.desktop.Services
                 ValidateReturnPermission(connection, null, userId);
 
                 using (var command = new SQLiteCommand(@"
-                    SELECT COALESCE(SUM(Total), 0)
-                    FROM SalesReturns
-                    WHERE InvoiceId = @InvoiceId
-                      AND Status = 'Completed';",
+            SELECT COALESCE(
+                SUM(
+                    COALESCE(Total, 0)
+                    - COALESCE(DiscountAmount, 0)
+                    + COALESCE(TaxTotal, 0)
+                ),
+                0
+            )
+            FROM SalesReturns
+            WHERE InvoiceId = @InvoiceId
+              AND Status = 'Completed';",
                     connection))
                 {
                     command.Parameters.AddWithValue(
