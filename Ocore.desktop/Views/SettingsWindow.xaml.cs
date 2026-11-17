@@ -31,6 +31,7 @@ namespace Ocore.desktop.Views
             LoadSettings();
             ConfigureClearButton();
             ConfigureDrugCatalogImportButton();
+            ConfigureTaxManagementButton();
         }
 
         // التحقق من أن المستخدم مدير النظام وحسابه نشط
@@ -87,6 +88,14 @@ LIMIT 1;";
                     : Visibility.Collapsed;
         }
 
+        // إظهار زر إدارة الضرائب للمدير فقط
+        private void ConfigureTaxManagementButton()
+        {
+            ManageTaxesButton.Visibility =
+                IsCurrentUserManager()
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+        }
         // إظهار زر استيراد دليل الأدوية للمدير فقط
         private void ConfigureDrugCatalogImportButton()
         {

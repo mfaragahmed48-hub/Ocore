@@ -1,3 +1,4 @@
+
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props" Condition="Exists('..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -34,7 +35,6 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
@@ -172,6 +172,9 @@
     <Compile Include="Views\ShiftHistoryWindow.xaml.cs">
       <DependentUpon>ShiftHistoryWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\TaxManagementWindow.xaml.cs">
+      <DependentUpon>TaxManagementWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\ThermalReceiptPreviewWindow.xaml.cs">
       <DependentUpon>ThermalReceiptPreviewWindow.xaml</DependentUpon>
     </Compile>
@@ -196,7 +199,7 @@
     <Compile Include="Services\SalesReturnsService.cs" />
     <Compile Include="Services\SalesService.cs" />
     <Compile Include="Services\SupplierService.cs" />
-<Compile Include="Services\TaxProfileService.cs" />
+    <Compile Include="Services\TaxProfileService.cs" />
     <Compile Include="Services\ThermalPrinterService.cs" />
     <Compile Include="Services\ThermalReceiptRenderer.cs" />
     <Compile Include="Services\UserService.cs" />
@@ -276,9 +279,6 @@
     <Compile Include="Views\SalesReturnsHistoryWindow.xaml.cs">
       <DependentUpon>SalesReturnsHistoryWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Views\SalesReturnsWindow.xaml.cs">
-      <DependentUpon>SalesReturnsWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Views\SalesReturnInvoiceWindow.xaml.cs">
       <DependentUpon>SalesReturnInvoiceWindow.xaml</DependentUpon>
     </Compile>
@@ -327,6 +327,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\ShiftHistoryWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\TaxManagementWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -406,19 +410,15 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\PurchaseInvoicesWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Views\PurchaseWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\SaleInvoiceDetailsWindow.xaml">
+    <Page Include="Views\PurchaseInvoicesWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\SalesInvoicesWindow.xaml">
+    <Page Include="Views\SaleInvoiceDetailsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -498,7 +498,7 @@
   <Import Project="..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets" Condition="Exists('..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them. For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them. The missing file is {0}.</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\CommunityToolkit.Mvvm.8.4.2\build\CommunityToolkit.Mvvm.targets'))" />
     <Error Condition="!Exists('..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\SourceGear.sqlite3.3.53.4\build\net471\SourceGear.sqlite3.props'))" />

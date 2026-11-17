@@ -239,6 +239,42 @@
 
                     </Border>
 
+                    <!-- إدارة الضرائب -->
+                    <Separator Margin="0,25,0,20"/>
+
+                    <Border Background="#F0FDFA"
+        BorderBrush="#99F6E4"
+        BorderThickness="1"
+        CornerRadius="10"
+        Padding="18">
+
+                        <StackPanel>
+                            <TextBlock Text="إدارة الضرائب"
+                   FontSize="19"
+                   FontWeight="Bold"
+                   Foreground="#0F766E"
+                   Margin="0,0,0,10"/>
+
+                            <TextBlock Text="إدارة التصنيفات الضريبية ومكونات الضريبة ونسبها وفترات سريانها."
+                   Foreground="#334155"
+                   FontSize="13"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,12"/>
+
+                            <Button x:Name="ManageTaxesButton"
+                Content="إدارة التصنيفات والنسب الضريبية"
+                Width="280"
+                Height="43"
+                HorizontalAlignment="Right"
+                Background="#0F766E"
+                Foreground="White"
+                FontSize="14"
+                FontWeight="Bold"
+                BorderThickness="0"
+                Cursor="Hand"
+                Click="ManageTaxesButton_Click"/>
+                        </StackPanel>
+                    </Border>
                     <!-- إعادة ضبط البيانات التجريبية -->
                     <Separator Margin="0,25,0,20"/>
 

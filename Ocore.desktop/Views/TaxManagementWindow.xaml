@@ -1,0 +1,358 @@
+﻿<Window x:Class="Ocore.desktop.Views.TaxManagementWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="O CORE - إدارة الضرائب"
+        Height="780"
+        Width="1180"
+        MinHeight="680"
+        MinWidth="1000"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="#F3F6FA">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="#17365D"
+                CornerRadius="10"
+                Padding="16"
+                Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Text="إدارة الضرائب والتصنيفات الضريبية"
+                           Foreground="White"
+                           FontSize="22"
+                           FontWeight="Bold"/>
+                <TextBlock Text="إدارة المعاملات الضريبية ومكونات الضريبة وفترات سريانها"
+                           Foreground="#DCE6F1"
+                           FontSize="12"
+                           Margin="0,6,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0.95*"/>
+                <ColumnDefinition Width="1.45*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- قائمة التصنيفات -->
+            <Border Grid.Column="0"
+                    Background="White"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="12"
+                    Margin="0,0,8,0">
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="التصنيفات الضريبية"
+                               FontSize="17"
+                               FontWeight="Bold"
+                               Foreground="#17365D"
+                               Margin="0,0,0,12"/>
+
+                    <DataGrid x:Name="ProfilesDataGrid"
+                              Grid.Row="1"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              SelectionChanged="ProfilesDataGrid_SelectionChanged"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              RowHeaderWidth="0"
+                              FontSize="12">
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الكود"
+                                                Binding="{Binding Code}"
+                                                Width="85"/>
+                            <DataGridTextColumn Header="اسم التصنيف"
+                                                Binding="{Binding Name}"
+                                                Width="*"/>
+                            <DataGridTextColumn Header="النوع"
+                                                Binding="{Binding TaxType}"
+                                                Width="90"/>
+                            <DataGridCheckBoxColumn Header="نشط"
+                                                    Binding="{Binding IsActive}"
+                                                    Width="55"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <Button Grid.Row="2"
+                            Content="＋ تصنيف ضريبي جديد"
+                            Height="40"
+                            Margin="0,12,0,0"
+                            Background="#2563EB"
+                            Foreground="White"
+                            FontWeight="Bold"
+                            BorderThickness="0"
+                            Click="NewProfileButton_Click"/>
+                </Grid>
+            </Border>
+
+            <!-- بيانات التصنيف -->
+            <Border Grid.Column="1"
+                    Background="White"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="16"
+                    Margin="8,0,0,0">
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Text="بيانات التصنيف"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#17365D"
+                                   Margin="0,0,0,14"/>
+
+                        <TextBlock Text="كود التصنيف"/>
+                        <TextBox x:Name="CodeTextBox"
+                                 Height="34"
+                                 Margin="0,5,0,10"
+                                 MaxLength="50"
+                                 FlowDirection="LeftToRight"/>
+
+                        <TextBlock Text="اسم التصنيف"/>
+                        <TextBox x:Name="NameTextBox"
+                                 Height="34"
+                                 Margin="0,5,0,10"
+                                 MaxLength="150"/>
+
+                        <TextBlock Text="نوع المعاملة الضريبية"/>
+                        <ComboBox x:Name="TaxTypeComboBox"
+                                  Height="34"
+                                  Margin="0,5,0,10"
+                                  SelectedIndex="0"
+                                  SelectionChanged="TaxTypeComboBox_SelectionChanged">
+                            <ComboBoxItem Content="معفى" Tag="Exempt"/>
+                            <ComboBoxItem Content="سعر عام" Tag="Standard"/>
+                            <ComboBoxItem Content="سعر خاص" Tag="Reduced"/>
+                            <ComboBoxItem Content="ضريبة جدول / مكونات" Tag="Schedule"/>
+                        </ComboBox>
+
+                        <TextBlock Text="الوصف والملاحظات"/>
+                        <TextBox x:Name="DescriptionTextBox"
+                                 Height="58"
+                                 Margin="0,5,0,10"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"/>
+
+                        <CheckBox x:Name="IsActiveCheckBox"
+                                  Content="التصنيف نشط"
+                                  IsChecked="True"
+                                  Margin="0,0,0,14"/>
+
+                        <Separator Margin="0,5,0,12"/>
+
+                        <TextBlock Text="مكونات الضريبة وفترات السريان"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="#17365D"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock Text="السجلات المحفوظة لا يمكن تعديل نسبها أو تاريخ بدايتها. يمكنك تحديد سجل مفتوح وإغلاق فترة سريانه، ثم إضافة سجل جديد."
+                                   FontSize="11"
+                                   Foreground="#64748B"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10"/>
+
+                        <DataGrid x:Name="RatesDataGrid"
+                                  Height="190"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  RowHeaderWidth="0"
+                                  FontSize="11">
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="الكود"
+                                                    Binding="{Binding ComponentCode}"
+                                                    Width="75"/>
+                                <DataGridTextColumn Header="المكون"
+                                                    Binding="{Binding ComponentName}"
+                                                    Width="*"/>
+                                <DataGridTextColumn Header="النوع"
+                                                    Binding="{Binding ComponentType}"
+                                                    Width="65"/>
+                                <DataGridTextColumn Header="النسبة %"
+                                                    Binding="{Binding RatePercent}"
+                                                    Width="70"/>
+                                <DataGridTextColumn Header="من"
+                                                    Binding="{Binding EffectiveFrom, StringFormat=yyyy-MM-dd}"
+                                                    Width="90"/>
+                                <DataGridTextColumn Header="إلى"
+                                                    Binding="{Binding EffectiveTo, StringFormat=yyyy-MM-dd}"
+                                                    Width="90"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Text="إغلاق فترة سريان السجل المحدد"
+                                   FontWeight="SemiBold"
+                                   Margin="0,12,0,5"/>
+
+                        <TextBlock Text="تاريخ نهاية السريان (yyyy-MM-dd)"
+                                   FontSize="11"
+                                   Foreground="#64748B"/>
+
+                        <TextBox x:Name="CloseRateDateTextBox"
+                                 Height="32"
+                                 Margin="0,4,0,6"
+                                 FlowDirection="LeftToRight"
+                                 ToolTip="مثال: 2026-12-31"/>
+
+                        <Button x:Name="CloseRateButton"
+                                Content="إغلاق فترة السريان للسجل المحدد"
+                                Height="34"
+                                Background="#D97706"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Click="CloseRateButton_Click"/>
+
+                        <Separator Margin="0,14,0,12"/>
+
+                        <TextBlock Text="إضافة مكون ضريبي جديد"
+                                   FontSize="15"
+                                   FontWeight="Bold"
+                                   Foreground="#17365D"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock Text="كود المكون"/>
+                        <TextBox x:Name="ComponentCodeTextBox"
+                                 Height="32"
+                                 Margin="0,4,0,8"
+                                 FlowDirection="LeftToRight"
+                                 MaxLength="50"/>
+
+                        <TextBlock Text="اسم المكون"/>
+                        <TextBox x:Name="ComponentNameTextBox"
+                                 Height="32"
+                                 Margin="0,4,0,8"/>
+
+                        <TextBlock Text="نوع المكون"/>
+                        <ComboBox x:Name="ComponentTypeComboBox"
+                                  Height="32"
+                                  Margin="0,4,0,8"
+                                  SelectedIndex="0">
+                            <ComboBoxItem Content="ضريبة قيمة مضافة VAT" Tag="VAT"/>
+                            <ComboBoxItem Content="ضريبة جدول Schedule" Tag="Schedule"/>
+                        </ComboBox>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                <TextBlock Text="النسبة المئوية"/>
+                                <TextBox x:Name="RatePercentTextBox"
+                                         Height="32"
+                                         Margin="0,4,0,8"
+                                         FlowDirection="LeftToRight"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                <TextBlock Text="ترتيب الحساب"/>
+                                <TextBox x:Name="CalculationOrderTextBox"
+                                         Text="1"
+                                         Height="32"
+                                         Margin="0,4,0,8"
+                                         FlowDirection="LeftToRight"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="تاريخ بداية السريان (yyyy-MM-dd)"/>
+                        <TextBox x:Name="EffectiveFromTextBox"
+                                 Height="32"
+                                 Margin="0,4,0,8"
+                                 FlowDirection="LeftToRight"/>
+
+                        <CheckBox x:Name="IsCompoundCheckBox"
+                                  Content="يُحسب هذا المكون على الضريبة السابقة"
+                                  Margin="0,0,0,10"/>
+
+                        <Button x:Name="AddRateButton"
+                                Content="＋ إضافة المكون إلى التصنيف"
+                                Height="38"
+                                Background="#0F766E"
+                                Foreground="White"
+                                FontWeight="Bold"
+                                BorderThickness="0"
+                                Click="AddRateButton_Click"/>
+
+                        <TextBlock Text="سبب التعديل / ملاحظات التدقيق"
+                                   Margin="0,14,0,4"
+                                   FontWeight="SemiBold"/>
+
+                        <TextBox x:Name="ReasonTextBox"
+                                 Height="48"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"/>
+
+                        <Separator Margin="0,14,0,12"/>
+
+                        <WrapPanel HorizontalAlignment="Left">
+                            <Button x:Name="SaveProfileButton"
+                                    Content="حفظ التصنيف"
+                                    Width="130"
+                                    Height="40"
+                                    Margin="0,0,8,8"
+                                    Background="#16865D"
+                                    Foreground="White"
+                                    FontWeight="Bold"
+                                    BorderThickness="0"
+                                    Click="SaveProfileButton_Click"/>
+
+                            <Button x:Name="DeactivateProfileButton"
+                                    Content="تعطيل التصنيف"
+                                    Width="130"
+                                    Height="40"
+                                    Margin="0,0,8,8"
+                                    Background="#DC2626"
+                                    Foreground="White"
+                                    BorderThickness="0"
+                                    Click="DeactivateProfileButton_Click"/>
+
+                            <Button Content="إغلاق النافذة"
+                                    Width="110"
+                                    Height="40"
+                                    Margin="0,0,0,8"
+                                    Background="#64748B"
+                                    Foreground="White"
+                                    BorderThickness="0"
+                                    Click="CloseButton_Click"/>
+                        </WrapPanel>
+
+                        <TextBlock x:Name="StatusTextBlock"
+                                   Foreground="#475569"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,5,0,0"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
