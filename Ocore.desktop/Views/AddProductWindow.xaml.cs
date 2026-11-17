@@ -155,6 +155,7 @@ namespace Ocore.desktop.Views
                        StringComparison.OrdinalIgnoreCase);
         }
 
+
         private void LoadTaxProfiles()
         {
             try
@@ -173,11 +174,9 @@ namespace Ocore.desktop.Views
                          profile.Id == currentProfileId.Value))
                     .Where(profile =>
                         !profile.IsSystem ||
+                        IsUnclassifiedProfile(profile) ||
                         (currentProfileId.HasValue &&
                          profile.Id == currentProfileId.Value))
-                    .Where(profile =>
-                        isEditMode ||
-                        !IsUnclassifiedProfile(profile))
                     .OrderBy(profile => profile.Name)
                     .ToList();
 
@@ -191,6 +190,20 @@ namespace Ocore.desktop.Views
                 {
                     TaxProfileComboBox.SelectedValue =
                         currentProfileId.Value;
+                }
+                else if (!isEditMode)
+                {
+                    var unclassifiedProfile = availableTaxProfiles
+                        .FirstOrDefault(IsUnclassifiedProfile);
+
+                    if (unclassifiedProfile == null)
+                    {
+                        throw new InvalidOperationException(
+                            "لم يتم العثور على التصنيف النظامي «غير مصنف ضريبيًا».");
+                    }
+
+                    TaxProfileComboBox.SelectedValue =
+                        unclassifiedProfile.Id;
                 }
                 else
                 {

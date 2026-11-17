@@ -1166,12 +1166,13 @@ ORDER BY Name;";
                                 product.DrugCatalogId.Value);
                         }
 
+
                         ValidateProductTax(
                             connection,
                             transaction,
                             product.TaxProfileId,
                             product.TaxPriceMode,
-                            false);
+                            true);
 
                         string generatedCode;
                         string generatedBarcode;
