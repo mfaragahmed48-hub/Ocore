@@ -16,10 +16,10 @@ namespace Ocore.desktop.Views
     {
         private readonly int currentUserId;
         private readonly ProductService productService;
-        private readonly TaxProfileService taxProfileService;
+        
         private readonly string connectionString;
 
-        private List<TaxProfile> availableTaxProfiles;
+        
 
         private List<CatalogDrugItem> allCatalogDrugs;
         private ICollectionView catalogDrugsView;
@@ -62,9 +62,9 @@ namespace Ocore.desktop.Views
 
             currentUserId = userId;
             productService = new ProductService();
-            taxProfileService = new TaxProfileService();
+            
 
-            availableTaxProfiles = new List<TaxProfile>();
+            
 
             var database = new Ocore.desktop.Data.DatabaseManager();
 
@@ -103,8 +103,7 @@ namespace Ocore.desktop.Views
             CategoriesDataGrid.SelectionChanged +=
                 CategoriesDataGrid_SelectionChanged;
 
-            TaxProfileComboBox.SelectionChanged +=
-                TaxProfileComboBox_SelectionChanged;
+            
 
             UseCatalogDrugButton.IsEnabled = false;
 
@@ -126,7 +125,7 @@ namespace Ocore.desktop.Views
             RoutedEventArgs e)
         {
             LoadCategories();
-            LoadTaxProfiles();
+           
 
             if (isEditMode)
             {
@@ -137,181 +136,7 @@ namespace Ocore.desktop.Views
             LoadDrugCatalog();
         }
 
-        #region Tax Profiles
-
-        private bool IsUnclassifiedProfile(TaxProfile profile)
-        {
-            if (profile == null)
-                return false;
-
-            return string.Equals(
-                       profile.Code,
-                       "UNCLASSIFIED",
-                       StringComparison.OrdinalIgnoreCase)
-                   ||
-                   string.Equals(
-                       profile.TaxType,
-                       "Unclassified",
-                       StringComparison.OrdinalIgnoreCase);
-        }
-
-
-        private void LoadTaxProfiles()
-        {
-            try
-            {
-                var allProfiles =
-                    taxProfileService.GetAllProfiles(true);
-
-                int? currentProfileId = isEditMode
-                    ? productBeingEdited.TaxProfileId
-                    : (int?)null;
-
-                availableTaxProfiles = allProfiles
-                    .Where(profile =>
-                        profile.IsActive ||
-                        (currentProfileId.HasValue &&
-                         profile.Id == currentProfileId.Value))
-                    .Where(profile =>
-                        !profile.IsSystem ||
-                        IsUnclassifiedProfile(profile) ||
-                        (currentProfileId.HasValue &&
-                         profile.Id == currentProfileId.Value))
-                    .OrderBy(profile => profile.Name)
-                    .ToList();
-
-                TaxProfileComboBox.ItemsSource =
-                    availableTaxProfiles;
-
-                TaxProfileComboBox.DisplayMemberPath = "Name";
-                TaxProfileComboBox.SelectedValuePath = "Id";
-
-                if (isEditMode && currentProfileId.HasValue)
-                {
-                    TaxProfileComboBox.SelectedValue =
-                        currentProfileId.Value;
-                }
-                else if (!isEditMode)
-                {
-                    var unclassifiedProfile = availableTaxProfiles
-                        .FirstOrDefault(IsUnclassifiedProfile);
-
-                    if (unclassifiedProfile == null)
-                    {
-                        throw new InvalidOperationException(
-                            "لم يتم العثور على التصنيف النظامي «غير مصنف ضريبيًا».");
-                    }
-
-                    TaxProfileComboBox.SelectedValue =
-                        unclassifiedProfile.Id;
-                }
-                else
-                {
-                    TaxProfileComboBox.SelectedIndex = -1;
-                }
-
-                UpdateTaxProfileInfo();
-            }
-            catch (Exception ex)
-            {
-                SaveButton.IsEnabled = false;
-
-                MessageBox.Show(
-                    "تعذر تحميل التصنيفات الضريبية، ولذلك تم إيقاف الحفظ لحماية بيانات الأصناف.\n\n"
-                    + ex.Message,
-                    "خطأ في تحميل الضرائب",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private void TaxProfileComboBox_SelectionChanged(
-            object sender,
-            SelectionChangedEventArgs e)
-        {
-            UpdateTaxProfileInfo();
-        }
-
-        private void UpdateTaxProfileInfo()
-        {
-            var profile =
-                TaxProfileComboBox.SelectedItem as TaxProfile;
-
-            if (profile == null)
-            {
-                TaxProfileInfoTextBlock.Text =
-                    "اختر التصنيف الضريبي لمعرفة تفاصيل المعاملة.";
-
-                return;
-            }
-
-            DateTime today = DateTime.Today;
-
-            var activeRates = profile.Rates
-                .Where(rate =>
-                    rate.IsActive &&
-                    rate.EffectiveFrom.Date <= today &&
-                    (!rate.EffectiveTo.HasValue ||
-                     rate.EffectiveTo.Value.Date >= today))
-                .OrderBy(rate => rate.CalculationOrder)
-                .ToList();
-
-            if (activeRates.Count == 0)
-            {
-                TaxProfileInfoTextBlock.Text =
-                    profile.Name +
-                    (IsUnclassifiedProfile(profile)
-                        ? "\nهذا الصنف غير مصنف ضريبيًا، ولا يجوز اعتماده للبيع الضريبي."
-                        : "\nلا توجد نسبة سارية حاليًا لهذا التصنيف.");
-
-                return;
-            }
-
-            TaxProfileInfoTextBlock.Text =
-                profile.Name + "\n" +
-                string.Join(
-                    "\n",
-                    activeRates.Select(rate =>
-                        rate.ComponentName + ": " +
-                        rate.RatePercent.ToString(
-                            "0.####",
-                            CultureInfo.CurrentCulture) + "%"));
-        }
-
-        private string GetSelectedTaxPriceMode()
-        {
-            var selectedMode =
-                TaxPriceModeComboBox.SelectedItem as ComboBoxItem;
-
-            if (selectedMode == null || selectedMode.Tag == null)
-                return null;
-
-            return Convert.ToString(selectedMode.Tag);
-        }
-
-        private void ConfigureTaxPriceMode()
-        {
-            string mode = productBeingEdited.TaxPriceMode;
-
-            if (string.IsNullOrWhiteSpace(mode))
-                mode = "Exclusive";
-
-            var matchingItem = TaxPriceModeComboBox.Items
-                .OfType<ComboBoxItem>()
-                .FirstOrDefault(item =>
-                    string.Equals(
-                        Convert.ToString(item.Tag),
-                        mode,
-                        StringComparison.OrdinalIgnoreCase));
-
-            if (matchingItem != null)
-                TaxPriceModeComboBox.SelectedItem = matchingItem;
-            else
-                TaxPriceModeComboBox.SelectedIndex = 0;
-        }
-
-        #endregion
-
+        
         private void ConfigureEditMode()
         {
             Title = "O CORE - تعديل بيانات الصنف";
@@ -370,7 +195,7 @@ namespace Ocore.desktop.Views
                 productBeingEdited.PurchasePrice.ToString(
                     CultureInfo.CurrentCulture);
 
-            ConfigureTaxPriceMode();
+              
 
             if (productBeingEdited.CategoryId.HasValue)
             {
@@ -858,43 +683,7 @@ ORDER BY TradeName;";
                     return;
                 }
 
-                // التحقق من التصنيف الضريبي
-                if (TaxProfileComboBox.SelectedValue == null)
-                {
-                    MessageBox.Show(
-                        "اختر التصنيف الضريبي للصنف.",
-                        "التصنيف الضريبي مطلوب",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-
-                    TaxProfileComboBox.Focus();
-                    return;
-                }
-
-                int selectedTaxProfileId;
-
-                if (!int.TryParse(
-                    Convert.ToString(TaxProfileComboBox.SelectedValue),
-                    out selectedTaxProfileId) ||
-                    selectedTaxProfileId <= 0)
-                {
-                    MessageBox.Show("التصنيف الضريبي المحدد غير صحيح.");
-                    TaxProfileComboBox.Focus();
-                    return;
-                }
-
-                string taxPriceMode = GetSelectedTaxPriceMode();
-
-                if (taxPriceMode != "Exclusive" &&
-                    taxPriceMode != "Inclusive")
-                {
-                    MessageBox.Show(
-                        "اختر طريقة عرض السعر: شامل الضريبة أو غير شامل الضريبة.");
-
-                    TaxPriceModeComboBox.Focus();
-                    return;
-                }
-
+                
                 if (!TryReadNumber(
                     SalePriceTextBox.Text, out double salePrice))
                 {
@@ -1047,9 +836,7 @@ ORDER BY TradeName;";
                     SalePrice = salePrice,
                     PurchasePrice = purchasePrice,
 
-                    TaxProfileId = selectedTaxProfileId,
-                    TaxPriceMode = taxPriceMode,
-
+                   
                     DrugCatalogId = isEditMode
                         ? productBeingEdited.DrugCatalogId
                         : selectedCatalogDrug?.Id

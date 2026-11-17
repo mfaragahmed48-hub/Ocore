@@ -604,7 +604,7 @@ namespace Ocore.desktop.Services
         // ==========================================
 
         private double ValidateAndGetLineTotal(
-            PurchaseInvoiceItem item)
+    PurchaseInvoiceItem item)
         {
             if (item.UnitPrice < 0 ||
                 IsInvalidNumber(item.UnitPrice))
@@ -622,20 +622,15 @@ namespace Ocore.desktop.Services
                     item.ItemName);
             }
 
-            if (item.TaxPercent < 0 ||
-                IsInvalidNumber(item.TaxPercent))
-            {
-                throw new Exception(
-                    "نسبة الضريبة لا يمكن أن تكون سالبة للصنف: " +
-                    item.ItemName);
-            }
+            // الفواتير الجديدة بدون ضرائب
+            item.TaxPercent = 0;
 
             double lineTotal = item.Total;
 
             if (IsInvalidNumber(lineTotal) || lineTotal < 0)
             {
                 throw new Exception(
-                    "إجمالي الصنف بعد الخصم والضريبة غير صحيح: " +
+                    "إجمالي الصنف بعد الخصم غير صحيح: " +
                     item.ItemName);
             }
 
@@ -644,13 +639,12 @@ namespace Ocore.desktop.Services
                 IsInvalidNumber(item.NetUnitPrice))
             {
                 throw new Exception(
-                    "تعذر حساب الخصم أو الضريبة للصنف: " +
+                    "تعذر حساب الخصم أو صافي سعر الوحدة للصنف: " +
                     item.ItemName);
             }
 
             return RoundMoney(lineTotal);
         }
-
         // ==========================================
         // حفظ فاتورة شراء جديدة
         // ==========================================
@@ -754,11 +748,14 @@ namespace Ocore.desktop.Services
                                     "يوجد صنف برقم غير صحيح.");
 
                             PreparePurchaseItem(
-                                connection,
-                                transaction,
-                                item);
+    connection,
+    transaction,
+    item);
 
-                            // تاريخ الصلاحية للأصناف اليدوية اختياري،
+                            // إلغاء الضريبة من فواتير الشراء الجديدة
+                            item.TaxPercent = 0;
+
+                            // تاريخ الصلاحية للأصناف اليدوية اختياري،،
                             // لكن إذا تم إدخاله فيجب أن يكون صالحًا.
                             if (item.ExpiryDate.HasValue)
                             {

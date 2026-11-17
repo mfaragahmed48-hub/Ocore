@@ -360,7 +360,7 @@
                             Click="RemoveItemButton_Click"/>
                 </Grid>
 
-                <TextBlock Text="يمكن تعديل الكمية والوحدة والمجاني والخصم والضريبة مباشرة داخل الجدول قبل الحفظ."
+                <TextBlock Text="يمكن تعديل الكمية والوحدة والمجاني والخصم مباشرة داخل الجدول قبل الحفظ."
                            FontSize="10"
                            Foreground="{StaticResource MutedBrush}"
                            Margin="3,6,3,0"/>
@@ -493,8 +493,7 @@
                         <DataGridTextColumn Header="خصم %" Binding="{Binding DiscountPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
                         <DataGridTextColumn Header="قيمة الخصم" Binding="{Binding DiscountAmount, StringFormat=N2}" IsReadOnly="True" Width="80"/>
                         <DataGridTextColumn Header="بعد الخصم" Binding="{Binding DiscountedUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
-                        <DataGridTextColumn Header="ضريبة %" Binding="{Binding TaxPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
-                        <DataGridTextColumn Header="قيمة الضريبة" Binding="{Binding TaxAmount, StringFormat=N2}" IsReadOnly="True" Width="80"/>
+                      
                         <DataGridTextColumn Header="صافي الوحدة" Binding="{Binding NetUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
                         <DataGridTextColumn Header="الإجمالي" Binding="{Binding Total, StringFormat=N2}" IsReadOnly="True" Width="85"/>
                         <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="120"/>
