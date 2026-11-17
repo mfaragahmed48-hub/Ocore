@@ -274,6 +274,92 @@ namespace Ocore.desktop.Services
 
         #endregion
 
+        #region Product Tax Validation
+
+        private void ValidateProductTax(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            int? taxProfileId,
+            string taxPriceMode,
+            bool allowUnclassified)
+        {
+            if (!taxProfileId.HasValue || taxProfileId.Value <= 0)
+            {
+                throw new InvalidOperationException(
+                    "يجب اختيار التصنيف الضريبي للصنف.");
+            }
+
+            if (!string.Equals(
+                taxPriceMode,
+                "Inclusive",
+                StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(
+                taxPriceMode,
+                "Exclusive",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "طريقة احتساب السعر الضريبي غير صحيحة.");
+            }
+
+            using (var command = new SQLiteCommand(
+                @"SELECT Code, TaxType, IsActive, IsSystem
+          FROM TaxProfiles
+          WHERE Id = @Id
+          LIMIT 1;",
+                connection,
+                transaction))
+            {
+                command.Parameters.AddWithValue(
+                    "@Id",
+                    taxProfileId.Value);
+
+                using (var reader = command.ExecuteReader())
+                {
+                    if (!reader.Read())
+                    {
+                        throw new InvalidOperationException(
+                            "التصنيف الضريبي المحدد غير موجود.");
+                    }
+
+                    string code = Convert.ToString(reader["Code"]);
+                    string taxType = Convert.ToString(reader["TaxType"]);
+                    bool isActive = Convert.ToInt32(reader["IsActive"]) == 1;
+                    bool isSystem = Convert.ToInt32(reader["IsSystem"]) == 1;
+
+                    bool isUnclassified =
+                        string.Equals(
+                            code,
+                            "UNCLASSIFIED",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(
+                            taxType,
+                            "Unclassified",
+                            StringComparison.OrdinalIgnoreCase);
+
+                    if (!isActive)
+                    {
+                        throw new InvalidOperationException(
+                            "التصنيف الضريبي المحدد غير نشط.");
+                    }
+
+                    if (isUnclassified && !allowUnclassified)
+                    {
+                        throw new InvalidOperationException(
+                            "لا يمكن إضافة صنف جديد دون تحديد معاملته الضريبية.");
+                    }
+
+                    if (isSystem && !isUnclassified)
+                    {
+                        throw new InvalidOperationException(
+                            "لا يمكن استخدام تصنيف ضريبي نظامي غير مخصص للأصناف.");
+                    }
+                }
+            }
+        }
+
+        #endregion
+
         #region Get Products
 
         public List<Product> GetProductsForManagement(int currentUserId)
@@ -1072,6 +1158,13 @@ ORDER BY Name;";
                                 product.DrugCatalogId.Value);
                         }
 
+                        ValidateProductTax(
+                            connection,
+                            transaction,
+                            product.TaxProfileId,
+                            product.TaxPriceMode,
+                            false);
+
                         string generatedCode;
                         string generatedBarcode;
 
@@ -1080,18 +1173,38 @@ ORDER BY Name;";
                             transaction,
                             out generatedCode,
                             out generatedBarcode);
-
+                        ValidateProductTax(
+    connection,
+    transaction,
+    product.TaxProfileId,
+    product.TaxPriceMode,
+    false);
                         using (var command = new SQLiteCommand(
-                            @"INSERT INTO Products
-                              (ProductCode, Name, DrugCatalogId,
-                               CategoryId, UnitName,
-                               SmallUnitName, UnitsPerPackage,
-                               SalePrice, PurchasePrice, IsArchived, CreatedAt)
-                              VALUES
-                              (@Code, @Name, @DrugCatalogId,
-                               @CategoryId, @Unit,
-                               @SmallUnitName, @UnitsPerPackage,
-                               @SalePrice, @PurchasePrice, 0, @CreatedAt);",
+
+@"INSERT INTO Products
+  (ProductCode, Name, DrugCatalogId,
+   CategoryId, UnitName,
+   SmallUnitName, UnitsPerPackage,
+   SalePrice, PurchasePrice,
+   TaxProfileId, TaxPriceMode,
+   IsArchived, CreatedAt)
+  VALUES
+  (@Code, @Name, @DrugCatalogId,
+   @CategoryId, @Unit,
+   @SmallUnitName, @UnitsPerPackage,
+   @SalePrice, @PurchasePrice,
+
+command.Parameters.AddWithValue(
+    ""@TaxProfileId"",
+    product.TaxProfileId.Value);
+
+command.Parameters.AddWithValue(
+    ""@TaxPriceMode"",
+    product.TaxPriceMode);
+
+   @TaxProfileId, @TaxPriceMode,
+   0, @CreatedAt);"
+
                             connection, transaction))
                         {
                             command.Parameters.AddWithValue(
