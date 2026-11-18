@@ -1456,13 +1456,14 @@ namespace Ocore.desktop.Views
             return true;
         }
 
+
         private void ResetAccountingInputs()
         {
             CustomerComboBox.SelectedIndex = -1;
             CustomerComboBox.Text = string.Empty;
 
             DiscountValueTextBox.Text = "0";
-            DiscountTypeComboBox.SelectedIndex = 0;
+            DiscountTypeComboBox.SelectedIndex = 1;
 
             PaidAmountTextBox.Text = "0";
             PaymentMethodComboBox.SelectedIndex = 0;
