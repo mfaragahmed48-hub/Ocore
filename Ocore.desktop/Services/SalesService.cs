@@ -1961,16 +1961,15 @@ TaxStatus = 'Legacy'
         }
 
         private ProductSaleInfo GetProduct(
-            SQLiteConnection connection,
-            SQLiteTransaction transaction,
-            int productId)
+    SQLiteConnection connection,
+    SQLiteTransaction transaction,
+    int productId)
         {
             using (var command = new SQLiteCommand(
                 @"SELECT
-              Id, Name, UnitName, SmallUnitName,
-              UnitsPerPackage, SalePrice, IsArchived,
-              MaxDiscountPercentage,
-              
+            Id, Name, UnitName, SmallUnitName,
+            UnitsPerPackage, SalePrice, IsArchived,
+            MaxDiscountPercentage
           FROM Products
           WHERE Id = @id;",
                 connection, transaction))
@@ -1993,9 +1992,7 @@ TaxStatus = 'Legacy'
                         IsArchived = Convert.ToInt32(reader["IsArchived"]) == 1,
 
                         MaxDiscountPercentage =
-                            ReadDouble(reader["MaxDiscountPercentage"], 0),
-
-                        
+                            ReadDouble(reader["MaxDiscountPercentage"], 0)
                     };
                 }
             }
