@@ -288,10 +288,9 @@
                                                 Width="75"/>
 
                             <DataGridTextColumn Header="الإجمالي"
-                                                Binding="{Binding Total, StringFormat={}{0:N2}}"
-                                                IsReadOnly="True"
-                                                Width="75"/>
-
+                    Binding="{Binding NetTotal, StringFormat={}{0:N2}}"
+                    IsReadOnly="True"
+                    Width="75"/>
                         </DataGrid.Columns>
                     </DataGrid>
 
