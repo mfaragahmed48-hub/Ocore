@@ -142,9 +142,21 @@
                                             Width="100"/>
 
                         <DataGridTextColumn Header="المنتهي"
-                                            Binding="{Binding ExpiredQuantity, StringFormat=N3}"
-                                            Width="90"/>
-
+                    Binding="{Binding ExpiredQuantity, StringFormat=N3}"
+                    Width="90">
+                            <DataGridTextColumn.CellStyle>
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="Background" Value="#F8D7DA"/>
+                                    <Setter Property="Foreground" Value="#842029"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ExpiredQuantity}" Value="0">
+                                            <Setter Property="Background" Value="White"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGridTextColumn.CellStyle>
+                        </DataGridTextColumn>
                         <DataGridTextColumn Header="الباركود"
                                             Binding="{Binding Barcode}"
                                             Width="110"/>
