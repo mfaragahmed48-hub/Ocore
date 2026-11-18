@@ -462,10 +462,10 @@
                                  VerticalContentAlignment="Center"/>
 
                         <ComboBox x:Name="DiscountTypeComboBox"
-                                  Grid.Column="1"
-                                  Height="32"
-                                  Margin="4,0,0,0"
-                                  SelectedIndex="0">
+          Grid.Column="1"
+          Height="32"
+          Margin="4,0,0,0"
+          SelectedIndex="1">
                             <ComboBoxItem Content="مبلغ" Tag="Amount"/>
                             <ComboBoxItem Content="نسبة %" Tag="Percentage"/>
                         </ComboBox>
