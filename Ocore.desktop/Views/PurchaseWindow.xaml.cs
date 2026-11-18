@@ -28,7 +28,8 @@ namespace Ocore.desktop.Views
         private List<Product> allProducts;
         private ICollectionView productsView;
         private TextBox productEditableTextBox;
-
+        // الباركود الدولي الذي ينتظر تأكيد ربطه بصنف
+        private string pendingInternationalBarcode;
         private readonly Dictionary<PurchaseInvoiceItem, double>
             packagePrices = new Dictionary<PurchaseInvoiceItem, double>();
 
@@ -243,6 +244,239 @@ namespace Ocore.desktop.Views
             if (ProductComboBox.Items.Count > 0)
                 ProductComboBox.IsDropDownOpen = true;
         }
+
+        // ==========================================
+        // قراءة الباركود الدولي وربطه بالصنف
+        // ==========================================
+
+        private void BarcodeScanTextBox_KeyDown(
+            object sender,
+            System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                e.Handled = true;
+                ProcessScannedBarcode();
+            }
+        }
+
+        private void ReadBarcodeButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            ProcessScannedBarcode();
+        }
+
+        private void ProcessScannedBarcode()
+        {
+            string scannedValue =
+                (BarcodeScanTextBox.Text ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(scannedValue))
+            {
+                BarcodeStatusTextBlock.Text =
+                    "امسح الباركود أولاً.";
+
+                BarcodeScanTextBox.Focus();
+                return;
+            }
+
+            pendingInternationalBarcode = null;
+            LinkPendingBarcodeButton.IsEnabled = false;
+
+            try
+            {
+                GS1BarcodeData barcodeData =
+                    GS1BarcodeService.Parse(scannedValue);
+
+                int? productId =
+                    productService.FindProductIdByBarcode(
+                        barcodeData.GTIN);
+
+                if (productId.HasValue)
+                {
+                    Product product = allProducts.Find(
+                        p => p.Id == productId.Value);
+
+                    if (product == null)
+                    {
+                        LoadProducts();
+
+                        product = allProducts.Find(
+                            p => p.Id == productId.Value);
+                    }
+
+                    if (product == null)
+                    {
+                        throw new InvalidOperationException(
+                            "تم العثور على الباركود، لكن تعذر تحميل بيانات الصنف.");
+                    }
+
+                    ProductComboBox.SelectedItem = product;
+                    ProductComboBox.Text = product.Name;
+
+                    // لا نستبدل البيانات اليدوية إذا لم يرسلها الباركود.
+                    if (!string.IsNullOrWhiteSpace(
+                        barcodeData.BatchNumber))
+                    {
+                        BatchNumberTextBox.Text =
+                            barcodeData.BatchNumber;
+                    }
+
+                    if (barcodeData.ExpiryDate.HasValue)
+                    {
+                        ExpiryDatePicker.SelectedDate =
+                            barcodeData.ExpiryDate.Value.Date;
+                    }
+
+                    BarcodeStatusTextBlock.Text =
+                        "تم التعرف على الصنف: " +
+                        product.Name +
+                        " - GTIN: " +
+                        barcodeData.GTIN +
+                        (barcodeData.BatchNumber != null
+                            ? " - التشغيلة: " + barcodeData.BatchNumber
+                            : "") +
+                        (barcodeData.ExpiryDate.HasValue
+                            ? " - الصلاحية: " +
+                              barcodeData.ExpiryDate.Value.ToString("yyyy-MM-dd")
+                            : "");
+
+                    BarcodeScanTextBox.Clear();
+                    ProductComboBox.Focus();
+                }
+                else
+                {
+                    pendingInternationalBarcode =
+                        barcodeData.GTIN;
+
+                    BarcodeStatusTextBlock.Text =
+                        "هذا الباركود غير مرتبط بأي صنف. اختر الصنف يدويًا، ثم اضغط (ربط بالصنف المحدد)."
+                        + " GTIN: " + barcodeData.GTIN;
+
+                    // نملأ بيانات التشغيلة والصلاحية إن وجدت،
+                    // دون ربط الباركود تلقائيًا.
+                    if (!string.IsNullOrWhiteSpace(
+                        barcodeData.BatchNumber))
+                    {
+                        BatchNumberTextBox.Text =
+                            barcodeData.BatchNumber;
+                    }
+
+                    if (barcodeData.ExpiryDate.HasValue)
+                    {
+                        ExpiryDatePicker.SelectedDate =
+                            barcodeData.ExpiryDate.Value.Date;
+                    }
+
+                    LinkPendingBarcodeButton.IsEnabled = true;
+
+                    BarcodeScanTextBox.Clear();
+                    ProductComboBox.Focus();
+                }
+            }
+            catch (Exception ex)
+            {
+                pendingInternationalBarcode = null;
+                LinkPendingBarcodeButton.IsEnabled = false;
+
+                BarcodeStatusTextBlock.Text =
+                    "تعذر قراءة الباركود: " + ex.Message;
+
+                MessageBox.Show(
+                    "تعذر قراءة الباركود:\n" + ex.Message,
+                    "باركود غير صالح",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                BarcodeScanTextBox.Focus();
+                BarcodeScanTextBox.SelectAll();
+            }
+        }
+
+        // ==========================================
+        // تأكيد ربط الباركود بالصنف المحدد
+        // ==========================================
+
+        private void LinkPendingBarcodeButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(
+                pendingInternationalBarcode))
+            {
+                MessageBox.Show(
+                    "لا يوجد باركود جديد ينتظر الربط.");
+
+                return;
+            }
+
+            Product selectedProduct =
+                ProductComboBox.SelectedItem as Product;
+
+            if (selectedProduct == null ||
+                !string.Equals(
+                    (ProductComboBox.Text ?? "").Trim(),
+                    (selectedProduct.Name ?? "").Trim(),
+                    StringComparison.CurrentCultureIgnoreCase))
+            {
+                MessageBox.Show(
+                    "اختر الصنف الصحيح من القائمة أولاً.",
+                    "اختيار الصنف",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                ProductComboBox.Focus();
+                return;
+            }
+
+            string barcodeToLink =
+                pendingInternationalBarcode;
+
+            var confirmation = MessageBox.Show(
+                "هل تريد ربط الباركود التالي بالصنف المحدد؟\n\n"
+                + "الصنف: " + selectedProduct.Name + "\n"
+                + "الباركود: " + barcodeToLink + "\n\n"
+                + "لن يمكن ربط هذا الباركود بصنف آخر بعد تأكيد العملية.",
+                "تأكيد ربط الباركود",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                productService.LinkInternationalBarcode(
+                    currentUserId,
+                    selectedProduct.Id,
+                    barcodeToLink);
+
+                pendingInternationalBarcode = null;
+                LinkPendingBarcodeButton.IsEnabled = false;
+
+                BarcodeStatusTextBlock.Text =
+                    "تم ربط الباركود بنجاح بالصنف: " +
+                    selectedProduct.Name;
+
+                MessageBox.Show(
+                    "تم ربط الباركود بالصنف بنجاح.",
+                    "نجاح",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                BarcodeScanTextBox.Focus();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "تعذر ربط الباركود:\n" + ex.Message,
+                    "خطأ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
 
         // ==========================================
         // اختيار الصنف

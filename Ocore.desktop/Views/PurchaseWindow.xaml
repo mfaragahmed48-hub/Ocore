@@ -99,7 +99,6 @@
         </Style>
     </Window.Resources>
 
-    <!-- الشاشة الرئيسية: الأجزاء ثابتة والجدول وحده يتمرر -->
     <Grid Margin="10"
           MinWidth="1050">
 
@@ -150,7 +149,7 @@
             </Grid>
         </Border>
 
-        <!-- بيانات المورد والفاتورة: ثابتة -->
+        <!-- بيانات المورد والفاتورة -->
         <Border Grid.Row="1"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -198,7 +197,7 @@
             </Grid>
         </Border>
 
-        <!-- إضافة صنف: ثابتة -->
+        <!-- إضافة صنف -->
         <Border Grid.Row="2"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -208,6 +207,64 @@
                 Margin="0,0,0,8">
 
             <StackPanel>
+
+                <!-- منطقة مسح الباركود الدولي -->
+                <Border Background="#F7FAF8"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="7"
+                        Margin="3,0,3,8">
+
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="3">
+                            <TextBlock Text="مسح الباركود الدولي"
+                                       Style="{StaticResource FieldLabel}"/>
+
+                            <TextBox x:Name="BarcodeScanTextBox"
+                                     ToolTip="امسح الباركود باستخدام قارئ USB"
+                                     KeyDown="BarcodeScanTextBox_KeyDown"/>
+                        </StackPanel>
+
+                        <Button x:Name="ReadBarcodeButton"
+                                Grid.Column="1"
+                                Content="قراءة الباركود"
+                                Width="115"
+                                Margin="5,17,3,0"
+                                Style="{StaticResource PrimaryButton}"
+                                Click="ReadBarcodeButton_Click"/>
+
+                        <Button x:Name="LinkPendingBarcodeButton"
+                                Grid.Column="2"
+                                Content="ربط بالصنف المحدد"
+                                Width="135"
+                                Margin="3,17,3,0"
+                                Style="{StaticResource SecondaryButton}"
+                                IsEnabled="False"
+                                Click="LinkPendingBarcodeButton_Click"/>
+
+                        <TextBlock Grid.Row="1"
+                                   Grid.ColumnSpan="3"
+                                   x:Name="BarcodeStatusTextBlock"
+                                   Text="امسح الباركود للتعرف على الصنف والتشغيلة والصلاحية."
+                                   FontSize="10"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="4,5,4,0"
+                                   TextWrapping="Wrap"/>
+                    </Grid>
+                </Border>
+
                 <DockPanel Margin="3,0,3,7">
                     <TextBlock Text="إضافة صنف إلى الفاتورة"
                                FontSize="14"
@@ -238,50 +295,48 @@
                                 <ColumnDefinition Width="95"/>
                             </Grid.ColumnDefinitions>
 
-
                             <ComboBox x:Name="ProductComboBox"
-          Grid.Column="0"
-          IsEditable="True"
-          IsReadOnly="False"
-          IsTextSearchEnabled="False"
-          StaysOpenOnEdit="True"
-          TextSearch.TextPath="Name"
-          SelectedValuePath="Id"
-          MaxDropDownHeight="280">
+                                      Grid.Column="0"
+                                      IsEditable="True"
+                                      IsReadOnly="False"
+                                      IsTextSearchEnabled="False"
+                                      StaysOpenOnEdit="True"
+                                      TextSearch.TextPath="Name"
+                                      SelectedValuePath="Id"
+                                      MaxDropDownHeight="280">
 
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Margin="4,3">
                                             <TextBlock Text="{Binding Name}"
-                           FontWeight="Bold"
-                           FontSize="12"/>
+                                                       FontWeight="Bold"
+                                                       FontSize="12"/>
 
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="الكود: "
-                               FontSize="10"
-                               Foreground="Gray"/>
+                                                           FontSize="10"
+                                                           Foreground="Gray"/>
                                                 <TextBlock Text="{Binding ProductCode}"
-                               FontSize="10"
-                               Margin="0,0,12,0"/>
+                                                           FontSize="10"
+                                                           Margin="0,0,12,0"/>
 
                                                 <TextBlock Text="سعر البيع: "
-                               FontSize="10"
-                               Foreground="Gray"/>
+                                                           FontSize="10"
+                                                           Foreground="Gray"/>
                                                 <TextBlock Text="{Binding SalePrice, StringFormat={}{0:N2}}"
-                               FontSize="10"
-                               Margin="0,0,12,0"/>
+                                                           FontSize="10"
+                                                           Margin="0,0,12,0"/>
 
                                                 <TextBlock Text="سعر الشراء: "
-                               FontSize="10"
-                               Foreground="Gray"/>
+                                                           FontSize="10"
+                                                           Foreground="Gray"/>
                                                 <TextBlock Text="{Binding PurchasePrice, StringFormat={}{0:N2}}"
-                               FontSize="10"/>
+                                                           FontSize="10"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
-
 
                             <Button Grid.Column="1"
                                     Content="+ صنف جديد"
@@ -332,7 +387,6 @@
                                  HorizontalContentAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- سعر البيع المسجل في الأصناف والمخزن: للعرض فقط -->
                     <StackPanel Grid.Column="2" Margin="3">
                         <TextBlock Text="سعر البيع الحالي" Style="{StaticResource FieldLabel}"/>
                         <TextBox x:Name="SalePriceTextBox"
@@ -367,7 +421,7 @@
             </StackPanel>
         </Border>
 
-        <!-- جدول الأصناف: هو الجزء القابل للتمرير -->
+        <!-- جدول الأصناف -->
         <Border Grid.Row="3"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -493,7 +547,6 @@
                         <DataGridTextColumn Header="خصم %" Binding="{Binding DiscountPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
                         <DataGridTextColumn Header="قيمة الخصم" Binding="{Binding DiscountAmount, StringFormat=N2}" IsReadOnly="True" Width="80"/>
                         <DataGridTextColumn Header="بعد الخصم" Binding="{Binding DiscountedUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
-                      
                         <DataGridTextColumn Header="صافي الوحدة" Binding="{Binding NetUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
                         <DataGridTextColumn Header="الإجمالي" Binding="{Binding Total, StringFormat=N2}" IsReadOnly="True" Width="85"/>
                         <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="120"/>
@@ -502,7 +555,7 @@
             </Grid>
         </Border>
 
-        <!-- إجمالي الفاتورة وأزرار التحكم: ثابتة -->
+        <!-- إجمالي الفاتورة وأزرار التحكم -->
         <Border Grid.Row="4"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
