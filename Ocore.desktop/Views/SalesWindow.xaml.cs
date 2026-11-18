@@ -134,7 +134,8 @@ namespace Ocore.desktop.Views
 
             CustomerComboBox.SelectionChanged +=
                 CustomerComboBox_SelectionChanged;
-
+            ManageCustomersButton.Click +=
+    ManageCustomersButton_Click;
             CustomerComboBox.AddHandler(
                 TextBox.TextChangedEvent,
                 new TextChangedEventHandler(CustomerComboBox_TextChanged));
@@ -232,6 +233,60 @@ namespace Ocore.desktop.Views
 
         #region Customers
 
+        private void ManageCustomersButton_Click(
+    object sender,
+    RoutedEventArgs e)
+        {
+            try
+            {
+                Customer selectedCustomer = GetSelectedCustomer();
+
+                int? selectedCustomerId =
+                    selectedCustomer != null
+                        ? (int?)selectedCustomer.Id
+                        : null;
+
+                var window =
+                    new CustomersManagementWindow(currentUserId);
+
+                window.Owner = this;
+                window.ShowDialog();
+
+                // إعادة تحميل العملاء بعد إغلاق شاشة الإدارة.
+                LoadCustomers();
+
+                // استعادة العميل السابق إن كان ما زال نشطًا.
+                if (selectedCustomerId.HasValue &&
+                    allCustomers != null)
+                {
+                    Customer customer = allCustomers.FirstOrDefault(
+                        x => x.Id == selectedCustomerId.Value);
+
+                    if (customer != null)
+                    {
+                        CustomerComboBox.SelectedItem = customer;
+                    }
+                }
+
+                UpdateGrandTotal();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                MessageBox.Show(
+                    "ليس لديك صلاحية إدارة العملاء.\n\n" + ex.Message,
+                    "صلاحيات العملاء",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "تعذر فتح إدارة العملاء:\n\n" + ex.Message,
+                    "خطأ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
         private void LoadCustomers()
         {
             isLoadingCustomers = true;

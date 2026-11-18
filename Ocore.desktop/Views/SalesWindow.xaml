@@ -243,17 +243,16 @@
                                                 IsReadOnly="True"
                                                 Width="*"/>
 
-
                             <DataGridTemplateColumn Header="الوحدة"
-                        Width="95">
+                                                    Width="95">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <ComboBox ItemsSource="{Binding UnitOptions}"
-                      SelectedItem="{Binding UnitName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                      VerticalContentAlignment="Center"
-                      HorizontalContentAlignment="Center"
-                      FontSize="11"
-                      MinWidth="75"/>
+                                                  SelectedItem="{Binding UnitName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  VerticalContentAlignment="Center"
+                                                  HorizontalContentAlignment="Center"
+                                                  FontSize="11"
+                                                  MinWidth="75"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
@@ -279,10 +278,10 @@
                                                 Width="65"/>
 
                             <DataGridTextColumn Header="الخصم الفعلي %"
-                    Binding="{Binding AppliedDiscountPercentage, StringFormat={}{0:N2}}"
-                    IsReadOnly="True"
-                    Width="100"/>
-                            
+                                                Binding="{Binding AppliedDiscountPercentage, StringFormat={}{0:N2}}"
+                                                IsReadOnly="True"
+                                                Width="100"/>
+
                             <DataGridTextColumn Header="قيمة الخصم"
                                                 Binding="{Binding DiscountAmount, StringFormat={}{0:N2}}"
                                                 IsReadOnly="True"
@@ -389,6 +388,7 @@
                 <!-- Customer -->
                 <StackPanel Grid.Column="0"
                             Margin="5">
+
                     <TextBlock Text="العميل"
                                FontWeight="Bold"
                                Foreground="#183F36"
@@ -402,12 +402,14 @@
                               TextSearch.TextPath="Name"
                               StaysOpenOnEdit="True"
                               ToolTip="ابحث باسم العميل أو رقم الهاتف أو كود العميل، أو اتركه فارغًا للبيع النقدي">
+
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Margin="2">
                                     <TextBlock Text="{Binding Name}"
                                                FontWeight="Bold"
                                                Foreground="#183F36"/>
+
                                     <TextBlock FontSize="11"
                                                Foreground="#64736F">
                                         <Run Text="الكود: "/>
@@ -420,7 +422,17 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
 
-                    <TextBlock Text="اتركه فارغًا عند البيع النقدي دون حساب عميل"
+                    <Button x:Name="ManageCustomersButton"
+                            Content="إدارة / إضافة عميل"
+                            Height="30"
+                            Margin="0,5,0,0"
+                            Background="#246B58"
+                            Foreground="White"
+                            FontWeight="Bold"
+                            BorderThickness="0"
+                            Cursor="Hand"/>
+
+                    <TextBlock Text="اترك العميل فارغًا عند البيع النقدي دون حساب عميل"
                                FontSize="10"
                                Foreground="#7A8581"
                                TextWrapping="Wrap"
@@ -481,25 +493,25 @@
                               SelectedIndex="0">
 
                         <ComboBoxItem Content="نقدي فقط"
-                                       Tag="Cash"/>
+                                      Tag="Cash"/>
 
                         <ComboBoxItem Content="فيزا فقط"
-                                       Tag="Card"/>
+                                      Tag="Card"/>
 
                         <ComboBoxItem Content="إنستا باي فقط"
-                                       Tag="InstaPay"/>
+                                      Tag="InstaPay"/>
 
                         <ComboBoxItem Content="نقدي + فيزا"
-                                       Tag="CashCard"/>
+                                      Tag="CashCard"/>
 
                         <ComboBoxItem Content="نقدي + إنستا باي"
-                                       Tag="CashInstaPay"/>
+                                      Tag="CashInstaPay"/>
 
                         <ComboBoxItem Content="فيزا + إنستا باي"
-                                       Tag="CardInstaPay"/>
+                                      Tag="CardInstaPay"/>
 
                         <ComboBoxItem Content="نقدي + فيزا + إنستا باي"
-                                       Tag="CashCardInstaPay"/>
+                                      Tag="CashCardInstaPay"/>
 
                     </ComboBox>
 
