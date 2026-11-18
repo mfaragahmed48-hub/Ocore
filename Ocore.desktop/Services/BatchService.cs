@@ -352,6 +352,159 @@ ORDER BY
             }
         }
 
+        public void SetBatchActualQuantity(
+            int userId,
+            int productId,
+            int batchId,
+            double newQuantity,
+            string reason)
+        {
+            if (productId <= 0 || batchId <= 0)
+                throw new ArgumentException("الصنف أو التشغيلة غير صحيحة.");
+
+            if (newQuantity < 0 ||
+                double.IsNaN(newQuantity) ||
+                double.IsInfinity(newQuantity))
+                throw new ArgumentException("الرصيد الجديد غير صحيح.");
+
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ArgumentException("يجب كتابة سبب تسوية الرصيد.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                using (var transaction = connection.BeginTransaction(
+                    IsolationLevel.Serializable))
+                {
+                    try
+                    {
+                        string username;
+                        string role;
+
+                        using (var command = new SQLiteCommand(
+                            @"SELECT Username, Role
+                      FROM Users
+                      WHERE Id = @UserId AND IsActive = 1;",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@UserId", userId);
+
+                            using (var reader = command.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new UnauthorizedAccessException(
+                                        "المستخدم غير موجود أو غير نشط.");
+
+                                username = reader["Username"].ToString();
+                                role = reader["Role"].ToString();
+                            }
+                        }
+
+                        if (!string.Equals(
+                            role,
+                            "Manager",
+                            StringComparison.OrdinalIgnoreCase))
+                            throw new UnauthorizedAccessException(
+                                "تسوية أرصدة المخزون متاحة للمدير فقط.");
+
+                        string productName;
+                        string batchNumber;
+                        double oldQuantity;
+
+                        using (var command = new SQLiteCommand(
+                            @"SELECT p.Name,
+                             b.BatchNumber,
+                             b.Quantity
+                      FROM Batches b
+                      INNER JOIN Products p ON p.Id = b.ProductId
+                      WHERE b.Id = @BatchId
+                        AND b.ProductId = @ProductId
+                        AND p.IsArchived = 0;",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@BatchId", batchId);
+                            command.Parameters.AddWithValue("@ProductId", productId);
+
+                            using (var reader = command.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new InvalidOperationException(
+                                        "التشغيلة غير موجودة أو لا تتبع هذا الصنف.");
+
+                                productName = reader["Name"].ToString();
+
+                                batchNumber = reader["BatchNumber"] == DBNull.Value
+                                    ? ""
+                                    : reader["BatchNumber"].ToString();
+
+                                oldQuantity = Convert.ToDouble(reader["Quantity"]);
+                            }
+                        }
+
+                        using (var command = new SQLiteCommand(
+                            @"UPDATE Batches
+                      SET Quantity = @NewQuantity
+                      WHERE Id = @BatchId
+                        AND ProductId = @ProductId;",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@NewQuantity", newQuantity);
+
+                            command.Parameters.AddWithValue("@BatchId", batchId);
+                            command.Parameters.AddWithValue("@ProductId", productId);
+
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException(
+                                    "لم يتم تعديل رصيد التشغيلة.");
+                        }
+
+                        string details =
+                            "تسوية رصيد مخزون" +
+                            " - الصنف: " + productName +
+                            " - رقم التشغيلة: " + batchNumber +
+                            " - الرصيد قبل التسوية: " +
+                            oldQuantity.ToString("0.########", CultureInfo.InvariantCulture) +
+                            " - الرصيد بعد التسوية: " +
+                            newQuantity.ToString("0.########", CultureInfo.InvariantCulture) +
+                            " - السبب: " + reason.Trim();
+
+                        using (var command = new SQLiteCommand(
+                            @"INSERT INTO AuditLogs
+                      (UserId, Username, ActionType, EntityType,
+                       EntityId, Details, DeviceName, CreatedAt)
+                      VALUES
+                      (@UserId, @Username, 'Update', 'Batch',
+                       @EntityId, @Details, @DeviceName, @CreatedAt);",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@UserId", userId);
+                            command.Parameters.AddWithValue("@Username", username);
+                            command.Parameters.AddWithValue("@EntityId", batchId);
+                            command.Parameters.AddWithValue("@Details", details);
+                            command.Parameters.AddWithValue(
+                                "@DeviceName", Environment.MachineName);
+                            command.Parameters.AddWithValue(
+                                "@CreatedAt",
+                                DateTime.Now.ToString(
+                                    "yyyy-MM-dd HH:mm:ss",
+                                    CultureInfo.InvariantCulture));
+
+                            command.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
+        }
+
         private string GetActiveUserRole(
             SQLiteConnection connection,
             int userId)
