@@ -139,6 +139,7 @@
     <Compile Include="Models\TaxModels.cs" />
     <Compile Include="Services\ExpenseService.cs" />
     <Compile Include="Services\ExpiryAlertService.cs" />
+    <Compile Include="Services\GS1BarcodeService.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationDefaults.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationService.cs" />
     <Compile Include="Services\Printing\PrinterSettingsNavigationService.cs" />
@@ -202,6 +203,7 @@
     <Compile Include="Services\ThermalPrinterService.cs" />
     <Compile Include="Services\ThermalReceiptRenderer.cs" />
     <Compile Include="Services\UserService.cs" />
+<Compile Include="Services\GS1BarcodeService.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="Views\AddCatalogDrugWindow.xaml.cs">
       <DependentUpon>AddCatalogDrugWindow.xaml</DependentUpon>

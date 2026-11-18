@@ -1,9 +1,10 @@
 ﻿
+using Ocore.desktop.Data;
+using Ocore.desktop.Models;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
-using Ocore.desktop.Data;
-using Ocore.desktop.Models;
+using System.Linq;
 
 namespace Ocore.desktop.Services
 {
@@ -1459,6 +1460,206 @@ ORDER BY Name;";
                         }
 
                         throw;
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+
+        #region International Barcode Lookup And Linking
+
+        // البحث عن الصنف باستخدام الباركود.
+        // يدعم المطابقة الدقيقة، وكذلك الصيغ المكافئة لـ EAN-13 وUPC
+        // عندما يكون الاختلاف مجرد أصفار بادئة في GTIN.
+        public int? FindProductIdByBarcode(string barcode)
+        {
+            if (string.IsNullOrWhiteSpace(barcode))
+                return null;
+
+            string value = barcode.Trim();
+
+            var candidates = new List<string> { value };
+
+            if (value.Length == 14 &&
+                value.StartsWith("00", StringComparison.Ordinal))
+            {
+                candidates.Add(value.Substring(2));
+            }
+            else if (value.Length == 14 &&
+                     value.StartsWith("0", StringComparison.Ordinal))
+            {
+                candidates.Add(value.Substring(1));
+            }
+            else if (value.Length == 13)
+            {
+                candidates.Add(value.PadLeft(14, '0'));
+            }
+            else if (value.Length == 12)
+            {
+                candidates.Add(value.PadLeft(14, '0'));
+            }
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                foreach (string candidate in candidates.Distinct())
+                {
+                    using (var command = new SQLiteCommand(@"
+                SELECT p.Id
+                FROM ProductBarcodes pb
+                INNER JOIN Products p ON p.Id = pb.ProductId
+                WHERE pb.Barcode = @Barcode
+                  AND p.IsArchived = 0
+                LIMIT 1;",
+                        connection))
+                    {
+                        command.Parameters.AddWithValue(
+                            "@Barcode", candidate);
+
+                        object result = command.ExecuteScalar();
+
+                        if (result != null && result != DBNull.Value)
+                            return Convert.ToInt32(result);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        // ربط باركود دولي بصنف بعد تأكيد المستخدم.
+        // لا يستبدل أي باركود موجود، ولا يسمح بربط باركود بصنفين.
+        public void LinkInternationalBarcode(
+            int currentUserId,
+            int productId,
+            string barcode)
+        {
+            if (productId <= 0)
+                throw new ArgumentException("الصنف المحدد غير صحيح.");
+
+            if (string.IsNullOrWhiteSpace(barcode))
+                throw new ArgumentException("الباركود غير صحيح.");
+
+            string normalizedBarcode =
+                GS1BarcodeService.NormalizeGTIN(barcode.Trim());
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                using (var transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        string role = GetActiveUserRole(
+                            connection,
+                            currentUserId);
+
+                        bool isManager = string.Equals(
+                            role,
+                            "Manager",
+                            StringComparison.OrdinalIgnoreCase);
+
+                        bool hasEditPermission =
+                            permissionService.HasPermission(
+                                role,
+                                "Products.Edit");
+
+                        if (!isManager && !hasEditPermission)
+                        {
+                            throw new UnauthorizedAccessException(
+                                "ليس لديك صلاحية ربط الباركودات بالأصناف.");
+                        }
+
+                        string productName = null;
+
+                        using (var command = new SQLiteCommand(@"
+                    SELECT Name
+                    FROM Products
+                    WHERE Id = @ProductId
+                      AND IsArchived = 0;",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@ProductId", productId);
+
+                            productName = Convert.ToString(
+                                command.ExecuteScalar());
+                        }
+
+                        if (string.IsNullOrWhiteSpace(productName))
+                            throw new InvalidOperationException(
+                                "الصنف غير موجود أو مؤرشف.");
+
+                        int? existingProductId = null;
+
+                        using (var command = new SQLiteCommand(@"
+                    SELECT ProductId
+                    FROM ProductBarcodes
+                    WHERE Barcode = @Barcode
+                    LIMIT 1;",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@Barcode", normalizedBarcode);
+
+                            object result = command.ExecuteScalar();
+
+                            if (result != null && result != DBNull.Value)
+                            {
+                                existingProductId =
+                                    Convert.ToInt32(result);
+                            }
+                        }
+
+                        if (existingProductId.HasValue)
+                        {
+                            if (existingProductId.Value == productId)
+                            {
+                                transaction.Commit();
+                                return;
+                            }
+
+                            throw new InvalidOperationException(
+                                "هذا الباركود مرتبط بالفعل بصنف آخر، ولا يمكن نقله تلقائيًا.");
+                        }
+
+                        using (var command = new SQLiteCommand(@"
+                    INSERT INTO ProductBarcodes
+                    (ProductId, Barcode)
+                    VALUES
+                    (@ProductId, @Barcode);",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue(
+                                "@ProductId", productId);
+
+                            command.Parameters.AddWithValue(
+                                "@Barcode", normalizedBarcode);
+
+                            command.ExecuteNonQuery();
+                        }
+
+                        WriteProductAudit(
+                            connection,
+                            transaction,
+                            currentUserId,
+                            productId,
+                            "BarcodeLink",
+                            "ربط باركود دولي بالصنف: " +
+                            productName +
+                            "، الباركود: " +
+                            normalizedBarcode);
+
+                        transaction.Commit();
                     }
                     catch
                     {
