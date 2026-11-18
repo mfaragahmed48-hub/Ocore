@@ -1944,17 +1944,23 @@ namespace Ocore.desktop.Services
             }
         }
 
+
         private bool IsBatchExpired(string expiryDate)
         {
+            // عدم وجود تاريخ صلاحية يعني أن التشغيلة غير منتهية.
+            if (string.IsNullOrWhiteSpace(expiryDate))
+                return false;
+
             DateTime parsedDate;
 
             bool validDate = DateTime.TryParseExact(
-                expiryDate,
+                expiryDate.Trim(),
                 "yyyy-MM-dd",
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
                 out parsedDate);
 
+            // التاريخ الموجود ولكن بصيغة غير صحيحة يُعامل بحذر.
             if (!validDate)
                 return true;
 
