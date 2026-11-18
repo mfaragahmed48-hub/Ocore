@@ -384,14 +384,7 @@ namespace Ocore.desktop.Views
                         "هاتف: " + pharmacySettings.Phone));
             }
 
-            if (pharmacySettings != null &&
-                !string.IsNullOrWhiteSpace(pharmacySettings.TaxNumber))
-            {
-                document.Blocks.Add(
-                    CreateCenteredParagraph(
-                        "الرقم الضريبي: " + pharmacySettings.TaxNumber));
-            }
-
+            
             Paragraph subtitle = new Paragraph(
                 new Run("فاتورة شراء"))
             {

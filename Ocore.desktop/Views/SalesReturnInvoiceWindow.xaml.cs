@@ -888,11 +888,10 @@ namespace Ocore.desktop.Views
             if (refundAmount > accountingTotal + Epsilon)
             {
                 errorMessage =
-                    "مبلغ الرد الفعلي لا يمكن أن يتجاوز صافي القيمة المحاسبية للمرتجع بعد الخصم والضريبة.";
+                    "مبلغ الرد الفعلي لا يمكن أن يتجاوز صافي قيمة المرتجع.";
 
                 return false;
             }
-
             if (refundAmount <= Epsilon)
             {
                 refundAmount = 0;
@@ -1051,7 +1050,7 @@ namespace Ocore.desktop.Views
                         invoiceNumber +
                         "\nعدد الأصناف: " +
                         selectedItems.Count +
-                        "\nإجمالي المرتجع قبل الخصم والضريبة: " +
+                       "\nإجمالي الأصناف المرتجعة: " +
                         total.ToString("N2") +
                         "\nصافي القيمة المحاسبية للمرتجع: " +
                         accountingTotal.ToString("N2") +
@@ -1080,7 +1079,7 @@ namespace Ocore.desktop.Views
                 MessageBox.Show(
                     "تم حفظ المرتجع بنجاح.\n\n" +
                     "رقم عملية المرتجع: " + returnId +
-                    "\nإجمالي المرتجع قبل الخصم والضريبة: " +
+                    "\nإجمالي الأصناف المرتجعة: " +
                     total.ToString("N2") +
                     "\nصافي القيمة المحاسبية: " +
                     accountingTotal.ToString("N2") +
