@@ -421,6 +421,17 @@ namespace Ocore.desktop.Views
 
     public class BatchDisplayInfo
     {
+
+        public string ExpiryDateDisplay
+        {
+            get
+            {
+                return ExpiryDate == DateTime.MaxValue
+                    ? "بدون تاريخ صلاحية"
+                    : ExpiryDate.ToString("dd/MM/yyyy");
+            }
+        }
+
         public int Id { get; set; }
 
         public string BatchNumber { get; set; }

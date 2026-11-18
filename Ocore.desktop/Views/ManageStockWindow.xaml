@@ -258,9 +258,10 @@
                                             Binding="{Binding BatchNumber}"
                                             Width="*"/>
 
+
                         <DataGridTextColumn Header="تاريخ الصلاحية"
-                                            Binding="{Binding ExpiryDate, StringFormat=dd/MM/yyyy}"
-                                            Width="*"/>
+                    Binding="{Binding ExpiryDateDisplay}"
+                    Width="*"/>
 
                         <DataGridTextColumn Header="سعر الشراء"
                                             Binding="{Binding PurchasePrice, StringFormat=N2}"

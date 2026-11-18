@@ -47,6 +47,7 @@ namespace Ocore.desktop.Services
                 }
             }
         }
+
         public List<BatchInfo> GetProductBatches(
             int userId,
             int productId)
@@ -65,10 +66,15 @@ namespace Ocore.desktop.Services
 
                 using (var command = new SQLiteCommand(
                     @"SELECT Id, BatchNumber, ExpiryDate,
-                             PurchasePrice, Quantity
-                      FROM Batches
-                      WHERE ProductId = @ProductId
-                      ORDER BY ExpiryDate ASC, Id ASC;",
+                     PurchasePrice, Quantity
+              FROM Batches
+              WHERE ProductId = @ProductId
+              ORDER BY
+                  CASE
+                      WHEN TRIM(COALESCE(ExpiryDate, '')) = '' THEN 1
+                      ELSE 0
+                  END,
+                  ExpiryDate ASC, Id ASC;",
                     connection))
                 {
                     command.Parameters.AddWithValue("@ProductId", productId);
@@ -77,16 +83,32 @@ namespace Ocore.desktop.Services
                     {
                         while (reader.Read())
                         {
+                            string expiryText =
+                                reader["ExpiryDate"] == DBNull.Value
+                                    ? ""
+                                    : reader["ExpiryDate"].ToString().Trim();
+
+                            DateTime expiryDate;
+
+                            if (string.IsNullOrWhiteSpace(expiryText))
+                            {
+                                expiryDate = DateTime.MaxValue;
+                            }
+                            else
+                            {
+                                expiryDate = DateTime.ParseExact(
+                                    expiryText,
+                                    "yyyy-MM-dd",
+                                    CultureInfo.InvariantCulture);
+                            }
+
                             batches.Add(new BatchInfo
                             {
                                 Id = Convert.ToInt32(reader["Id"]),
                                 BatchNumber = reader["BatchNumber"] == DBNull.Value
                                     ? ""
                                     : reader["BatchNumber"].ToString(),
-                                ExpiryDate = DateTime.ParseExact(
-                                    reader["ExpiryDate"].ToString(),
-                                    "yyyy-MM-dd",
-                                    CultureInfo.InvariantCulture),
+                                ExpiryDate = expiryDate,
                                 PurchasePrice = Convert.ToDouble(
                                     reader["PurchasePrice"]),
                                 Quantity = Convert.ToDouble(
