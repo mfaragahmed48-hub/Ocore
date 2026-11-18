@@ -31,7 +31,7 @@ namespace Ocore.desktop.Views
             LoadSettings();
             ConfigureClearButton();
             ConfigureDrugCatalogImportButton();
-            ConfigureTaxManagementButton();
+           
         }
 
         // التحقق من أن المستخدم مدير النظام وحسابه نشط
@@ -89,13 +89,7 @@ LIMIT 1;";
         }
 
         // إظهار زر إدارة الضرائب للمدير فقط
-        private void ConfigureTaxManagementButton()
-        {
-            ManageTaxesButton.Visibility =
-                IsCurrentUserManager()
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-        }
+       
         // إظهار زر استيراد دليل الأدوية للمدير فقط
         private void ConfigureDrugCatalogImportButton()
         {
@@ -124,9 +118,7 @@ LIMIT 1;";
                 PhoneTextBox.Text =
                     settings.Phone;
 
-                TaxNumberTextBox.Text =
-                    settings.TaxNumber;
-
+                
                 ManagerNameTextBox.Text =
                     settings.ManagerName;
 
@@ -245,9 +237,7 @@ LIMIT 1;";
                 settings.Phone =
                     PhoneTextBox.Text;
 
-                settings.TaxNumber =
-                    TaxNumberTextBox.Text;
-
+                
                 settings.ManagerName =
                     ManagerNameTextBox.Text;
 
@@ -474,46 +464,11 @@ LIMIT 1;";
 
 
         private void CloseButton_Click(
-            object sender,
-            RoutedEventArgs e)
+    object sender,
+    RoutedEventArgs e)
         {
             Close();
         }
 
-        private void ManageTaxesButton_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            try
-            {
-                // إعادة التحقق من صلاحية المدير قبل فتح النافذة
-                if (!IsCurrentUserManager())
-                {
-                    MessageBox.Show(
-                        "إدارة الضرائب متاحة لمدير النظام فقط.",
-                        "صلاحيات غير كافية",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-
-                    ManageTaxesButton.Visibility = Visibility.Collapsed;
-                    return;
-                }
-
-                var window = new TaxManagementWindow(currentUserId)
-                {
-                    Owner = this
-                };
-
-                window.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "تعذر فتح إدارة الضرائب:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
     }
 }
