@@ -93,22 +93,12 @@ namespace Ocore.desktop.Views
 
             ItemsDataGrid.ItemsSource = returnDetails.Items;
 
-            double taxTotal =
-                returnDetails.VatAmount +
-                returnDetails.ScheduleTaxAmount;
-
-            if (returnDetails.TaxTotal > 0)
-                taxTotal = returnDetails.TaxTotal;
-
+            
+            
             double accountingReturnValue =
                 CalculateAccountingReturnValue();
 
-            string taxStatus =
-                (returnDetails.TaxStatus ?? "Legacy").Trim();
-
-            bool hasCalculatedTax =
-                taxStatus == "Calculated" || taxStatus == "Mixed";
-
+            
             string summary =
                 "إجمالي الأصناف: " +
                 returnDetails.Total.ToString("N2") + " ج.م" +
@@ -116,37 +106,15 @@ namespace Ocore.desktop.Views
                 "إجمالي الخصم: " +
                 returnDetails.DiscountAmount.ToString("N2") + " ج.م";
 
-            if (hasCalculatedTax)
-            {
-                summary +=
-                    Environment.NewLine +
-                    "وعاء الضريبة: " +
-                    returnDetails.TaxableAmount.ToString("N2") + " ج.م" +
-                    Environment.NewLine +
-                    "ضريبة القيمة المضافة: " +
-                    returnDetails.VatAmount.ToString("N2") + " ج.م" +
-                    Environment.NewLine +
-                    "ضريبة الجدول: " +
-                    returnDetails.ScheduleTaxAmount.ToString("N2") + " ج.م" +
-                    Environment.NewLine +
-                    "إجمالي الضريبة: " +
-                    taxTotal.ToString("N2") + " ج.م";
-            }
-            else
-            {
-                summary +=
-                    Environment.NewLine +
-                    "فاتورة قديمة بدون بيانات ضريبية محفوظة";
-            }
 
             summary +=
-                Environment.NewLine +
-                "قيمة المرتجع بعد الخصم والضريبة: " +
-                accountingReturnValue.ToString("N2") + " ج.م" +
-                Environment.NewLine +
-                "المبلغ المصروف فعليًا للعميل: " +
-                returnDetails.RefundAmount.ToString("N2") + " ج.م";
-
+    Environment.NewLine +
+    "صافي قيمة المرتجع: " +
+    accountingReturnValue.ToString("N2") + " ج.م" +
+    Environment.NewLine +
+    "المبلغ المصروف فعليًا للعميل: " +
+    returnDetails.RefundAmount.ToString("N2") + " ج.م";
+            
             if (returnDetails.RefundAmount > 0)
             {
                 summary +=
@@ -596,16 +564,7 @@ namespace Ocore.desktop.Views
                         false);
                 }
 
-                if (!string.IsNullOrWhiteSpace(
-                    pharmacySettings.TaxNumber))
-                {
-                    AddCenteredParagraph(
-                        document,
-                        "الرقم الضريبي: " +
-                        pharmacySettings.TaxNumber,
-                        9 * fontScale,
-                        false);
-                }
+                
             }
 
             AddSeparator(document);
@@ -696,57 +655,23 @@ namespace Ocore.desktop.Views
                         " ج.م",
                         fontScale);
 
-                    if (item.DiscountAmount > 0)
-                    {
-                        AddInfoParagraph(
-                            document,
-                            "خصم الصنف: " +
-                            item.DiscountAmount.ToString("N2") +
-                            " ج.م",
-                            fontScale);
-                    }
 
                     bool itemHasCalculatedTax =
-                        string.Equals(
-                            item.TaxStatus,
-                            "Calculated",
-                            StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(
-                            item.TaxStatus,
-                            "Mixed",
-                            StringComparison.OrdinalIgnoreCase);
+     string.Equals(
+         item.TaxStatus,
+         "Calculated",
+         StringComparison.OrdinalIgnoreCase) ||
+     string.Equals(
+         item.TaxStatus,
+         "Mixed",
+         StringComparison.OrdinalIgnoreCase);
 
                     double itemNetTotal;
 
                     if (itemHasCalculatedTax)
                     {
-                        AddInfoParagraph(
-                            document,
-                            "الوعاء الضريبي: " +
-                            item.TaxableAmount.ToString("N2") +
-                            " ج.م",
-                            fontScale);
-
-                        if (item.VatAmount > 0)
-                        {
-                            AddInfoParagraph(
-                                document,
-                                "ضريبة القيمة المضافة: " +
-                                item.VatAmount.ToString("N2") +
-                                " ج.م",
-                                fontScale);
-                        }
-
-                        if (item.ScheduleTaxAmount > 0)
-                        {
-                            AddInfoParagraph(
-                                document,
-                                "ضريبة الجدول: " +
-                                item.ScheduleTaxAmount.ToString("N2") +
-                                " ج.م",
-                                fontScale);
-                        }
-
+                        // الحفاظ على القيمة التاريخية للمرتجعات القديمة.
+                        // لا يتم عرض تفاصيل الضرائب للعميل.
                         itemNetTotal =
                             item.TaxableAmount +
                             item.VatAmount +
@@ -763,24 +688,17 @@ namespace Ocore.desktop.Views
                         itemNetTotal,
                         2,
                         MidpointRounding.AwayFromZero);
-
                     AddInfoParagraph(
-                        document,
-                        "صافي قيمة الصنف: " +
-                        itemNetTotal.ToString("N2") +
-                        " ج.م",
-                        fontScale);
-
+    document,
+    "صافي قيمة الصنف: " +
+    itemNetTotal.ToString("N2") +
+    " ج.م",
+    fontScale);
                     AddSeparator(document);
                 }
             }
 
-            double totalTax =
-                returnDetails.TaxTotal > 0
-                    ? returnDetails.TaxTotal
-                    : returnDetails.VatAmount +
-                      returnDetails.ScheduleTaxAmount;
-
+            
             double netReturnTotal =
                 CalculateAccountingReturnValue();
 
@@ -803,52 +721,15 @@ namespace Ocore.desktop.Views
                     fontScale);
             }
 
-            if (returnDetails.TaxStatus == "Calculated" ||
-                returnDetails.TaxStatus == "Mixed")
-            {
-                AddInfoParagraph(
-                    document,
-                    "وعاء الضريبة: " +
-                    returnDetails.TaxableAmount.ToString("N2") +
-                    " ج.م",
-                    fontScale);
 
-                AddInfoParagraph(
-                    document,
-                    "ضريبة القيمة المضافة: " +
-                    returnDetails.VatAmount.ToString("N2") +
-                    " ج.م",
-                    fontScale);
-
-                AddInfoParagraph(
-                    document,
-                    "ضريبة الجدول: " +
-                    returnDetails.ScheduleTaxAmount.ToString("N2") +
-                    " ج.م",
-                    fontScale);
-
-                AddInfoParagraph(
-                    document,
-                    "إجمالي الضريبة: " +
-                    totalTax.ToString("N2") +
-                    " ج.م",
-                    fontScale);
-            }
-            else
-            {
-                AddInfoParagraph(
-                    document,
-                    "مرتجع لفاتورة قديمة بدون بيانات ضريبية محفوظة",
-                    fontScale);
-            }
 
             AddCenteredParagraph(
-                document,
-                "قيمة المرتجع بعد الخصم والضريبة: " +
-                netReturnTotal.ToString("N2") +
-                " ج.م",
-                14 * fontScale,
-                true);
+    document,
+    "صافي قيمة المرتجع: " +
+    netReturnTotal.ToString("N2") +
+    " ج.م",
+    14 * fontScale,
+    true);
 
             AddSeparator(document);
 

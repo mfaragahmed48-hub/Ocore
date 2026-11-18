@@ -268,8 +268,9 @@
 
                         </DataGridTemplateColumn>
 
-                        <!-- سعر الوحدة الفعلي بعد الخصم والضريبة -->
-                        <DataGridTextColumn Header="سعر الوحدة بعد الخصم والضريبة"
+                        <!-- سعر الوحدة -->
+                        <DataGridTextColumn Header="سعر الوحدة"
+                       
                                             Binding="{Binding DisplayUnitPrice, StringFormat=N2}"
                                             Width="1.3*"
                                             IsReadOnly="True"/>
@@ -321,7 +322,7 @@
                 <StackPanel Grid.Column="1"
                             Margin="12,0">
 
-                    <TextBlock Text="صافي المرتجع بعد الخصم والضريبة"
+                    <TextBlock Text="قيمة المرتجع"
                                FontWeight="SemiBold"
                                Margin="0,0,0,7"/>
 
