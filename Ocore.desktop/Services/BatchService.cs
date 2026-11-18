@@ -24,6 +24,29 @@ namespace Ocore.desktop.Services
             permissionService = new PermissionService();
         }
 
+        public bool IsManager(int userId)
+        {
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                using (var command = new SQLiteCommand(
+                    @"SELECT Role FROM Users
+              WHERE Id = @UserId AND IsActive = 1;",
+                    connection))
+                {
+                    command.Parameters.AddWithValue("@UserId", userId);
+
+                    object result = command.ExecuteScalar();
+
+                    return result != null &&
+                           string.Equals(
+                               result.ToString(),
+                               "Manager",
+                               StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
         public List<BatchInfo> GetProductBatches(
             int userId,
             int productId)

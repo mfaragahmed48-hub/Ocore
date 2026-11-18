@@ -29,6 +29,10 @@ namespace Ocore.desktop.Views
             selectedProduct = product;
 
             batchService = new BatchService();
+            AdjustStockButton.Visibility =
+    batchService.IsManager(currentUserId)
+        ? Visibility.Visible
+        : Visibility.Collapsed;
             allBatches = new List<BatchDisplayInfo>();
 
             ProductNameTextBlock.Text =
@@ -229,6 +233,174 @@ namespace Ocore.desktop.Views
                     "خطأ",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+        }
+
+
+        private void AdjustStockButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            var selectedBatch =
+                BatchesDataGrid.SelectedItem as BatchDisplayInfo;
+
+            if (selectedBatch == null)
+            {
+                MessageBox.Show(
+                    "يرجى تحديد التشغيلة التي تريد تسوية رصيدها.",
+                    "تنبيه",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            Window dialog = new Window
+            {
+                Title = "تسوية رصيد المخزون",
+                Width = 430,
+                Height = 350,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                FlowDirection = FlowDirection.RightToLeft,
+                Background = System.Windows.Media.Brushes.White
+            };
+
+            StackPanel panel = new StackPanel
+            {
+                Margin = new Thickness(20)
+            };
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "الصنف: " + selectedProduct.Name,
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "رقم التشغيلة: " + selectedBatch.BatchNumber,
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "الرصيد المسجل حاليًا: " +
+                       selectedBatch.Quantity.ToString("N4"),
+                Foreground = System.Windows.Media.Brushes.DarkBlue,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 12)
+            });
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "الرصيد الفعلي الجديد:"
+            });
+
+            TextBox quantityBox = new TextBox
+            {
+                Text = selectedBatch.Quantity.ToString(
+                    "0.####",
+                    CultureInfo.CurrentCulture),
+                Height = 35,
+                Padding = new Thickness(7),
+                Margin = new Thickness(0, 5, 0, 12)
+            };
+
+            panel.Children.Add(quantityBox);
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "سبب التسوية:"
+            });
+
+            TextBox reasonBox = new TextBox
+            {
+                Height = 55,
+                Padding = new Thickness(7),
+                Margin = new Thickness(0, 5, 0, 15),
+                TextWrapping = TextWrapping.Wrap,
+                AcceptsReturn = true
+            };
+
+            panel.Children.Add(reasonBox);
+
+            Button saveButton = new Button
+            {
+                Content = "حفظ التسوية",
+                Height = 40,
+                Background = System.Windows.Media.Brushes.DarkOrange,
+                Foreground = System.Windows.Media.Brushes.White,
+                FontWeight = FontWeights.Bold
+            };
+
+            saveButton.Click += (s, args) =>
+            {
+                double newQuantity;
+
+                bool validQuantity =
+                    double.TryParse(
+                        quantityBox.Text.Trim(),
+                        NumberStyles.Any,
+                        CultureInfo.CurrentCulture,
+                        out newQuantity) ||
+                    double.TryParse(
+                        quantityBox.Text.Trim(),
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out newQuantity);
+
+                if (!validQuantity ||
+                    double.IsNaN(newQuantity) ||
+                    double.IsInfinity(newQuantity) ||
+                    newQuantity < 0)
+                {
+                    MessageBox.Show(
+                        "يرجى إدخال رصيد صحيح لا يقل عن صفر.");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(reasonBox.Text))
+                {
+                    MessageBox.Show("يرجى كتابة سبب التسوية.");
+                    return;
+                }
+
+                try
+                {
+                    batchService.SetBatchActualQuantity(
+                        currentUserId,
+                        selectedProduct.Id,
+                        selectedBatch.Id,
+                        newQuantity,
+                        reasonBox.Text.Trim());
+
+                    dialog.DialogResult = true;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        "تعذر تنفيذ التسوية:\n" + ex.Message,
+                        "خطأ",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            };
+
+            panel.Children.Add(saveButton);
+            dialog.Content = panel;
+
+            if (dialog.ShowDialog() == true)
+            {
+                MessageBox.Show(
+                    "تمت تسوية رصيد التشغيلة بنجاح.",
+                    "نجاح",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                LoadBatches();
             }
         }
 
