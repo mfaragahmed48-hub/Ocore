@@ -149,7 +149,7 @@
             </Grid>
         </Border>
 
-        <!-- بيانات المورد والفاتورة -->
+        <!-- بيانات المورد والفاتورة والباركود -->
         <Border Grid.Row="1"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -162,7 +162,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1.5*"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Margin="2">
@@ -179,21 +179,73 @@
                                 SelectedDateFormat="Short"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Margin="2">
-                    <TextBlock Text="نوع المستند" Style="{StaticResource FieldLabel}"/>
-                    <Border Background="#F2F6F4"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="5"
-                            Height="29"
-                            Padding="8,0">
-                        <TextBlock Text="فاتورة شراء"
-                                   VerticalAlignment="Center"
-                                   Foreground="{StaticResource PrimaryBrush}"
-                                   FontWeight="SemiBold"
-                                   FontSize="11"/>
-                    </Border>
-                </StackPanel>
+                <!-- منطقة مسح الباركود في مكان نوع المستند -->
+                <Border Grid.Column="2"
+                        Background="#F7FAF8"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="5"
+                        Padding="5,3"
+                        Margin="3,0,2,0">
+
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="مسح الباركود الدولي"
+                                   Style="{StaticResource FieldLabel}"
+                                   Margin="0,0,0,3"/>
+
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="BarcodeScanTextBox"
+                                     Grid.Column="0"
+                                     Height="29"
+                                     MinWidth="100"
+                                     ToolTip="امسح الباركود باستخدام قارئ USB"
+                                     KeyDown="BarcodeScanTextBox_KeyDown"/>
+
+                            <Button x:Name="ReadBarcodeButton"
+                                    Grid.Column="1"
+                                    Content="قراءة"
+                                    Width="58"
+                                    Height="29"
+                                    Margin="3,0,0,0"
+                                    Padding="3,1"
+                                    FontSize="10"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Click="ReadBarcodeButton_Click"/>
+
+                            <Button x:Name="LinkPendingBarcodeButton"
+                                    Grid.Column="2"
+                                    Content="ربط الصنف"
+                                    Width="75"
+                                    Height="29"
+                                    Margin="3,0,0,0"
+                                    Padding="3,1"
+                                    FontSize="10"
+                                    Style="{StaticResource SecondaryButton}"
+                                    IsEnabled="False"
+                                    Click="LinkPendingBarcodeButton_Click"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="1"
+                                   x:Name="BarcodeStatusTextBlock"
+                                   Text="امسح الباركود للتعرف على الصنف والتشغيلة والصلاحية."
+                                   FontSize="8"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,32,0,0"
+                                   TextWrapping="Wrap"
+                                   MaxHeight="25"/>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
 
@@ -207,63 +259,6 @@
                 Margin="0,0,0,5">
 
             <StackPanel>
-
-                <!-- منطقة مسح الباركود الدولي -->
-                <Border Background="#F7FAF8"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="5"
-                        Margin="2,0,2,5">
-
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0" Margin="2">
-                            <TextBlock Text="مسح الباركود الدولي"
-                                       Style="{StaticResource FieldLabel}"/>
-
-                            <TextBox x:Name="BarcodeScanTextBox"
-                                     ToolTip="امسح الباركود باستخدام قارئ USB"
-                                     KeyDown="BarcodeScanTextBox_KeyDown"/>
-                        </StackPanel>
-
-                        <Button x:Name="ReadBarcodeButton"
-                                Grid.Column="1"
-                                Content="قراءة الباركود"
-                                Width="110"
-                                Margin="4,14,2,0"
-                                Style="{StaticResource PrimaryButton}"
-                                Click="ReadBarcodeButton_Click"/>
-
-                        <Button x:Name="LinkPendingBarcodeButton"
-                                Grid.Column="2"
-                                Content="ربط بالصنف المحدد"
-                                Width="125"
-                                Margin="2,14,2,0"
-                                Style="{StaticResource SecondaryButton}"
-                                IsEnabled="False"
-                                Click="LinkPendingBarcodeButton_Click"/>
-
-                        <TextBlock Grid.Row="1"
-                                   Grid.ColumnSpan="3"
-                                   x:Name="BarcodeStatusTextBlock"
-                                   Text="امسح الباركود للتعرف على الصنف والتشغيلة والصلاحية."
-                                   FontSize="9"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   Margin="3,3,3,0"
-                                   TextWrapping="Wrap"/>
-                    </Grid>
-                </Border>
 
                 <DockPanel Margin="2,0,2,4">
                     <TextBlock Text="إضافة صنف إلى الفاتورة"
@@ -449,7 +444,7 @@
                                VerticalAlignment="Center"/>
 
                     <TextBlock Grid.Column="1"
-                               Text="يمكن تعديل بيانات البنود قبل الحفظ"
+                               Text="فاتورة شراء - يمكن تعديل بيانات البنود قبل الحفظ"
                                FontSize="9"
                                Foreground="{StaticResource MutedBrush}"
                                VerticalAlignment="Center"/>
