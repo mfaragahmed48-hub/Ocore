@@ -544,6 +544,20 @@
 
                         <DataGridTextColumn Header="ضريبة %" Binding="{Binding TaxPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="70"/>
 
+                        <DataGridTemplateColumn Header="الضريبة غير قابلة للخصم" Width="125">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsTaxNonDeductible,
+                                                                  Mode=TwoWay,
+                                                                  UpdateSourceTrigger=PropertyChanged}"
+                                              IsThreeState="False"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              ToolTip="حدد هذا الخيار إذا كانت ضريبة البند غير قابلة للخصم"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
                         <DataGridTextColumn Header="قيمة الخصم" Binding="{Binding DiscountAmount, StringFormat=N2}" IsReadOnly="True" Width="80"/>
 
                         <DataGridTextColumn Header="بعد الخصم" Binding="{Binding DiscountedUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
