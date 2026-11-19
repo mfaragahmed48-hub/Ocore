@@ -145,21 +145,22 @@
                                         Width="1.2*"/>
 
                     <DataGridTemplateColumn Header="معالجة الضريبة"
-                                            Width="1.3*">
+                        Width="1.3*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="غير مسجل"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center"
+                       VerticalAlignment="Center">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Text" Value="غير مسجل"/>
                                             <Setter Property="Foreground" Value="#71817C"/>
+
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsTaxDeductible}" Value="True">
                                                     <Setter Property="Text" Value="قابلة للخصم"/>
                                                     <Setter Property="Foreground" Value="#16865D"/>
                                                 </DataTrigger>
+
                                                 <DataTrigger Binding="{Binding IsTaxDeductible}" Value="False">
                                                     <Setter Property="Text" Value="غير قابلة للخصم"/>
                                                     <Setter Property="Foreground" Value="#A65A24"/>
@@ -171,7 +172,6 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-
                     <DataGridTextColumn Header="الإجمالي"
                                         Binding="{Binding Total, StringFormat=N2}"
                                         Width="1.2*"/>
