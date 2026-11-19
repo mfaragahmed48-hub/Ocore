@@ -457,7 +457,7 @@ namespace Ocore.desktop.Views
                     currentUserId,
                     selectedProduct.Id,
                     barcodeToLink);
-
+                scannedProductId = selectedProduct.Id;
                 pendingInternationalBarcode = null;
                 LinkPendingBarcodeButton.IsEnabled = false;
 
