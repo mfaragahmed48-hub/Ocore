@@ -30,6 +30,7 @@ namespace Ocore.desktop.Models
         private double unitPrice;
         private double discountPercent;
         private double taxPercent;
+        private bool? isTaxDeductible = false;
         private string notes;
 
         public int ProductId
@@ -202,7 +203,11 @@ namespace Ocore.desktop.Models
         public double FreeQuantity
         {
             get => freeQuantity;
-            set => SetProperty(ref freeQuantity, value);
+            set
+            {
+                if (SetProperty(ref freeQuantity, value))
+                    NotifyCalculatedProperties();
+            }
         }
 
         public double UnitPrice
@@ -253,6 +258,22 @@ namespace Ocore.desktop.Models
             }
         }
 
+        public bool? IsTaxDeductible
+        {
+            get => isTaxDeductible;
+            set
+            {
+                if (SetProperty(ref isTaxDeductible, value))
+                    OnPropertyChanged(nameof(IsTaxNonDeductible));
+            }
+        }
+
+        public bool IsTaxNonDeductible
+        {
+            get => IsTaxDeductible != true;
+            set => IsTaxDeductible = !value;
+        }
+
         // قيمة الضريبة على وحدة الشراء الواحدة
         public double TaxAmount
         {
@@ -263,7 +284,7 @@ namespace Ocore.desktop.Models
             }
         }
 
-        // إجمالي الضريبة على كمية الصنف بالكامل
+        // إجمالي الضريبة على كمية الصنف المدفوعة
         public double TotalTaxAmount
         {
             get

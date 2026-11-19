@@ -1055,6 +1055,7 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
 
                 { "TaxPercent", "REAL NOT NULL DEFAULT 0" },
                 { "TaxAmount", "REAL NOT NULL DEFAULT 0" },
+                { "IsTaxDeductible", "INTEGER NULL DEFAULT NULL" },
 
                 { "Notes", "TEXT NOT NULL DEFAULT ''" }
             };

@@ -341,6 +341,7 @@ namespace Ocore.desktop.Services
                         COALESCE(pii.FreeQuantity, 0) AS FreeQuantity,
                         COALESCE(pii.DiscountPercent, 0) AS DiscountPercent,
                         COALESCE(pii.TaxPercent, 0) AS TaxPercent,
+                        pii.IsTaxDeductible,
                         COALESCE(pii.Notes, '') AS Notes
 
                     FROM PurchaseInvoiceItems pii
@@ -405,6 +406,9 @@ namespace Ocore.desktop.Services
                                 FreeQuantity = Convert.ToDouble(reader["FreeQuantity"]),
                                 DiscountPercent = Convert.ToDouble(reader["DiscountPercent"]),
                                 TaxPercent = Convert.ToDouble(reader["TaxPercent"]),
+                                IsTaxDeductible = reader["IsTaxDeductible"] == DBNull.Value
+                                    ? (bool?)null
+                                    : Convert.ToInt32(reader["IsTaxDeductible"]) == 1,
                                 Notes = Convert.ToString(reader["Notes"])
                             });
                         }
@@ -594,13 +598,19 @@ namespace Ocore.desktop.Services
                     "إجمالي كمية المخزون بعد التحويل غير صحيح.");
             }
 
-            // تكلفة الكمية المشتراة بعد الخصم وقبل الضريبة
-            double preTaxLineTotal = RoundMoney(
+            // تكلفة الكمية المشتراة بعد الخصم وقبل الضريبة.
+            double inventoryLineTotal = RoundMoney(
                 item.Quantity * item.DiscountedUnitPrice);
 
-            // توزيع التكلفة على الكمية المشتراة والمجانية
+            // الضريبة غير القابلة للخصم تدخل في تكلفة المخزون،
+            // أما الضريبة القابلة للخصم فتظل ضمن إجمالي المورد فقط.
+            if (item.IsTaxDeductible != true)
+                inventoryLineTotal = RoundMoney(
+                    inventoryLineTotal + item.TotalTaxAmount);
+
+            // توزيع التكلفة على الكمية المشتراة والمجانية.
             double inventoryCost =
-                preTaxLineTotal / totalPackageQuantity;
+                inventoryLineTotal / totalPackageQuantity;
 
             if (IsInvalidNumber(inventoryCost) || inventoryCost < 0)
                 throw new Exception("تكلفة المخزون الفعلية غير صحيحة.");
@@ -985,6 +995,7 @@ namespace Ocore.desktop.Services
 
                                     TaxPercent,
                                     TaxAmount,
+                                    IsTaxDeductible,
 
                                     Notes
                                 )
@@ -1018,6 +1029,7 @@ namespace Ocore.desktop.Services
 
                                     @TaxPercent,
                                     @TaxAmount,
+                                    @IsTaxDeductible,
 
                                     @Notes
                                 );",
@@ -1062,6 +1074,11 @@ namespace Ocore.desktop.Services
 
                                 command.Parameters.AddWithValue("@TaxPercent", item.TaxPercent);
                                 command.Parameters.AddWithValue("@TaxAmount", item.TaxAmount);
+                                command.Parameters.AddWithValue(
+                                    "@IsTaxDeductible",
+                                    item.IsTaxDeductible.HasValue
+                                        ? (object)(item.IsTaxDeductible.Value ? 1 : 0)
+                                        : DBNull.Value);
 
                                 command.Parameters.AddWithValue("@Notes", item.Notes ?? "");
 
