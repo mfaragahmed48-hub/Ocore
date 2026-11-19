@@ -232,24 +232,54 @@ namespace Ocore.desktop.Services
             return new DateTime(year, month, day);
         }
 
+
         public static string NormalizeGTIN(string value)
         {
             if (string.IsNullOrWhiteSpace(value) ||
                 !IsDigits(value))
             {
-                throw new FormatException("رقم الباركود يجب أن يكون أرقامًا فقط.");
+                throw new FormatException(
+                    "رقم الباركود يجب أن يكون أرقامًا فقط.");
             }
 
-            if (value.Length == 12)
+            if (value.Length != 12 &&
+                value.Length != 13 &&
+                value.Length != 14)
+            {
+                throw new FormatException(
+                    "طول رقم الباركود غير مدعوم.");
+            }
+
+            int sum = 0;
+            int weight = 3;
+
+            // حساب رقم التحقق من اليمين إلى اليسار
+            // مع استبعاد آخر رقم (Check Digit).
+            for (int i = value.Length - 2; i >= 0; i--)
+            {
+                int digit = value[i] - '0';
+
+                sum += digit * weight;
+
+                weight = weight == 3 ? 1 : 3;
+            }
+
+            int expectedCheckDigit =
+                (10 - (sum % 10)) % 10;
+
+            int actualCheckDigit =
+                value[value.Length - 1] - '0';
+
+            if (expectedCheckDigit != actualCheckDigit)
+            {
+                throw new FormatException(
+                    "رقم الباركود غير صحيح: رقم التحقق Check Digit غير مطابق.");
+            }
+
+            if (value.Length == 12 || value.Length == 13)
                 return value.PadLeft(14, '0');
 
-            if (value.Length == 13)
-                return value.PadLeft(14, '0');
-
-            if (value.Length == 14)
-                return value;
-
-            throw new FormatException("طول رقم الباركود غير مدعوم.");
+            return value;
         }
 
         private static void ValidateResult(GS1BarcodeData result)
