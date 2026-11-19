@@ -30,6 +30,8 @@ namespace Ocore.desktop.Views
         private TextBox productEditableTextBox;
         // الباركود الدولي الذي ينتظر تأكيد ربطه بصنف
         private string pendingInternationalBarcode;
+        // الصنف الذي تم التعرف عليه من آخر باركود معروف
+        private int? scannedProductId;
         private readonly Dictionary<PurchaseInvoiceItem, double>
             packagePrices = new Dictionary<PurchaseInvoiceItem, double>();
 
@@ -282,6 +284,7 @@ namespace Ocore.desktop.Views
             }
 
             pendingInternationalBarcode = null;
+            scannedProductId = null;
             LinkPendingBarcodeButton.IsEnabled = false;
 
             try
@@ -311,6 +314,8 @@ namespace Ocore.desktop.Views
                         throw new InvalidOperationException(
                             "تم العثور على الباركود، لكن تعذر تحميل بيانات الصنف.");
                     }
+
+                    scannedProductId = product.Id;
 
                     ProductComboBox.SelectedItem = product;
                     ProductComboBox.Text = product.Name;
@@ -377,6 +382,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
+                scannedProductId = null;
                 pendingInternationalBarcode = null;
                 LinkPendingBarcodeButton.IsEnabled = false;
 
@@ -752,6 +758,26 @@ namespace Ocore.desktop.Views
                 return;
             }
 
+            // منع إضافة صنف مختلف عن الصنف الذي تعرف عليه الباركود
+            if (scannedProductId.HasValue &&
+                product.Id != scannedProductId.Value)
+            {
+                MessageBox.Show(
+                    "تنبيه: الصنف المحدد لا يطابق الصنف الذي تم التعرف عليه من الباركود.\n\n"
+                    + "الصنف الصحيح هو: "
+                    + (allProducts.Find(
+                        p => p.Id == scannedProductId.Value)?.Name
+                        ?? "غير معروف")
+                    + "\n\n"
+                    + "أعد قراءة باركود الصنف المطلوب قبل إضافته إلى الفاتورة.",
+                    "عدم تطابق الباركود والصنف",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                ProductComboBox.Focus();
+                return;
+            }
+
             if (PurchaseUnitComboBox.SelectedItem == null)
             {
                 MessageBox.Show(
@@ -871,6 +897,8 @@ namespace Ocore.desktop.Views
 
             packagePrices[item] = product.PurchasePrice;
 
+            // انتهت عملية استخدام الباركود للصنف الذي تمت إضافته
+            scannedProductId = null;
             RefreshInvoiceGrid();
             UpdateTotal();
 
@@ -1158,7 +1186,9 @@ namespace Ocore.desktop.Views
 
                 invoiceItems.Clear();
                 packagePrices.Clear();
-
+                scannedProductId = null;
+                pendingInternationalBarcode = null;
+                LinkPendingBarcodeButton.IsEnabled = false;
                 InvoiceDatePicker.SelectedDate =
                     DateTime.Today;
 
