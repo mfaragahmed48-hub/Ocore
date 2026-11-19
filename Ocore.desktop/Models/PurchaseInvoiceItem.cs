@@ -147,9 +147,7 @@ namespace Ocore.desktop.Models
                 {
                     DateTime parsedDate;
 
-                    if (DateTime.TryParse(
-                        value,
-                        out parsedDate))
+                    if (DateTime.TryParse(value, out parsedDate))
                     {
                         if (expiryDate?.Date != parsedDate.Date)
                         {
@@ -255,6 +253,7 @@ namespace Ocore.desktop.Models
             }
         }
 
+        // قيمة الضريبة على وحدة الشراء الواحدة
         public double TaxAmount
         {
             get
@@ -264,6 +263,17 @@ namespace Ocore.desktop.Models
             }
         }
 
+        // إجمالي الضريبة على كمية الصنف بالكامل
+        public double TotalTaxAmount
+        {
+            get
+            {
+                return RoundMoney(
+                    Quantity * TaxAmount);
+            }
+        }
+
+        // صافي سعر الوحدة بعد الخصم والضريبة
         public double NetUnitPrice
         {
             get
@@ -315,6 +325,7 @@ namespace Ocore.desktop.Models
             }
         }
 
+        // إجمالي الصنف بعد الخصم والضريبة
         public double Total
         {
             get
@@ -339,6 +350,7 @@ namespace Ocore.desktop.Models
             OnPropertyChanged(nameof(DiscountAmount));
             OnPropertyChanged(nameof(DiscountedUnitPrice));
             OnPropertyChanged(nameof(TaxAmount));
+            OnPropertyChanged(nameof(TotalTaxAmount));
             OnPropertyChanged(nameof(NetUnitPrice));
             OnPropertyChanged(nameof(Total));
             OnPropertyChanged(nameof(PackageQuantity));

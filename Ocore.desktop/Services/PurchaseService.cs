@@ -579,6 +579,10 @@ namespace Ocore.desktop.Services
         // حساب تكلفة العبوة الفعلية
         // ==========================================
 
+        // ==========================================
+        // حساب تكلفة العبوة الفعلية بدون ضريبة
+        // ==========================================
+
         private double CalculateInventoryPackageCost(
             PurchaseInvoiceItem item,
             double totalPackageQuantity)
@@ -590,21 +594,29 @@ namespace Ocore.desktop.Services
                     "إجمالي كمية المخزون بعد التحويل غير صحيح.");
             }
 
+            // تكلفة الكمية المشتراة بعد الخصم وقبل الضريبة
+            double preTaxLineTotal = RoundMoney(
+                item.Quantity * item.DiscountedUnitPrice);
+
+            // توزيع التكلفة على الكمية المشتراة والمجانية
             double inventoryCost =
-                item.Total / totalPackageQuantity;
+                preTaxLineTotal / totalPackageQuantity;
 
             if (IsInvalidNumber(inventoryCost) || inventoryCost < 0)
                 throw new Exception("تكلفة المخزون الفعلية غير صحيحة.");
 
             return RoundMoney(inventoryCost);
         }
+        // ==========================================
+        // التحقق من بيانات البند وحساب الإجمالي
+        // ==========================================
 
         // ==========================================
         // التحقق من بيانات البند وحساب الإجمالي
         // ==========================================
 
         private double ValidateAndGetLineTotal(
-    PurchaseInvoiceItem item)
+            PurchaseInvoiceItem item)
         {
             if (item.UnitPrice < 0 ||
                 IsInvalidNumber(item.UnitPrice))
@@ -622,24 +634,32 @@ namespace Ocore.desktop.Services
                     item.ItemName);
             }
 
-            // الفواتير الجديدة بدون ضرائب
-            item.TaxPercent = 0;
+            // التحقق من نسبة الضريبة المدخلة يدويًا
+            if (item.TaxPercent < 0 ||
+                item.TaxPercent > 100 ||
+                IsInvalidNumber(item.TaxPercent))
+            {
+                throw new Exception(
+                    "نسبة الضريبة يجب أن تكون من صفر إلى 100 للصنف: " +
+                    item.ItemName);
+            }
 
             double lineTotal = item.Total;
 
             if (IsInvalidNumber(lineTotal) || lineTotal < 0)
             {
                 throw new Exception(
-                    "إجمالي الصنف بعد الخصم غير صحيح: " +
+                    "إجمالي الصنف بعد الخصم والضريبة غير صحيح: " +
                     item.ItemName);
             }
 
             if (IsInvalidNumber(item.DiscountAmount) ||
                 IsInvalidNumber(item.TaxAmount) ||
+                IsInvalidNumber(item.TotalTaxAmount) ||
                 IsInvalidNumber(item.NetUnitPrice))
             {
                 throw new Exception(
-                    "تعذر حساب الخصم أو صافي سعر الوحدة للصنف: " +
+                    "تعذر حساب الخصم أو الضريبة أو صافي سعر الوحدة للصنف: " +
                     item.ItemName);
             }
 
@@ -748,13 +768,9 @@ namespace Ocore.desktop.Services
                                     "يوجد صنف برقم غير صحيح.");
 
                             PreparePurchaseItem(
-    connection,
-    transaction,
-    item);
-
-                            // إلغاء الضريبة من فواتير الشراء الجديدة
-                            item.TaxPercent = 0;
-
+                              connection,
+                              transaction,
+                              item);
                             // تاريخ الصلاحية للأصناف اليدوية اختياري،،
                             // لكن إذا تم إدخاله فيجب أن يكون صالحًا.
                             if (item.ExpiryDate.HasValue)

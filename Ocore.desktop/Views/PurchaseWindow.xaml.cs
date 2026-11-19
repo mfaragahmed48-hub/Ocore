@@ -1125,7 +1125,16 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
-                
+                if (item.TaxPercent < 0 ||
+    item.TaxPercent > 100 ||
+    IsInvalidNumber(item.TaxPercent))
+                {
+                    MessageBox.Show(
+                        "نسبة الضريبة يجب أن تكون بين صفر و100.");
+
+                    return;
+                }
+
                 if (IsInvalidNumber(item.Total) ||
                     item.Total < 0)
                 {

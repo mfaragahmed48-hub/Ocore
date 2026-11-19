@@ -539,10 +539,19 @@
                         <DataGridTextColumn Header="المجاني" Binding="{Binding FreeQuantity, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
                         <DataGridTextColumn Header="وحدات/عبوة" Binding="{Binding UnitsPerPackage}" IsReadOnly="True" Width="75"/>
                         <DataGridTextColumn Header="سعر الوحدة" Binding="{Binding UnitPrice, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="80"/>
+
                         <DataGridTextColumn Header="خصم %" Binding="{Binding DiscountPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
+
+                        <DataGridTextColumn Header="ضريبة %" Binding="{Binding TaxPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="70"/>
+
                         <DataGridTextColumn Header="قيمة الخصم" Binding="{Binding DiscountAmount, StringFormat=N2}" IsReadOnly="True" Width="80"/>
+
                         <DataGridTextColumn Header="بعد الخصم" Binding="{Binding DiscountedUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
+
+                        <DataGridTextColumn Header="قيمة الضريبة" Binding="{Binding TotalTaxAmount, StringFormat=N2}" IsReadOnly="True" Width="90"/>
+
                         <DataGridTextColumn Header="صافي الوحدة" Binding="{Binding NetUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
+
                         <DataGridTextColumn Header="الإجمالي" Binding="{Binding Total, StringFormat=N2}" IsReadOnly="True" Width="85"/>
                         <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="120"/>
                     </DataGrid.Columns>
