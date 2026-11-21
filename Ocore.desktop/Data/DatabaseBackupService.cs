@@ -59,6 +59,7 @@ namespace Ocore.desktop.Data
                 .ToList();
         }
 
+        // تحديد أنواع النسخ الاحتياطية المسموح بعرضها واستعادتها
         private bool IsSupportedBackup(string path)
         {
             string name = Path.GetFileName(path);
@@ -70,6 +71,10 @@ namespace Ocore.desktop.Data
                 ||
                 name.StartsWith(
                     "OCORE_Backup_Before_Update_",
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                name.StartsWith(
+                    "OCORE_Backup_Before_Clear_",
                     StringComparison.OrdinalIgnoreCase)
                 ||
                 name.StartsWith(
