@@ -564,34 +564,37 @@ namespace Ocore.desktop.Data
 
                     // جميع جداول البيانات التشغيلية المسموح بتنظيفها.
                     var allowedTablesToClear = new HashSet<string>(
-                        StringComparer.OrdinalIgnoreCase)
-            {
-                "Users",
-                "Categories",
-                "Suppliers",
-                "Products",
-                "DrugCatalog",
-                "ProductBarcodes",
-                "Batches",
-                "Customers",
-                "SalesInvoices",
-                "SalesInvoicePayments",
-                "CustomerAccountTransactions",
-                "PurchaseInvoices",
-                "PurchaseInvoiceItems",
-                "SalesInvoiceItems",
-                "SalesInvoiceBatchAllocations",
-                "SalesReturns",
-                "SalesReturnItems",
-                "SalesReturnBatchAllocations",
-                "AuditLogs",
-                "TaxProfiles",
-                "TaxProfileRates",
-                "TaxAuditLogs",
-                "SalesInvoiceItemTaxComponents",
-                "SalesReturnItemTaxComponents",
-                "SystemTest"
-            };
+    StringComparer.OrdinalIgnoreCase)
+{
+    "Users",
+    "Categories",
+    "Suppliers",
+    "Products",
+    "DrugCatalog",
+    "ProductBarcodes",
+    "Batches",
+    "Customers",
+    "SalesInvoices",
+    "SalesInvoicePayments",
+    "CustomerAccountTransactions",
+    "PurchaseInvoices",
+    "PurchaseInvoiceItems",
+    "SalesInvoiceItems",
+    "SalesInvoiceBatchAllocations",
+    "SalesReturns",
+    "SalesReturnItems",
+    "SalesReturnBatchAllocations",
+    "AuditLogs",
+    "TaxProfiles",
+    "TaxProfileRates",
+    "TaxAuditLogs",
+    "SalesInvoiceItemTaxComponents",
+    "SalesReturnItemTaxComponents",
+    "ExpenseTransactions",
+    "ShiftClosures",
+    "Shifts",
+    "SystemTest"
+};
 
                     var tablesToClear = new List<string>();
 
