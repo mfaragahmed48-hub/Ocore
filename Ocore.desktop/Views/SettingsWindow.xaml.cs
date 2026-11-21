@@ -31,7 +31,6 @@ namespace Ocore.desktop.Views
             LoadSettings();
             ConfigureClearButton();
             ConfigureDrugCatalogImportButton();
-           
         }
 
         // التحقق من أن المستخدم مدير النظام وحسابه نشط
@@ -88,8 +87,6 @@ LIMIT 1;";
                     : Visibility.Collapsed;
         }
 
-        // إظهار زر إدارة الضرائب للمدير فقط
-       
         // إظهار زر استيراد دليل الأدوية للمدير فقط
         private void ConfigureDrugCatalogImportButton()
         {
@@ -118,7 +115,6 @@ LIMIT 1;";
                 PhoneTextBox.Text =
                     settings.Phone;
 
-                
                 ManagerNameTextBox.Text =
                     settings.ManagerName;
 
@@ -237,7 +233,6 @@ LIMIT 1;";
                 settings.Phone =
                     PhoneTextBox.Text;
 
-                
                 settings.ManagerName =
                     ManagerNameTextBox.Text;
 
@@ -395,16 +390,20 @@ LIMIT 1;";
 
                 MessageBoxResult firstConfirmation =
                     MessageBox.Show(
-                        "تحذير: سيتم حذف البيانات التالية نهائيًا:\n\n" +
-                        "• جميع الأصناف والباركود.\n" +
-                        "• جميع التصنيفات والموردين.\n" +
+                        "تحذير: ستتم إعادة قاعدة بيانات البرنامج إلى حالة فارغة تمامًا.\n\n" +
+                        "سيتم حذف:\n" +
+                        "• جميع حسابات المستخدمين، بما فيها حساب المدير الحالي.\n" +
+                        "• جميع الأصناف والباركود والتصنيفات.\n" +
+                        "• جميع الموردين والعملاء.\n" +
                         "• جميع التشغيلات وكميات المخزون.\n" +
-                        "• جميع فواتير البيع والشراء.\n" +
-                        "• جميع مرتجعات البيع.\n\n" +
-                        "سيتم الاحتفاظ بالمستخدمين والصلاحيات وإعدادات الصيدلية والطابعة وسجل العمليات.\n\n" +
-                        "سيتم إنشاء نسخة احتياطية قبل الحذف.\n\n" +
+                        "• جميع فواتير البيع والشراء والمرتجعات.\n" +
+                        "• جميع الحركات والسجلات التشغيلية وسجل العمليات.\n\n" +
+                        "سيتم تصفير إعدادات الصيدلية العامة.\n\n" +
+                        "سيتم الاحتفاظ بتعريفات الأدوار والصلاحيات وإعدادات الطباعة والطابعات كما هي.\n\n" +
+                        "سيتم إنشاء نسخة احتياطية تلقائيًا قبل الحذف.\n\n" +
+                        "بعد إعادة تشغيل البرنامج ستظهر شاشة إنشاء حساب مدير جديد.\n\n" +
                         "هل تريد المتابعة؟",
-                        "تأكيد إعادة ضبط البيانات",
+                        "تحذير - إعادة ضبط قاعدة البيانات بالكامل",
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Warning,
                         MessageBoxResult.No);
@@ -414,10 +413,12 @@ LIMIT 1;";
 
                 MessageBoxResult finalConfirmation =
                     MessageBox.Show(
-                        "هل أنت متأكد تمامًا؟\n\n" +
-                        "لن يمكن التراجع عن الحذف من داخل البرنامج.\n" +
-                        "يمكنك استعادة النسخة الاحتياطية عند الحاجة.",
-                        "التأكيد النهائي",
+                        "هذا هو التأكيد النهائي.\n\n" +
+                        "سيتم حذف حسابك الحالي وجميع البيانات التشغيلية.\n" +
+                        "لن يمكن التراجع عن الحذف من داخل البرنامج.\n\n" +
+                        "تأكد من وجود النسخة الاحتياطية قبل المتابعة.\n\n" +
+                        "هل أنت متأكد تمامًا من إعادة ضبط قاعدة البيانات؟",
+                        "التأكيد النهائي لإعادة الضبط",
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Stop,
                         MessageBoxResult.No);
@@ -430,19 +431,27 @@ LIMIT 1;";
                 // تنفيذ عملية التنظيف
                 string result = databaseManager.ClearTestData();
 
+                bool succeeded =
+                    !string.IsNullOrWhiteSpace(result) &&
+                    result.StartsWith(
+                        "تم تنظيف",
+                        StringComparison.Ordinal);
+
                 MessageBox.Show(
                     result,
                     "O CORE - إعادة ضبط البيانات",
                     MessageBoxButton.OK,
-                    result.StartsWith("تم تنظيف")
+                    succeeded
                         ? MessageBoxImage.Information
                         : MessageBoxImage.Error);
 
-                if (result.StartsWith("تم تنظيف"))
+                if (succeeded)
                 {
                     MessageBox.Show(
-                        "أصبحت قاعدة المخزون جاهزة لإضافة دليل الأدوية الجديد باللغة الإنجليزية.",
-                        "O CORE",
+                        "تمت إعادة ضبط قاعدة البيانات.\n\n" +
+                        "تم الاحتفاظ بإعدادات الطباعة والطابعات وتعريفات الأدوار والصلاحيات.\n\n" +
+                        "أغلق البرنامج وأعد تشغيله لإنشاء حساب المدير الجديد من شاشة التسجيل الأولى.",
+                        "اكتملت إعادة ضبط البيانات",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                 }
@@ -462,13 +471,11 @@ LIMIT 1;";
             }
         }
 
-
         private void CloseButton_Click(
-    object sender,
-    RoutedEventArgs e)
+            object sender,
+            RoutedEventArgs e)
         {
             Close();
         }
-
     }
 }
