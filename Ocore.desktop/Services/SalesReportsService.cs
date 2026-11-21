@@ -138,8 +138,9 @@ AND (
             return result;
         }
 
-        // أفضل 10 أصناف مبيعاً حسب الكمية
-        // قيمة المبيعات تعرض الصافي بعد خصم الخصومات
+        // تقرير جميع الأصناف المباعة خلال الفترة.
+        // الكميات موحدة على PackageQuantity.
+        // المرتجعات تخصم فقط إذا كانت مرتبطة ببنود مبيعات الفترة.
         public List<TopSellingProduct> GetTopSellingProducts(
             int userId,
             DateTime fromDate,
@@ -151,23 +152,165 @@ AND (
             var result = new List<TopSellingProduct>();
 
             string sql = @"
+WITH SalesLines AS
+(
+    SELECT
+        si.Id AS InvoiceItemId,
+        si.ProductId,
+        si.InvoiceId,
+        si.ItemName,
+        COALESCE(si.PackageQuantity, 0) AS PackageQuantity,
+
+        CASE
+            WHEN LOWER(COALESCE(si.TaxStatus, 'Legacy')) = 'calculated'
+            THEN
+                COALESCE(si.TaxableAmount, 0)
+                + COALESCE(si.VatAmount, 0)
+                + COALESCE(si.ScheduleTaxAmount, 0)
+            ELSE
+                COALESCE(si.Total, 0)
+                - COALESCE(si.DiscountAmount, 0)
+        END AS NetLineValue
+
+    FROM SalesInvoiceItems si
+    INNER JOIN SalesInvoices inv
+        ON inv.Id = si.InvoiceId
+
+    WHERE inv.Status = 'Completed'
+      AND inv.CreatedAt >= @FromDate
+      AND inv.CreatedAt < @ToDate
+),
+
+SalesByProduct AS
+(
+    SELECT
+        ProductId,
+        MAX(ItemName) AS HistoricalProductName,
+        SUM(PackageQuantity) AS TotalQuantity,
+        SUM(NetLineValue) AS TotalSales,
+        COUNT(DISTINCT InvoiceId) AS InvoiceCount
+    FROM SalesLines
+    GROUP BY ProductId
+),
+
+ReturnsByProduct AS
+(
+    SELECT
+        sl.ProductId,
+        SUM(COALESCE(sri.PackageQuantity, 0)) AS ReturnedQuantity,
+
+        SUM(
+            CASE
+                WHEN LOWER(COALESCE(sri.TaxStatus, 'Legacy')) = 'calculated'
+                THEN
+                    COALESCE(sri.TaxableAmount, 0)
+                    + COALESCE(sri.VatAmount, 0)
+                    + COALESCE(sri.ScheduleTaxAmount, 0)
+                ELSE
+                    COALESCE(sri.Total, 0)
+                    - COALESCE(sri.DiscountAmount, 0)
+            END
+        ) AS ReturnedSales
+
+    FROM SalesLines sl
+    INNER JOIN SalesReturnItems sri
+        ON sri.InvoiceItemId = sl.InvoiceItemId
+    INNER JOIN SalesReturns sr
+        ON sr.Id = sri.ReturnId
+
+    WHERE sr.Status = 'Completed'
+
+    GROUP BY sl.ProductId
+),
+
+StockByProduct AS
+(
+    SELECT
+        p.Id AS ProductId,
+
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN b.Quantity > 0
+                     AND (
+                        COALESCE(b.ExpiryDate, '') = ''
+                        OR b.ExpiryDate >= @Today
+                     )
+                    THEN b.Quantity
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS CurrentStock,
+
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN b.Quantity > 0
+                     AND COALESCE(b.ExpiryDate, '') <> ''
+                     AND b.ExpiryDate < @Today
+                    THEN b.Quantity
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS ExpiredQuantity
+
+    FROM Products p
+    LEFT JOIN Batches b
+        ON b.ProductId = p.Id
+
+    GROUP BY p.Id
+)
+
 SELECT
-    si.ProductId,
-    si.ItemName AS ProductName,
-    SUM(si.PackageQuantity) AS TotalQuantity,
-    SUM(
-        si.Total - COALESCE(si.DiscountAmount, 0)
-    ) AS TotalSales,
-    COUNT(DISTINCT si.InvoiceId) AS InvoiceCount
-FROM SalesInvoiceItems si
-INNER JOIN SalesInvoices inv
-    ON inv.Id = si.InvoiceId
-WHERE inv.Status = 'Completed'
-AND inv.CreatedAt >= @FromDate
-AND inv.CreatedAt < @ToDate
-GROUP BY si.ProductId, si.ItemName
-ORDER BY TotalQuantity DESC
-LIMIT 10;";
+    s.ProductId,
+
+    COALESCE(
+        NULLIF(p.Name, ''),
+        s.HistoricalProductName,
+        ''
+    ) AS ProductName,
+
+    COALESCE(s.TotalQuantity, 0) AS TotalQuantity,
+
+    COALESCE(r.ReturnedQuantity, 0) AS ReturnedQuantity,
+
+    (
+        COALESCE(s.TotalQuantity, 0)
+        - COALESCE(r.ReturnedQuantity, 0)
+    ) AS NetQuantity,
+
+    COALESCE(s.TotalSales, 0) AS TotalSales,
+
+    COALESCE(r.ReturnedSales, 0) AS ReturnedSales,
+
+    (
+        COALESCE(s.TotalSales, 0)
+        - COALESCE(r.ReturnedSales, 0)
+    ) AS NetSales,
+
+    COALESCE(s.InvoiceCount, 0) AS InvoiceCount,
+
+    COALESCE(st.CurrentStock, 0) AS CurrentStock,
+
+    COALESCE(st.ExpiredQuantity, 0) AS ExpiredQuantity
+
+FROM SalesByProduct s
+
+LEFT JOIN Products p
+    ON p.Id = s.ProductId
+
+LEFT JOIN ReturnsByProduct r
+    ON r.ProductId = s.ProductId
+
+LEFT JOIN StockByProduct st
+    ON st.ProductId = s.ProductId
+
+ORDER BY
+    NetQuantity DESC,
+    TotalQuantity DESC,
+    ProductName COLLATE NOCASE;";
 
             string connectionString =
                 "Data Source=" + databaseManager.GetDatabasePath() +
@@ -181,6 +324,12 @@ LIMIT 10;";
                 {
                     AddDateParameters(command, fromDate, toDate);
 
+                    command.Parameters.AddWithValue(
+                        "@Today",
+                        DateTime.Today.ToString(
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture));
+
                     using (var reader = command.ExecuteReader())
                     {
                         while (reader.Read())
@@ -191,16 +340,34 @@ LIMIT 10;";
                                     Convert.ToInt32(reader["ProductId"]),
 
                                 ProductName =
-                                    reader["ProductName"].ToString(),
+                                    Convert.ToString(reader["ProductName"]),
 
                                 TotalQuantity =
                                     Convert.ToDouble(reader["TotalQuantity"]),
 
+                                ReturnedQuantity =
+                                    Convert.ToDouble(reader["ReturnedQuantity"]),
+
+                                NetQuantity =
+                                    Convert.ToDouble(reader["NetQuantity"]),
+
                                 TotalSales =
                                     Convert.ToDouble(reader["TotalSales"]),
 
+                                ReturnedSales =
+                                    Convert.ToDouble(reader["ReturnedSales"]),
+
+                                NetSales =
+                                    Convert.ToDouble(reader["NetSales"]),
+
                                 InvoiceCount =
-                                    Convert.ToInt32(reader["InvoiceCount"])
+                                    Convert.ToInt32(reader["InvoiceCount"]),
+
+                                CurrentStock =
+                                    Convert.ToDouble(reader["CurrentStock"]),
+
+                                ExpiredQuantity =
+                                    Convert.ToDouble(reader["ExpiredQuantity"])
                             });
                         }
                     }
