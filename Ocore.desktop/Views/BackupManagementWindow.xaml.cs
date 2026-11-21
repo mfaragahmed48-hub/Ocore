@@ -67,6 +67,12 @@ namespace Ocore.desktop.Views
                             backupType = "قبل تحديث";
                         }
                         else if (fileInfo.Name.StartsWith(
+                            "OCORE_Backup_Before_Clear_",
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            backupType = "قبل إعادة ضبط البيانات";
+                        }
+                        else if (fileInfo.Name.StartsWith(
                             "OCORE_Before_Restore_",
                             StringComparison.OrdinalIgnoreCase))
                         {
@@ -368,7 +374,7 @@ namespace Ocore.desktop.Views
                     selectedBackup.FilePath);
 
                 bool succeeded = result.StartsWith(
-                    "تم تجهيز النسخة الاحتياطية بنجاح.",
+                    "تم تجهيز قاعدة البيانات للاستعادة بنجاح.",
                     StringComparison.OrdinalIgnoreCase);
 
                 MessageBox.Show(
