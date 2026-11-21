@@ -529,6 +529,7 @@ namespace Ocore.desktop.Data
 
 
 
+
         public string ClearTestData()
         {
             string backupPath = null;
@@ -561,7 +562,7 @@ namespace Ocore.desktop.Data
                 "PharmacySettings"
             };
 
-                    // جميع جداول البيانات التشغيلية المعروفة.
+                    // جميع جداول البيانات التشغيلية المسموح بتنظيفها.
                     var allowedTablesToClear = new HashSet<string>(
                         StringComparer.OrdinalIgnoreCase)
             {
@@ -658,9 +659,8 @@ namespace Ocore.desktop.Data
                         }
                     }
 
-                    // إنشاء نسخة احتياطية موثوقة في مجلد Backups.
-                    // استخدام BackupDatabase بدل File.Copy لتفادي
-                    // مشاكل ملفات SQLite WAL.
+                    // إنشاء نسخة احتياطية موثوقة قبل الحذف.
+                    // استخدام BackupDatabase لتفادي مشاكل SQLite WAL.
                     CreateDatabaseBackup(connection, backupName);
 
                     backupPath = Path.Combine(
@@ -681,6 +681,7 @@ namespace Ocore.desktop.Data
                         {
                             try
                             {
+                                // حذف جميع البيانات التشغيلية.
                                 foreach (string tableName in tablesToClear)
                                 {
                                     string safeTableName =
@@ -725,24 +726,23 @@ namespace Ocore.desktop.Data
                                     }
                                 }
 
-                                // إعادة أرقام التسلسل للجداول التي تم تنظيفها فقط.
-                                // لا يتم تغيير تسلسلات جداول الأدوار والطباعة.
-                                if (TableExists(connection, "sqlite_sequence"))
+                                // تصفير أرقام التسلسل للجداول التي تم تنظيفها فقط.
+                                // sqlite_sequence موجود بسبب استخدام AUTOINCREMENT
+                                // في جداول قاعدة البيانات الأساسية.
+                                // جميع الأوامر مرتبطة بنفس Transaction.
+                                foreach (string tableName in tablesToClear)
                                 {
-                                    foreach (string tableName in tablesToClear)
+                                    using (var command = new SQLiteCommand(
+                                        @"DELETE FROM sqlite_sequence
+                                  WHERE name = @TableName;",
+                                        connection,
+                                        transaction))
                                     {
-                                        using (var command = new SQLiteCommand(
-                                            @"DELETE FROM sqlite_sequence
-                                      WHERE name = @TableName;",
-                                            connection,
-                                            transaction))
-                                        {
-                                            command.Parameters.AddWithValue(
-                                                "@TableName",
-                                                tableName);
+                                        command.Parameters.AddWithValue(
+                                            "@TableName",
+                                            tableName);
 
-                                            command.ExecuteNonQuery();
-                                        }
+                                        command.ExecuteNonQuery();
                                     }
                                 }
 
