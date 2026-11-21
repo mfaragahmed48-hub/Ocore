@@ -528,6 +528,7 @@ namespace Ocore.desktop.Data
 
 
 
+
         public string ClearTestData()
         {
             string backupPath = null;
@@ -537,41 +538,136 @@ namespace Ocore.desktop.Data
                 if (!File.Exists(databasePath))
                     return "قاعدة البيانات غير موجودة.";
 
-                string folder = Path.GetDirectoryName(databasePath);
-
                 string backupName =
                     "OCORE_Backup_Before_Clear_" +
-                    DateTime.Now.ToString("yyyyMMdd_HHmmss") +
+                    DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") +
                     ".db";
-
-                backupPath = Path.Combine(folder, backupName);
-
-                // إنشاء نسخة احتياطية قبل أي حذف.
-                File.Copy(databasePath, backupPath, false);
 
                 using (var connection = new SQLiteConnection(
                     "Data Source=" + databasePath + ";Version=3;"))
                 {
                     connection.Open();
 
-                    // الجداول التي يجب الاحتفاظ ببياناتها.
-                    // تشمل إعدادات الطباعة وتعريفات النظام الأساسية.
+                    // الجداول التي يجب الاحتفاظ ببياناتها بالكامل.
                     var tablesToKeep = new HashSet<string>(
                         StringComparer.OrdinalIgnoreCase)
             {
                 "Roles",
                 "Permissions",
                 "RolePermissions",
-
                 "PrintingProfiles",
                 "PrintingMigrationState",
                 "PrinterConfigurations",
-
                 "PharmacySettings"
             };
 
-                    // إيقاف فحص العلاقات مؤقتًا حتى يمكن حذف
-                    // جميع البيانات دون تعارض ترتيب الجداول.
+                    // جميع جداول البيانات التشغيلية المعروفة.
+                    var allowedTablesToClear = new HashSet<string>(
+                        StringComparer.OrdinalIgnoreCase)
+            {
+                "Users",
+                "Categories",
+                "Suppliers",
+                "Products",
+                "DrugCatalog",
+                "ProductBarcodes",
+                "Batches",
+                "Customers",
+                "SalesInvoices",
+                "SalesInvoicePayments",
+                "CustomerAccountTransactions",
+                "PurchaseInvoices",
+                "PurchaseInvoiceItems",
+                "SalesInvoiceItems",
+                "SalesInvoiceBatchAllocations",
+                "SalesReturns",
+                "SalesReturnItems",
+                "SalesReturnBatchAllocations",
+                "AuditLogs",
+                "TaxProfiles",
+                "TaxProfileRates",
+                "TaxAuditLogs",
+                "SalesInvoiceItemTaxComponents",
+                "SalesReturnItemTaxComponents",
+                "SystemTest"
+            };
+
+                    var tablesToClear = new List<string>();
+
+                    using (var command = new SQLiteCommand(
+                        @"SELECT name
+                  FROM sqlite_master
+                  WHERE type = 'table'
+                  AND name NOT LIKE 'sqlite_%'
+                  ORDER BY name;",
+                        connection))
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string tableName =
+                                Convert.ToString(reader["name"]);
+
+                            if (tablesToKeep.Contains(tableName))
+                                continue;
+
+                            if (!allowedTablesToClear.Contains(tableName))
+                            {
+                                return
+                                    "تم إيقاف إعادة الضبط حفاظًا على سلامة البيانات.\n\n" +
+                                    "يوجد جدول غير معروف لم تتم إضافته إلى قائمة " +
+                                    "الجداول المسموح بتنظيفها:\n" +
+                                    tableName +
+                                    "\n\nلم يتم حذف أي بيانات.";
+                            }
+
+                            tablesToClear.Add(tableName);
+                        }
+                    }
+
+                    // التأكد من وجود إعدادات الصيدلية قبل بدء العملية.
+                    if (!TableExists(connection, "PharmacySettings"))
+                    {
+                        return "تعذر إعادة الضبط: جدول إعدادات الصيدلية غير موجود.";
+                    }
+
+                    string[] requiredSettingsColumns =
+                    {
+                "PharmacyName",
+                "Address",
+                "Phone",
+                "TaxNumber",
+                "ManagerName",
+                "LogoPath",
+                "UpdatedAt",
+                "VatRegistrationStatus",
+                "TaxInvoiceEnabled"
+            };
+
+                    foreach (string column in requiredSettingsColumns)
+                    {
+                        if (!ColumnExists(
+                            connection,
+                            "PharmacySettings",
+                            column))
+                        {
+                            return
+                                "تعذر إعادة الضبط: العمود " +
+                                column +
+                                " غير موجود في إعدادات الصيدلية.";
+                        }
+                    }
+
+                    // إنشاء نسخة احتياطية موثوقة في مجلد Backups.
+                    // استخدام BackupDatabase بدل File.Copy لتفادي
+                    // مشاكل ملفات SQLite WAL.
+                    CreateDatabaseBackup(connection, backupName);
+
+                    backupPath = Path.Combine(
+                        backupFolder,
+                        backupName);
+
+                    // تعطيل العلاقات مؤقتًا قبل بدء Transaction.
                     using (var pragma = new SQLiteCommand(
                         "PRAGMA foreign_keys = OFF;",
                         connection))
@@ -581,35 +677,10 @@ namespace Ocore.desktop.Data
 
                     try
                     {
-                        var tablesToClear =
-                            new List<string>();
-
-                        // اكتشاف جميع جداول البيانات تلقائيًا،
-                        // بما فيها الجداول التي أضيفت في إصدارات لاحقة.
-                        using (var command = new SQLiteCommand(
-                            @"SELECT name
-                      FROM sqlite_master
-                      WHERE type = 'table'
-                      AND name NOT LIKE 'sqlite_%';",
-                            connection))
-                        using (var reader = command.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                string tableName =
-                                    reader["name"].ToString();
-
-                                if (!tablesToKeep.Contains(tableName))
-                                    tablesToClear.Add(tableName);
-                            }
-                        }
-
-                        using (var transaction =
-                            connection.BeginTransaction())
+                        using (var transaction = connection.BeginTransaction())
                         {
                             try
                             {
-                                // حذف بيانات جميع الجداول غير المستثناة.
                                 foreach (string tableName in tablesToClear)
                                 {
                                     string safeTableName =
@@ -617,7 +688,8 @@ namespace Ocore.desktop.Data
 
                                     using (var command = new SQLiteCommand(
                                         "DELETE FROM \"" +
-                                        safeTableName + "\";",
+                                        safeTableName +
+                                        "\";",
                                         connection,
                                         transaction))
                                     {
@@ -625,8 +697,8 @@ namespace Ocore.desktop.Data
                                     }
                                 }
 
-                                // تصفير بيانات الصيدلية العامة فقط،
-                                // مع عدم المساس بأعمدة إعدادات الطباعة.
+                                // تصفير بيانات الصيدلية العامة فقط.
+                                // لا يتم تعديل أي عمود متعلق بالطباعة.
                                 using (var command = new SQLiteCommand(
                                     @"UPDATE PharmacySettings
                               SET
@@ -643,22 +715,50 @@ namespace Ocore.desktop.Data
                                     connection,
                                     transaction))
                                 {
-                                    command.ExecuteNonQuery();
+                                    int affectedRows =
+                                        command.ExecuteNonQuery();
+
+                                    if (affectedRows != 1)
+                                    {
+                                        throw new InvalidOperationException(
+                                            "تعذر تصفير إعدادات الصيدلية.");
+                                    }
                                 }
 
-                                // تصفير أرقام التسلسل للجداول التي تم تنظيفها.
+                                // إعادة أرقام التسلسل للجداول التي تم تنظيفها فقط.
+                                // لا يتم تغيير تسلسلات جداول الأدوار والطباعة.
+                                if (TableExists(connection, "sqlite_sequence"))
+                                {
+                                    foreach (string tableName in tablesToClear)
+                                    {
+                                        using (var command = new SQLiteCommand(
+                                            @"DELETE FROM sqlite_sequence
+                                      WHERE name = @TableName;",
+                                            connection,
+                                            transaction))
+                                        {
+                                            command.Parameters.AddWithValue(
+                                                "@TableName",
+                                                tableName);
+
+                                            command.ExecuteNonQuery();
+                                        }
+                                    }
+                                }
+
+                                // فحص العلاقات قبل اعتماد الحذف.
                                 using (var command = new SQLiteCommand(
-                                    @"DELETE FROM sqlite_sequence
-                              WHERE name NOT IN (
-                                  'Roles',
-                                  'Permissions',
-                                  'PrintingProfiles',
-                                  'PrinterConfigurations'
-                              );",
+                                    "PRAGMA foreign_key_check;",
                                     connection,
                                     transaction))
+                                using (var reader = command.ExecuteReader())
                                 {
-                                    command.ExecuteNonQuery();
+                                    if (reader.Read())
+                                    {
+                                        throw new InvalidOperationException(
+                                            "اكتُشف تعارض في علاقات قاعدة البيانات " +
+                                            "بعد التنظيف. تم إلغاء العملية.");
+                                    }
                                 }
 
                                 transaction.Commit();
@@ -672,7 +772,7 @@ namespace Ocore.desktop.Data
                     }
                     finally
                     {
-                        // إعادة تفعيل فحص العلاقات دائمًا.
+                        // إعادة تفعيل العلاقات حتى عند حدوث خطأ.
                         using (var pragma = new SQLiteCommand(
                             "PRAGMA foreign_keys = ON;",
                             connection))
@@ -684,11 +784,12 @@ namespace Ocore.desktop.Data
 
                 return
                     "تم تنظيف قاعدة البيانات بنجاح.\n\n" +
-                    "تم حذف البيانات التشغيلية والتجريبية بالكامل، " +
-                    "بما في ذلك المستخدمون والمدير وسجلات العمليات " +
-                    "والبيانات الضريبية ودليل الأدوية.\n\n" +
-                    "تم الاحتفاظ بإعدادات الطباعة والطابعات " +
-                    "وتعريفات الأدوار والصلاحيات الأساسية.\n\n" +
+                    "تم حذف البيانات التشغيلية والتجريبية، بما فيها:\n" +
+                    "المستخدمون والمدير والفواتير والمخزون والعملاء والموردون، " +
+                    "والمرتجعات والضرائب وسجلات العمليات ودليل الأدوية.\n\n" +
+                    "تم الاحتفاظ بإعدادات الطباعة والطابعات كما هي، " +
+                    "وبتعريفات الأدوار والصلاحيات الأساسية.\n\n" +
+                    "تم تصفير بيانات الصيدلية العامة.\n\n" +
                     "يمكن الآن إنشاء حساب مدير جديد عند تشغيل البرنامج.\n\n" +
                     "النسخة الاحتياطية محفوظة في:\n" +
                     backupPath;
@@ -699,7 +800,8 @@ namespace Ocore.desktop.Data
                     "تعذر تنظيف قاعدة البيانات:\n" +
                     ex.Message +
                     (backupPath != null
-                        ? "\n\nالنسخة الاحتياطية:\n" + backupPath
+                        ? "\n\nالنسخة الاحتياطية محفوظة في:\n" +
+                          backupPath
                         : "");
             }
         }
