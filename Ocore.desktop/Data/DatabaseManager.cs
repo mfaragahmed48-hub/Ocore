@@ -592,8 +592,9 @@ namespace Ocore.desktop.Data
     "SalesInvoiceItemTaxComponents",
     "SalesReturnItemTaxComponents",
     "ExpenseTransactions",
-    "ShiftClosures",
-    "Shifts",
+    "ShiftHandovers",
+"ShiftClosures",
+"Shifts",
     "SystemTest"
 };
 
