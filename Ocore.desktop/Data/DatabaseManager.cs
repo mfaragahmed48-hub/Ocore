@@ -570,6 +570,7 @@ namespace Ocore.desktop.Data
     "Categories",
     "Suppliers",
     "Products",
+    "ProductCodeSequence",
     "DrugCatalog",
     "ProductBarcodes",
     "Batches",
