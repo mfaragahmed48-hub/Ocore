@@ -4,6 +4,7 @@ using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Collections.Generic;
 
 namespace Ocore.desktop.Data
 {
@@ -526,6 +527,7 @@ namespace Ocore.desktop.Data
         }
 
 
+
         public string ClearTestData()
         {
             string backupPath = null;
@@ -552,107 +554,142 @@ namespace Ocore.desktop.Data
                 {
                     connection.Open();
 
+                    // الجداول التي يجب الاحتفاظ ببياناتها.
+                    // تشمل إعدادات الطباعة وتعريفات النظام الأساسية.
+                    var tablesToKeep = new HashSet<string>(
+                        StringComparer.OrdinalIgnoreCase)
+            {
+                "Roles",
+                "Permissions",
+                "RolePermissions",
+
+                "PrintingProfiles",
+                "PrintingMigrationState",
+                "PrinterConfigurations",
+
+                "PharmacySettings"
+            };
+
+                    // إيقاف فحص العلاقات مؤقتًا حتى يمكن حذف
+                    // جميع البيانات دون تعارض ترتيب الجداول.
                     using (var pragma = new SQLiteCommand(
-                        "PRAGMA foreign_keys = ON;", connection))
+                        "PRAGMA foreign_keys = OFF;",
+                        connection))
                     {
                         pragma.ExecuteNonQuery();
                     }
 
-                    using (var transaction = connection.BeginTransaction())
+                    try
                     {
-                        try
+                        var tablesToClear =
+                            new List<string>();
+
+                        // اكتشاف جميع جداول البيانات تلقائيًا،
+                        // بما فيها الجداول التي أضيفت في إصدارات لاحقة.
+                        using (var command = new SQLiteCommand(
+                            @"SELECT name
+                      FROM sqlite_master
+                      WHERE type = 'table'
+                      AND name NOT LIKE 'sqlite_%';",
+                            connection))
+                        using (var reader = command.ExecuteReader())
                         {
-                            // حذف البيانات التابعة أولاً.
-                            string[] tablesToClear =
+                            while (reader.Read())
                             {
-                        "SalesReturnBatchAllocations",
-                        "SalesReturnItems",
-                        "SalesReturns",
+                                string tableName =
+                                    reader["name"].ToString();
 
-                        "SalesInvoiceBatchAllocations",
-                        "SalesInvoicePayments",
-                        "CustomerAccountTransactions",
-                        "SalesInvoiceItems",
-                        "SalesInvoices",
-
-                        "PurchaseInvoiceItems",
-                        "PurchaseInvoices",
-
-                        "ExpenseTransactions",
-                        "ShiftHandovers",
-                        "ShiftClosures",
-                        "Shifts",
-
-                        "ProductBarcodes",
-                        "Batches",
-                        "Products",
-                        "Categories",
-                        "Suppliers",
-                        "Customers"
-                    };
-
-                            foreach (string tableName in tablesToClear)
-                            {
-                                DeleteTableDataIfExists(
-                                    connection,
-                                    transaction,
-                                    tableName);
+                                if (!tablesToKeep.Contains(tableName))
+                                    tablesToClear.Add(tableName);
                             }
-
-                            // تصفير أرقام التسلسل للجداول التشغيلية.
-                            string sequenceSql = @"
-DELETE FROM sqlite_sequence
-WHERE name IN (
-    'SalesReturnBatchAllocations',
-    'SalesReturnItems',
-    'SalesReturns',
-
-    'SalesInvoiceBatchAllocations',
-    'SalesInvoicePayments',
-    'CustomerAccountTransactions',
-    'SalesInvoiceItems',
-    'SalesInvoices',
-
-    'PurchaseInvoiceItems',
-    'PurchaseInvoices',
-
-    'ExpenseTransactions',
-    'ShiftHandovers',
-    'ShiftClosures',
-    'Shifts',
-
-    'ProductBarcodes',
-    'Batches',
-    'Products',
-    'Categories',
-    'Suppliers',
-    'Customers'
-);";
-
-                            using (var command = new SQLiteCommand(
-                                sequenceSql,
-                                connection,
-                                transaction))
-                            {
-                                command.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
                         }
-                        catch
+
+                        using (var transaction =
+                            connection.BeginTransaction())
                         {
-                            transaction.Rollback();
-                            throw;
+                            try
+                            {
+                                // حذف بيانات جميع الجداول غير المستثناة.
+                                foreach (string tableName in tablesToClear)
+                                {
+                                    string safeTableName =
+                                        tableName.Replace("\"", "\"\"");
+
+                                    using (var command = new SQLiteCommand(
+                                        "DELETE FROM \"" +
+                                        safeTableName + "\";",
+                                        connection,
+                                        transaction))
+                                    {
+                                        command.ExecuteNonQuery();
+                                    }
+                                }
+
+                                // تصفير بيانات الصيدلية العامة فقط،
+                                // مع عدم المساس بأعمدة إعدادات الطباعة.
+                                using (var command = new SQLiteCommand(
+                                    @"UPDATE PharmacySettings
+                              SET
+                                  PharmacyName = '',
+                                  Address = '',
+                                  Phone = '',
+                                  TaxNumber = '',
+                                  ManagerName = '',
+                                  LogoPath = '',
+                                  UpdatedAt = '',
+                                  VatRegistrationStatus = 'Unknown',
+                                  TaxInvoiceEnabled = 0
+                              WHERE Id = 1;",
+                                    connection,
+                                    transaction))
+                                {
+                                    command.ExecuteNonQuery();
+                                }
+
+                                // تصفير أرقام التسلسل للجداول التي تم تنظيفها.
+                                using (var command = new SQLiteCommand(
+                                    @"DELETE FROM sqlite_sequence
+                              WHERE name NOT IN (
+                                  'Roles',
+                                  'Permissions',
+                                  'PrintingProfiles',
+                                  'PrinterConfigurations'
+                              );",
+                                    connection,
+                                    transaction))
+                                {
+                                    command.ExecuteNonQuery();
+                                }
+
+                                transaction.Commit();
+                            }
+                            catch
+                            {
+                                transaction.Rollback();
+                                throw;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        // إعادة تفعيل فحص العلاقات دائمًا.
+                        using (var pragma = new SQLiteCommand(
+                            "PRAGMA foreign_keys = ON;",
+                            connection))
+                        {
+                            pragma.ExecuteNonQuery();
                         }
                     }
                 }
 
                 return
-                    "تم تنظيف البيانات التجريبية بنجاح.\n\n" +
-                    "تم حذف بيانات الأصناف والمخزون والفواتير والمرتجعات " +
-                    "وحسابات العملاء والمصروفات والشيفتات والإغلاقات والتسليمات.\n\n" +
-                    "تم الاحتفاظ بالمستخدمين والصلاحيات والإعدادات " +
-                    "وسجل العمليات ودليل الأدوية.\n\n" +
+                    "تم تنظيف قاعدة البيانات بنجاح.\n\n" +
+                    "تم حذف البيانات التشغيلية والتجريبية بالكامل، " +
+                    "بما في ذلك المستخدمون والمدير وسجلات العمليات " +
+                    "والبيانات الضريبية ودليل الأدوية.\n\n" +
+                    "تم الاحتفاظ بإعدادات الطباعة والطابعات " +
+                    "وتعريفات الأدوار والصلاحيات الأساسية.\n\n" +
+                    "يمكن الآن إنشاء حساب مدير جديد عند تشغيل البرنامج.\n\n" +
                     "النسخة الاحتياطية محفوظة في:\n" +
                     backupPath;
             }
