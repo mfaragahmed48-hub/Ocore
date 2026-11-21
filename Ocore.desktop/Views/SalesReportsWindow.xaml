@@ -250,50 +250,78 @@
                     </StackPanel>
                 </Border>
 
-                <!-- أفضل الأصناف -->
+                <!-- تقرير جميع الأصناف المباعة -->
                 <Border Style="{StaticResource CardStyle}"
                         Margin="6,0,6,12">
 
                     <DockPanel>
 
-                        <TextBlock Text="أفضل 10 أصناف مبيعًا حسب الكمية"
+                        <TextBlock Text="تقرير الأصناف المباعة"
                                    FontSize="16"
                                    FontWeight="Bold"
                                    Foreground="#1E293B"
                                    DockPanel.Dock="Top"
                                    Margin="0,0,0,5"/>
 
-                        <TextBlock Text="قيمة المبيعات الموضحة هي الصافي بعد الخصومات"
+                        <TextBlock Text="جميع الأصناف المباعة خلال الفترة المحددة، مع خصم المرتجعات وعرض المخزون الصالح والمنتهي بشكل منفصل."
                                    FontSize="11"
                                    Foreground="#64748B"
                                    DockPanel.Dock="Top"
-                                   Margin="0,0,0,12"/>
+                                   Margin="0,0,0,12"
+                                   TextWrapping="Wrap"/>
 
                         <DataGrid x:Name="TopProductsDataGrid"
                                   Style="{StaticResource DataGridStyle}"
-                                  Height="250">
+                                  Height="320"
+                                  MinWidth="1100"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
 
                             <DataGrid.Columns>
 
                                 <DataGridTextColumn Header="كود الصنف"
                                                     Binding="{Binding ProductId}"
-                                                    Width="100"/>
+                                                    Width="90"/>
 
                                 <DataGridTextColumn Header="اسم الصنف"
                                                     Binding="{Binding ProductName}"
-                                                    Width="*"/>
+                                                    Width="220"/>
 
                                 <DataGridTextColumn Header="الكمية المباعة"
                                                     Binding="{Binding TotalQuantity, StringFormat=N2}"
-                                                    Width="150"/>
+                                                    Width="125"/>
 
-                                <DataGridTextColumn Header="صافي المبيعات"
+                                <DataGridTextColumn Header="الكمية المرتجعة"
+                                                    Binding="{Binding ReturnedQuantity, StringFormat=N2}"
+                                                    Width="125"/>
+
+                                <DataGridTextColumn Header="صافي الكمية"
+                                                    Binding="{Binding NetQuantity, StringFormat=N2}"
+                                                    Width="115"/>
+
+                                <DataGridTextColumn Header="قيمة المبيعات"
                                                     Binding="{Binding TotalSales, StringFormat=N2}"
-                                                    Width="150"/>
+                                                    Width="125"/>
+
+                                <DataGridTextColumn Header="قيمة المرتجعات"
+                                                    Binding="{Binding ReturnedSales, StringFormat=N2}"
+                                                    Width="125"/>
+
+                                <DataGridTextColumn Header="صافي قيمة المبيعات"
+                                                    Binding="{Binding NetSales, StringFormat=N2}"
+                                                    Width="145"/>
+
+                                <DataGridTextColumn Header="الرصيد الصالح"
+                                                    Binding="{Binding CurrentStock, StringFormat=N2}"
+                                                    Width="115"/>
+
+                                <DataGridTextColumn Header="المنتهي الصلاحية"
+                                                    Binding="{Binding ExpiredQuantity, StringFormat=N2}"
+                                                    Width="125"/>
 
                                 <DataGridTextColumn Header="عدد الفواتير"
                                                     Binding="{Binding InvoiceCount}"
-                                                    Width="120"/>
+                                                    Width="100"/>
 
                             </DataGrid.Columns>
 
