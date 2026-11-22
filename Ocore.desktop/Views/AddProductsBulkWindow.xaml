@@ -81,30 +81,55 @@
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   CanUserDeleteRows="False"
+                  CanUserResizeColumns="False"
                   SelectionMode="Single"
                   SelectionUnit="FullRow"
                   HeadersVisibility="Column"
                   GridLinesVisibility="All"
                   MinRowHeight="36"
-                  FontSize="12"
+                  FontSize="11"
                   Background="White"
                   AlternatingRowBackground="#F7FAF9"
-                  HorizontalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
                   VerticalScrollBarVisibility="Auto">
+
+            <!-- تنسيق عناوين الأعمدة -->
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="{x:Type DataGridColumnHeader}">
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    <Setter Property="Padding" Value="3,5"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="FontSize" Value="10"/>
+                    <Setter Property="Background" Value="#E8F0ED"/>
+                    <Setter Property="Foreground" Value="#183F36"/>
+                    <Setter Property="ContentTemplate">
+                        <Setter.Value>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"
+                                           TextWrapping="Wrap"
+                                           TextAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </DataTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
 
             <DataGrid.Columns>
 
                 <!-- اسم الصنف -->
                 <DataGridTextColumn Header="اسم الصنف *"
                                     Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="280">
+                                    Width="2.5*">
 
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="{x:Type TextBlock}">
                             <Setter Property="TextWrapping" Value="Wrap"/>
                             <Setter Property="TextTrimming" Value="None"/>
                             <Setter Property="VerticalAlignment" Value="Center"/>
-                            <Setter Property="Margin" Value="5,3"/>
+                            <Setter Property="Margin" Value="4,3"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
 
@@ -113,7 +138,7 @@
                             <Setter Property="TextWrapping" Value="Wrap"/>
                             <Setter Property="AcceptsReturn" Value="True"/>
                             <Setter Property="VerticalContentAlignment" Value="Center"/>
-                            <Setter Property="Padding" Value="4"/>
+                            <Setter Property="Padding" Value="3"/>
                         </Style>
                     </DataGridTextColumn.EditingElementStyle>
 
@@ -121,13 +146,14 @@
 
                 <!-- التصنيف -->
                 <DataGridTemplateColumn Header="التصنيف"
-                                        Width="145">
+                                        Width="1.4*">
 
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding CategoryName}"
                                        VerticalAlignment="Center"
-                                       Margin="5,0"/>
+                                       TextWrapping="Wrap"
+                                       Margin="3,2"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
 
@@ -137,7 +163,8 @@
                                       DisplayMemberPath="Value"
                                       SelectedValuePath="Key"
                                       SelectedValue="{Binding CategoryId, UpdateSourceTrigger=PropertyChanged}"
-                                      IsTextSearchEnabled="True"/>
+                                      IsTextSearchEnabled="True"
+                                      FontSize="10"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
 
@@ -147,49 +174,59 @@
                 <DataGridTextColumn Header="العبوة"
                                     Binding="{Binding UnitName}"
                                     IsReadOnly="True"
-                                    Width="90"/>
+                                    Width="0.85*"/>
 
                 <!-- الوحدة الصغيرة -->
                 <DataGridTextColumn Header="الوحدة الصغيرة"
                                     Binding="{Binding SmallUnitName}"
                                     IsReadOnly="True"
-                                    Width="110"/>
+                                    Width="1.05*"/>
 
                 <!-- عدد الوحدات -->
                 <DataGridTextColumn Header="عدد الوحدات *"
                                     Binding="{Binding UnitsPerPackage, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="95"/>
+                                    Width="0.85*"/>
 
                 <!-- سعر البيع -->
                 <DataGridTextColumn Header="سعر البيع"
                                     Binding="{Binding SalePrice, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="95"/>
+                                    Width="0.8*"/>
 
                 <!-- سعر الشراء -->
                 <DataGridTextColumn Header="سعر الشراء"
                                     Binding="{Binding PurchasePrice, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="95"/>
+                                    Width="0.8*"/>
 
                 <!-- الكمية الافتتاحية -->
                 <DataGridTextColumn Header="الكمية الافتتاحية"
                                     Binding="{Binding InitialQuantity, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="110"/>
+                                    Width="0.95*"/>
 
                 <!-- رقم التشغيلة -->
                 <DataGridTextColumn Header="رقم التشغيلة"
                                     Binding="{Binding BatchNumber, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="120"/>
+                                    Width="1.05*"/>
 
                 <!-- تاريخ الصلاحية -->
-                <DataGridTextColumn Header="تاريخ الصلاحية yyyy-MM-dd"
+                <DataGridTextColumn Header="تاريخ الصلاحية"
                                     Binding="{Binding ExpiryDate, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="155"/>
+                                    Width="1.1*"/>
 
                 <!-- حالة الصف -->
                 <DataGridTextColumn Header="حالة الصف"
                                     Binding="{Binding Status}"
                                     IsReadOnly="True"
-                                    Width="220"/>
+                                    Width="1.4*">
+
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="{x:Type TextBlock}">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Margin" Value="3,2"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+
+                </DataGridTextColumn>
 
             </DataGrid.Columns>
         </DataGrid>
