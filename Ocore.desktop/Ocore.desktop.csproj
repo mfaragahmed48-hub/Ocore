@@ -162,7 +162,7 @@
     <Compile Include="Models\Supplier.cs" />
     <Compile Include="Models\TaxModels.cs" />
     <Compile Include="Services\ExpenseService.cs" />
-<Compile Include="Services\ProductExcelImportService.cs" />
+    <Compile Include="Services\ProductExcelImportService.cs" />
     <Compile Include="Services\ExpiryAlertService.cs" />
     <Compile Include="Services\GS1BarcodeService.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationDefaults.cs" />
@@ -198,6 +198,7 @@
     <Compile Include="Views\PrinterTypeSettingsWindow.xaml.cs">
       <DependentUpon>PrinterTypeSettingsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\ProductsManagementWindow.Excel.cs" />
     <Compile Include="Views\ShiftHistoryWindow.xaml.cs">
       <DependentUpon>ShiftHistoryWindow.xaml</DependentUpon>
     </Compile>
@@ -281,6 +282,7 @@
     <Compile Include="Views\PrinterSettingsWindow.xaml.cs">
       <DependentUpon>PrinterSettingsWindow.xaml</DependentUpon>
     </Compile>
+<Compile Include="Views\ProductsManagementWindow.Excel.cs" />
     <Compile Include="Views\ProductsManagementWindow.xaml.cs">
       <DependentUpon>ProductsManagementWindow.xaml</DependentUpon>
     </Compile>

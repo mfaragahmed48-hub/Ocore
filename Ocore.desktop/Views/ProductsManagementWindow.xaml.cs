@@ -26,6 +26,8 @@ namespace Ocore.desktop.Views
         {
             InitializeComponent();
 
+            InitializeExcelActions();
+
             currentUserId = userId;
 
             productService = new ProductService();
