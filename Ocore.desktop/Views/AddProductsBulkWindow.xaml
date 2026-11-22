@@ -85,7 +85,7 @@
                   SelectionUnit="FullRow"
                   HeadersVisibility="Column"
                   GridLinesVisibility="All"
-                  RowHeight="36"
+                  MinRowHeight="36"
                   FontSize="12"
                   Background="White"
                   AlternatingRowBackground="#F7FAF9"
@@ -97,7 +97,27 @@
                 <!-- اسم الصنف -->
                 <DataGridTextColumn Header="اسم الصنف *"
                                     Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="190"/>
+                                    Width="280">
+
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="{x:Type TextBlock}">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="TextTrimming" Value="None"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Margin" Value="5,3"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+
+                    <DataGridTextColumn.EditingElementStyle>
+                        <Style TargetType="{x:Type TextBox}">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="AcceptsReturn" Value="True"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            <Setter Property="Padding" Value="4"/>
+                        </Style>
+                    </DataGridTextColumn.EditingElementStyle>
+
+                </DataGridTextColumn>
 
                 <!-- التصنيف -->
                 <DataGridTemplateColumn Header="التصنيف"
