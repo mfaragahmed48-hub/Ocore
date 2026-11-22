@@ -99,6 +99,10 @@
                           GridLinesVisibility="Horizontal"
                           MinRowHeight="42"
                           FontSize="12"
+                          EnableRowVirtualization="False"
+                          EnableColumnVirtualization="False"
+                          VirtualizingPanel.IsVirtualizing="False"
+                          ScrollViewer.CanContentScroll="False"
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto">
 
