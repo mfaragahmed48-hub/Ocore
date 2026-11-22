@@ -115,7 +115,6 @@
                 CornerRadius="8"
                 Padding="8"
                 Margin="0,0,0,5">
-
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -156,7 +155,6 @@
                 CornerRadius="7"
                 Padding="6"
                 Margin="0,0,0,5">
-
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -185,7 +183,6 @@
                         CornerRadius="5"
                         Padding="5,3"
                         Margin="3,0,2,0">
-
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -247,7 +244,7 @@
             </Grid>
         </Border>
 
-        <!-- نموذج الإدخال القديم: مخفي مؤقتًا للحفاظ على مراجع الكود الحالي -->
+        <!-- نموذج الإدخال القديم -->
         <Border Grid.Row="2"
                 Visibility="Collapsed"
                 Background="White"
@@ -256,7 +253,6 @@
                 CornerRadius="7"
                 Padding="6"
                 Margin="0,0,0,5">
-
             <StackPanel>
                 <DockPanel Margin="2,0,2,4">
                     <TextBlock Text="إضافة صنف إلى الفاتورة"
@@ -281,7 +277,6 @@
 
                     <StackPanel Grid.Column="0" Margin="2">
                         <TextBlock Text="الصنف" Style="{StaticResource FieldLabel}"/>
-
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -297,7 +292,6 @@
                                       TextSearch.TextPath="Name"
                                       SelectedValuePath="Id"
                                       MaxDropDownHeight="280">
-
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Margin="4,3">
@@ -422,7 +416,6 @@
                 CornerRadius="7"
                 Padding="5"
                 ClipToBounds="True">
-
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -444,7 +437,6 @@
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
-
                         <TextBlock Text="أدخل الصنف بالكود أو الاسم، وامسح باركود التشغيلة والصلاحية داخل الصف"
                                    FontSize="9"
                                    Foreground="{StaticResource MutedBrush}"
@@ -477,7 +469,8 @@
                           SelectionUnit="FullRow"
                           HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal"
-                          RowHeight="30"
+                          RowHeight="Auto"
+                          MinRowHeight="34"
                           FontSize="11"
                           Background="White"
                           Foreground="{StaticResource TextBrush}"
@@ -507,33 +500,41 @@
                                             IsReadOnly="False"
                                             Width="100"/>
 
-
-                        <DataGridTemplateColumn Header="اسم الصنف" Width="190">
+                        <!-- اسم الصنف: عرض مرن ولف النص -->
+                        <DataGridTemplateColumn Header="اسم الصنف"
+                                                Width="2*"
+                                                MinWidth="220">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding ItemName}"
-                       VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis"/>
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Stretch"
+                                               TextWrapping="Wrap"
+                                               TextTrimming="None"
+                                               Padding="5,5"
+                                               ToolTip="{Binding ItemName}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
 
                             <DataGridTemplateColumn.CellEditingTemplate>
                                 <DataTemplate>
-                                    <ComboBox
-                IsEditable="True"
-                IsTextSearchEnabled="False"
-                StaysOpenOnEdit="True"
-                DisplayMemberPath="Name"
-                Text="{Binding ItemName,
-                               Mode=TwoWay,
-                               UpdateSourceTrigger=PropertyChanged}"
-                Loaded="InvoiceProductComboBox_Loaded"
-                SelectionChanged="InvoiceProductComboBox_SelectionChanged"
-                VerticalContentAlignment="Center"/>
+                                    <ComboBox IsEditable="True"
+                                              IsReadOnly="False"
+                                              IsTextSearchEnabled="False"
+                                              StaysOpenOnEdit="True"
+                                              DisplayMemberPath="Name"
+                                              MaxDropDownHeight="320"
+                                              MinWidth="200"
+                                              Text="{Binding ItemName,
+                                                             Mode=TwoWay,
+                                                             UpdateSourceTrigger=PropertyChanged}"
+                                              Loaded="InvoiceProductComboBox_Loaded"
+                                              SelectionChanged="InvoiceProductComboBox_SelectionChanged"
+                                              VerticalContentAlignment="Center"
+                                              ToolTip="اكتب اسم الصنف أو كوده ثم اختر الصنف من النتائج"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-
 
                         <DataGridTextColumn Header="الشركة"
                                             Binding="{Binding Manufacturer}"
@@ -697,7 +698,6 @@
                 CornerRadius="7"
                 Padding="6"
                 Margin="0,5,0,0">
-
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
