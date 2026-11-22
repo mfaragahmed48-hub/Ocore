@@ -15,6 +15,7 @@ namespace Ocore.desktop.Models
         private string productCode;
         private string itemName;
         private string manufacturer;
+        private string barcodeInput;
 
         private string unitName;
         private string packageUnitName;
@@ -25,7 +26,7 @@ namespace Ocore.desktop.Models
         private string expiryDateText;
         private DateTime? expiryDate;
 
-        private double quantity;
+        private double quantity = 1;
         private double freeQuantity;
         private double unitPrice;
         private double discountPercent;
@@ -61,6 +62,13 @@ namespace Ocore.desktop.Models
         {
             get => manufacturer;
             set => SetProperty(ref manufacturer, value);
+        }
+
+        // حقل استقبال الباركود الخاص بكل صف
+        public string BarcodeInput
+        {
+            get => barcodeInput;
+            set => SetProperty(ref barcodeInput, value);
         }
 
         public string UnitName
