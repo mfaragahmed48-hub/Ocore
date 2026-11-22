@@ -839,6 +839,107 @@ namespace Ocore.desktop.Views
             SalePriceTextBox.Clear();
             ProductComboBox.Focus();
         }
+        private void InvoiceProductComboBox_Loaded(
+            object sender,
+            RoutedEventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+
+            if (comboBox == null || allProducts == null)
+                return;
+
+            comboBox.ApplyTemplate();
+
+            var textBox = comboBox.Template.FindName(
+                "PART_EditableTextBox",
+                comboBox) as TextBox;
+
+            if (textBox == null)
+                return;
+
+            // لكل صف View مستقل حتى لا يؤثر البحث في صف على بقية الصفوف.
+            var view = new ListCollectionView(allProducts);
+
+            view.Filter = product =>
+            {
+                var p = product as Product;
+
+                if (p == null)
+                    return false;
+
+                string search = (textBox.Text ?? "").Trim();
+
+                if (string.IsNullOrWhiteSpace(search))
+                    return true;
+
+                return
+                    (!string.IsNullOrWhiteSpace(p.Name) &&
+                     p.Name.IndexOf(
+                         search,
+                         StringComparison.CurrentCultureIgnoreCase) >= 0)
+                    ||
+                    (!string.IsNullOrWhiteSpace(p.ProductCode) &&
+                     p.ProductCode.IndexOf(
+                         search,
+                         StringComparison.CurrentCultureIgnoreCase) >= 0);
+            };
+
+            comboBox.Tag = view;
+            comboBox.ItemsSource = view;
+
+            textBox.Tag = comboBox;
+
+            textBox.TextChanged -=
+                InvoiceProductSearchTextBox_TextChanged;
+
+            textBox.TextChanged +=
+                InvoiceProductSearchTextBox_TextChanged;
+        }
+
+        private void InvoiceProductSearchTextBox_TextChanged(
+            object sender,
+            TextChangedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            var comboBox = textBox?.Tag as ComboBox;
+            var view = comboBox?.Tag as ListCollectionView;
+
+            if (textBox == null || comboBox == null || view == null)
+                return;
+
+            // الفلتر يقرأ من TextBox نفسه لضمان استخدام أحدث حرف مكتوب.
+            view.Refresh();
+
+            if (!string.IsNullOrWhiteSpace(textBox.Text) &&
+                comboBox.Items.Count > 0)
+            {
+                comboBox.IsDropDownOpen = true;
+            }
+        }
+
+        private void InvoiceProductComboBox_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+
+            if (comboBox == null || e.AddedItems == null ||
+                e.AddedItems.Count == 0)
+                return;
+
+            var product = e.AddedItems[0] as Product;
+            var item = comboBox.DataContext as PurchaseInvoiceItem;
+
+            if (product == null || item == null)
+                return;
+
+            ApplyProductToInvoiceItem(item, product);
+
+            // تحديث النص الظاهر بعد اختيار نتيجة فعلية.
+            comboBox.Text = product.Name ?? "";
+
+            UpdateTotal();
+        }
 
         private void AddInvoiceRowButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1033,7 +1134,6 @@ namespace Ocore.desktop.Views
 
             UpdateTotal();
         }
-
         private void InvoiceRowBarcodeTextBox_KeyDown(
             object sender,
             System.Windows.Input.KeyEventArgs e)
@@ -1278,12 +1378,20 @@ namespace Ocore.desktop.Views
 
             string editedText = null;
 
-            if (codeColumn || nameColumn)
+            if (codeColumn)
             {
                 var textBox = e.EditingElement as TextBox;
 
                 if (textBox != null)
                     editedText = textBox.Text;
+            }
+            else if (nameColumn)
+            {
+                // عمود اسم الصنف أصبح ComboBox قابلًا للبحث.
+                var comboBox = e.EditingElement as ComboBox;
+
+                if (comboBox != null)
+                    editedText = comboBox.Text;
             }
 
             Dispatcher.BeginInvoke(

@@ -507,10 +507,33 @@
                                             IsReadOnly="False"
                                             Width="100"/>
 
-                        <DataGridTextColumn Header="اسم الصنف"
-                                            Binding="{Binding ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                            IsReadOnly="False"
-                                            Width="180"/>
+
+                        <DataGridTemplateColumn Header="اسم الصنف" Width="190">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding ItemName}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <ComboBox
+                IsEditable="True"
+                IsTextSearchEnabled="False"
+                StaysOpenOnEdit="True"
+                DisplayMemberPath="Name"
+                Text="{Binding ItemName,
+                               Mode=TwoWay,
+                               UpdateSourceTrigger=PropertyChanged}"
+                Loaded="InvoiceProductComboBox_Loaded"
+                SelectionChanged="InvoiceProductComboBox_SelectionChanged"
+                VerticalContentAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+
 
                         <DataGridTextColumn Header="الشركة"
                                             Binding="{Binding Manufacturer}"
