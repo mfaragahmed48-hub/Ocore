@@ -469,7 +469,6 @@
                           SelectionUnit="FullRow"
                           HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal"
-                          RowHeight="Auto"
                           MinRowHeight="34"
                           FontSize="11"
                           Background="White"
