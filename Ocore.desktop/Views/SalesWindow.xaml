@@ -170,30 +170,42 @@
                                Margin="0,0,0,7"/>
 
                     <DataGrid x:Name="ItemsDataGrid"
-                              Grid.Row="1"
-                              FlowDirection="LeftToRight"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              SelectionMode="Single"
-                              HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal"
-                              FontSize="12"
-                              RowHeight="34"
-                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          Grid.Row="1"
+          FlowDirection="LeftToRight"
+          AutoGenerateColumns="False"
+          IsReadOnly="True"
+          CanUserAddRows="False"
+          SelectionMode="Single"
+          HeadersVisibility="Column"
+          GridLinesVisibility="Horizontal"
+          FontSize="11"
+          MinRowHeight="34"
+          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
 
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Drug Name (English)"
-                                                Binding="{Binding Name}"
-                                                Width="*"/>
+
+                            <DataGridTemplateColumn Header="Drug Name (English)"
+                                Width="2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center"
+                               Padding="3,4"
+                               FontSize="10"
+                               ToolTip="{Binding Name}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="Price"
-                                                Binding="{Binding DisplayPrice}"
-                                                Width="85"/>
+                            Binding="{Binding DisplayPrice}"
+                            Width="65"/>
 
                             <DataGridTextColumn Header="Stock"
-                                                Binding="{Binding Quantity, StringFormat={}{0:N3}}"
-                                                Width="85"/>
+                            Binding="{Binding Quantity, StringFormat={}{0:N3}}"
+                            Width="65"/>
+
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
