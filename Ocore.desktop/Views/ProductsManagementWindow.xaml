@@ -219,13 +219,22 @@
             <WrapPanel HorizontalAlignment="Center">
 
                 <Button x:Name="AddProductButton"
-                        Content="➕ إضافة صنف"
-                        Width="115"
-                        Height="38"
-                        Margin="3"
-                        Background="#16865D"
-                        Foreground="White"
-                        FontWeight="Bold"/>
+        Content="➕ إضافة صنف"
+        Width="115"
+        Height="38"
+        Margin="3"
+        Background="#16865D"
+        Foreground="White"
+        FontWeight="Bold"/>
+
+                <Button x:Name="AddProductsBulkButton"
+        Content="📋 إضافة مجموعة أصناف"
+        Width="165"
+        Height="38"
+        Margin="3"
+        Background="#246B58"
+        Foreground="White"
+        FontWeight="Bold"/>
 
                 <Button x:Name="EditProductButton"
                         Content="✏️ تعديل صنف"

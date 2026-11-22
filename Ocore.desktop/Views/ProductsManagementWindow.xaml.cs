@@ -45,6 +45,7 @@ namespace Ocore.desktop.Views
                 ProductsDataGrid_SelectionChanged;
 
             AddProductButton.Click += AddProductButton_Click;
+            AddProductsBulkButton.Click += AddProductsBulkButton_Click;
             EditProductButton.Click += EditProductButton_Click;
             ManageStockButton.Click += ManageStockButton_Click;
             SetDiscountLimitButton.Click += SetDiscountLimitButton_Click;
@@ -283,6 +284,30 @@ namespace Ocore.desktop.Views
             }
         }
 
+        private void AddProductsBulkButton_Click(
+    object sender,
+    RoutedEventArgs e)
+        {
+            try
+            {
+                var window = new AddProductsBulkWindow(currentUserId);
+
+                window.Owner = this;
+
+                window.ShowDialog();
+
+                if (window.HasSavedProducts)
+                    LoadProducts();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "حدث خطأ أثناء فتح شاشة إضافة مجموعة الأصناف:\n" + ex.Message,
+                    "خطأ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
         private void EditProductButton_Click(
             object sender,
             RoutedEventArgs e)

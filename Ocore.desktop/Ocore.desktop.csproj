@@ -150,6 +150,9 @@
     <Compile Include="Services\ShiftService.cs" />
     <Compile Include="Services\TaxCalculationService.cs" />
     <Compile Include="Services\ThermalReceiptDocumentBuilder.cs" />
+    <Compile Include="Views\AddProductsBulkWindow.xaml.cs">
+      <DependentUpon>AddProductsBulkWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\BatchSelectionWindow.xaml.cs">
       <DependentUpon>BatchSelectionWindow.xaml</DependentUpon>
     </Compile>
@@ -203,7 +206,6 @@
     <Compile Include="Services\ThermalPrinterService.cs" />
     <Compile Include="Services\ThermalReceiptRenderer.cs" />
     <Compile Include="Services\UserService.cs" />
-
     <Compile Include="Settings.cs" />
     <Compile Include="Views\AddCatalogDrugWindow.xaml.cs">
       <DependentUpon>AddCatalogDrugWindow.xaml</DependentUpon>
@@ -314,6 +316,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="Views\AddProductsBulkWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Views\BatchSelectionWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
