@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Linq;
-
+using System.Globalization;
 namespace Ocore.desktop.Services
 {
     public class ProductService
@@ -103,7 +103,8 @@ namespace Ocore.desktop.Services
                         "وصل تسلسل الباركود إلى الحد الأقصى المسموح به.");
                 }
 
-                string candidateCode = serial.ToString("D6");
+                string candidateCode = serial.ToString(
+    CultureInfo.InvariantCulture);
 
                 string barcodeBase = "20" + serial.ToString("D10");
 
