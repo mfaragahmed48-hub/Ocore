@@ -31,7 +31,9 @@ namespace Ocore.desktop.Views
         private readonly Dictionary<ComboBox, DispatcherTimer>
             invoiceProductSearchTimers =
                 new Dictionary<ComboBox, DispatcherTimer>();
-
+        private readonly HashSet<ComboBox>
+    invoiceProductExplicitSelection =
+        new HashSet<ComboBox>();
         private string pendingInternationalBarcode;
         private int? scannedProductId;
         private readonly Dictionary<PurchaseInvoiceItem, string>
@@ -968,13 +970,62 @@ namespace Ocore.desktop.Views
                 timer.Start();
             }
         }
+        private void InvoiceProductComboBoxItem_PreviewMouseLeftButtonDown(
+    object sender,
+    System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var comboBoxItem = sender as ComboBoxItem;
+
+            if (comboBoxItem == null)
+                return;
+
+            var comboBox =
+                ItemsControl.ItemsControlFromItemContainer(comboBoxItem)
+                as ComboBox;
+
+            if (comboBox == null)
+                return;
+
+            invoiceProductExplicitSelection.Add(comboBox);
+
+            Dispatcher.BeginInvoke(
+                new Action(() =>
+                    invoiceProductExplicitSelection.Remove(comboBox)),
+                DispatcherPriority.Background);
+        }
+
+        private void InvoiceProductComboBox_PreviewKeyDown(
+            object sender,
+            System.Windows.Input.KeyEventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+
+            if (comboBox == null ||
+                e.Key != System.Windows.Input.Key.Enter ||
+                !comboBox.IsDropDownOpen)
+                return;
+
+            var product = comboBox.SelectedItem as Product;
+            var item = comboBox.DataContext as PurchaseInvoiceItem;
+
+            if (product == null || item == null)
+                return;
+
+            CommitInvoiceProductSelection(comboBox, item, product);
+
+            comboBox.IsDropDownOpen = false;
+            e.Handled = true;
+        }
+
         private void InvoiceProductComboBox_SelectionChanged(
             object sender,
             SelectionChangedEventArgs e)
         {
             var comboBox = sender as ComboBox;
 
-            if (comboBox == null || e.AddedItems == null ||
+            if (comboBox == null ||
+                !invoiceProductExplicitSelection.Remove(comboBox) ||
+                e.AddedItems == null ||
                 e.AddedItems.Count == 0)
                 return;
 
@@ -984,14 +1035,23 @@ namespace Ocore.desktop.Views
             if (product == null || item == null)
                 return;
 
-            ApplyProductToInvoiceItem(item, product);
+            CommitInvoiceProductSelection(comboBox, item, product);
+        }
 
+        private void CommitInvoiceProductSelection(
+            ComboBox comboBox,
+            PurchaseInvoiceItem item,
+            Product product)
+        {
+            if (comboBox == null || item == null || product == null)
+                return;
+
+            ApplyProductToInvoiceItem(item, product);
             TryLinkPendingInvoiceBarcode(item, product);
 
             comboBox.Text = product.Name ?? "";
             UpdateTotal();
         }
-
         private void AddInvoiceRowButton_Click(
             object sender,
             RoutedEventArgs e)
