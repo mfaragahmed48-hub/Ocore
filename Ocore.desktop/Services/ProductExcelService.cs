@@ -126,7 +126,7 @@ namespace Ocore.desktop.Services
                     row++;
                 }
 
-                sheet.SheetView.RightToLeft = true;
+                sheet.RightToLeft = true;
                 sheet.SheetView.FreezeRows(1);
                 sheet.RangeUsed().SetAutoFilter();
 

@@ -71,6 +71,7 @@ namespace Ocore.desktop.Services
                 bool isManager = IsManager(role);
 
                 var duplicateErrors = GetDuplicateRowErrors(rows);
+                var plans = new List<ImportPlan>();
 
                 foreach (var row in rows)
                 {
@@ -83,11 +84,18 @@ namespace Ocore.desktop.Services
                             ? duplicateErrors[row.RowNumber]
                             : null);
 
+                    plans.Add(plan);
+                }
+
+                MarkDuplicateExistingProducts(plans);
+
+                foreach (var plan in plans)
+                {
                     result.Add(new ProductExcelImportPreviewRow
                     {
-                        RowNumber = row.RowNumber,
-                        ProductCode = row.ProductCode,
-                        ProductName = row.Name,
+                        RowNumber = plan.Row.RowNumber,
+                        ProductCode = plan.Row.ProductCode,
+                        ProductName = plan.Row.Name,
                         Action = plan.Action,
                         Error = plan.Error
                     });
@@ -140,6 +148,9 @@ namespace Ocore.desktop.Services
 
                             plans.Add(plan);
                         }
+
+                        // منع تحديث الصنف نفسه من أكثر من صف.
+                        MarkDuplicateExistingProducts(plans);
 
                         var errors = plans
                             .Where(x => !string.IsNullOrWhiteSpace(x.Error))
@@ -1202,6 +1213,26 @@ namespace Ocore.desktop.Services
             }
 
             return errors;
+        }
+
+        // يمنع تكرار تحديث الصنف نفسه من أكثر من صف في ملف Excel.
+        private void MarkDuplicateExistingProducts(
+            List<ImportPlan> plans)
+        {
+            var duplicateGroups = plans
+                .Where(x => x.ExistingProductId > 0)
+                .GroupBy(x => x.ExistingProductId)
+                .Where(g => g.Count() > 1);
+
+            foreach (var group in duplicateGroups)
+            {
+                foreach (var plan in group)
+                {
+                    plan.Error =
+                        "أكثر من صف في ملف Excel يشير إلى الصنف نفسه. " +
+                        "راجع الكود والباركود في الصفوف المتكررة.";
+                }
+            }
         }
 
         private bool IsManager(string role)
