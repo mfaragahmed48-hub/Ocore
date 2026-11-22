@@ -970,9 +970,10 @@ namespace Ocore.desktop.Views
                 timer.Start();
             }
         }
+
         private void InvoiceProductComboBoxItem_PreviewMouseLeftButtonDown(
-    object sender,
-    System.Windows.Input.MouseButtonEventArgs e)
+            object sender,
+            System.Windows.Input.MouseButtonEventArgs e)
         {
             var comboBoxItem = sender as ComboBoxItem;
 
@@ -986,13 +987,10 @@ namespace Ocore.desktop.Views
             if (comboBox == null)
                 return;
 
+            // تسجيل أن المستخدم اختار نتيجة بالماوس.
             invoiceProductExplicitSelection.Add(comboBox);
-
-            Dispatcher.BeginInvoke(
-                new Action(() =>
-                    invoiceProductExplicitSelection.Remove(comboBox)),
-                DispatcherPriority.Background);
         }
+
 
         private void InvoiceProductComboBox_PreviewKeyDown(
             object sender,
@@ -1000,9 +998,21 @@ namespace Ocore.desktop.Views
         {
             var comboBox = sender as ComboBox;
 
-            if (comboBox == null ||
-                e.Key != System.Windows.Input.Key.Enter ||
-                !comboBox.IsDropDownOpen)
+            if (comboBox == null || !comboBox.IsDropDownOpen)
+                return;
+
+            if (e.Key == System.Windows.Input.Key.Up ||
+                e.Key == System.Windows.Input.Key.Down)
+            {
+                invoiceProductExplicitSelection.Add(comboBox);
+                return;
+            }
+
+            if (e.Key != System.Windows.Input.Key.Enter)
+                return;
+
+            // لا نعتمد أي نتيجة إلا بعد تنقل المستخدم إليها بالأسهم.
+            if (!invoiceProductExplicitSelection.Remove(comboBox))
                 return;
 
             var product = comboBox.SelectedItem as Product;
@@ -1015,6 +1025,16 @@ namespace Ocore.desktop.Views
 
             comboBox.IsDropDownOpen = false;
             e.Handled = true;
+        }
+
+        private void InvoiceProductComboBox_DropDownClosed(
+            object sender,
+            EventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+
+            if (comboBox != null)
+                invoiceProductExplicitSelection.Remove(comboBox);
         }
 
         private void InvoiceProductComboBox_SelectionChanged(
@@ -1050,8 +1070,10 @@ namespace Ocore.desktop.Views
             TryLinkPendingInvoiceBarcode(item, product);
 
             comboBox.Text = product.Name ?? "";
+
             UpdateTotal();
         }
+
         private void AddInvoiceRowButton_Click(
             object sender,
             RoutedEventArgs e)

@@ -457,31 +457,35 @@
                     </StackPanel>
                 </Grid>
 
+
                 <DataGrid x:Name="InvoiceItemsGrid"
-                          Grid.Row="1"
-                          AutoGenerateColumns="False"
-                          IsReadOnly="False"
-                          CanUserAddRows="False"
-                          CanUserDeleteRows="False"
-                          CanUserSortColumns="True"
-                          CanUserResizeColumns="True"
-                          SelectionMode="Single"
-                          SelectionUnit="FullRow"
-                          HeadersVisibility="Column"
-                          GridLinesVisibility="Horizontal"
-                          MinRowHeight="34"
-                          FontSize="11"
-                          Background="White"
-                          Foreground="{StaticResource TextBrush}"
-                          BorderThickness="0"
-                          HorizontalGridLinesBrush="#E9EFEC"
-                          AlternatingRowBackground="#F6F9F7"
-                          HorizontalScrollBarVisibility="Auto"
-                          VerticalScrollBarVisibility="Auto"
-                          EnableRowVirtualization="False"
-                          EnableColumnVirtualization="False"
-                          AlternationCount="10000"
-                          RowEditEnding="InvoiceItemsGrid_RowEditEnding">
+          Grid.Row="1"
+          AutoGenerateColumns="False"
+          IsReadOnly="False"
+          CanUserAddRows="False"
+          CanUserDeleteRows="False"
+          CanUserSortColumns="True"
+          CanUserResizeColumns="True"
+          CanUserResizeRows="True"
+          SelectionMode="Single"
+          SelectionUnit="FullRow"
+          HeadersVisibility="Column"
+          GridLinesVisibility="All"
+          MinRowHeight="38"
+          FontSize="11"
+          Background="White"
+          Foreground="{StaticResource TextBrush}"
+          BorderThickness="1"
+          BorderBrush="#C8D5CF"
+          HorizontalGridLinesBrush="#DCE5E1"
+          VerticalGridLinesBrush="#DCE5E1"
+          AlternatingRowBackground="#F6F9F7"
+          HorizontalScrollBarVisibility="Auto"
+          VerticalScrollBarVisibility="Auto"
+          EnableRowVirtualization="False"
+          EnableColumnVirtualization="False"
+          AlternationCount="10000"
+          RowEditEnding="InvoiceItemsGrid_RowEditEnding">
 
                     <DataGrid.Columns>
 
@@ -501,37 +505,49 @@
                                             IsReadOnly="False"
                                             Width="100"/>
 
+
                         <!-- اسم الصنف -->
                         <DataGridTemplateColumn Header="اسم الصنف"
-                                                Width="2*"
-                                                MinWidth="220">
+                        Width="2.5*"
+                        MinWidth="280">
 
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding ItemName}"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Stretch"
-                                               TextWrapping="Wrap"
-                                               TextTrimming="None"
-                                               Padding="5,5"
-                                               ToolTip="{Binding ItemName}"/>
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Stretch"
+                       TextWrapping="Wrap"
+                       TextTrimming="None"
+                       Padding="5,5"
+                       ToolTip="{Binding ItemName}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
 
                             <DataGridTemplateColumn.CellEditingTemplate>
                                 <DataTemplate>
                                     <ComboBox IsEditable="True"
-                                              IsReadOnly="False"
-                                              IsTextSearchEnabled="False"
-                                              StaysOpenOnEdit="True"
-                                              DisplayMemberPath="Name"
-                                              MaxDropDownHeight="320"
-                                              MinWidth="200"
-                                              Text="{Binding ItemName, Mode=OneWay}"
-                                              Loaded="InvoiceProductComboBox_Loaded"
-                                              SelectionChanged="InvoiceProductComboBox_SelectionChanged"
-                                              VerticalContentAlignment="Center"
-                                              ToolTip="اكتب اسم الصنف أو كوده ثم اختر الصنف من النتائج"/>
+          IsReadOnly="False"
+          IsTextSearchEnabled="False"
+          StaysOpenOnEdit="True"
+          DisplayMemberPath="Name"
+          MaxDropDownHeight="320"
+          MinWidth="200"
+          Text="{Binding ItemName, Mode=OneWay}"
+          Loaded="InvoiceProductComboBox_Loaded"
+SelectionChanged="InvoiceProductComboBox_SelectionChanged"
+PreviewKeyDown="InvoiceProductComboBox_PreviewKeyDown"
+DropDownClosed="InvoiceProductComboBox_DropDownClosed"
+VerticalContentAlignment="Center"
+          ToolTip="اكتب اسم الصنف أو كوده ثم اختر الصنف من النتائج">
+
+                                        <ComboBox.ItemContainerStyle>
+                                            <Style TargetType="{x:Type ComboBoxItem}">
+                                                <EventSetter Event="PreviewMouseLeftButtonDown"
+                         Handler="InvoiceProductComboBoxItem_PreviewMouseLeftButtonDown"/>
+                                            </Style>
+                                        </ComboBox.ItemContainerStyle>
+
+                                    </ComboBox>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
 
