@@ -7,6 +7,7 @@
         MinHeight="550"
         MinWidth="900"
         WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
         ResizeMode="CanResize"
         FlowDirection="RightToLeft"
         Background="#F1F4F6"
@@ -83,20 +84,46 @@
             <Setter Property="Background" Value="#EAF1EE"/>
             <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="Padding" Value="4,2"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="Padding" Value="3,4"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="BorderBrush" Value="#C8D5CF"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Stretch"
+                                   VerticalAlignment="Center"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="DataGridCell">
-            <Setter Property="Padding" Value="3,2"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="3,3"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="BorderBrush" Value="#DCE5E1"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
+
+        <Style TargetType="DataGridRow">
+            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="None"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
     </Window.Resources>
 
     <Grid Margin="7" MinWidth="0">
@@ -457,39 +484,38 @@
                     </StackPanel>
                 </Grid>
 
-
                 <DataGrid x:Name="InvoiceItemsGrid"
-          Grid.Row="1"
-          AutoGenerateColumns="False"
-          IsReadOnly="False"
-          CanUserAddRows="False"
-          CanUserDeleteRows="False"
-          CanUserSortColumns="True"
-          CanUserResizeColumns="True"
-          CanUserResizeRows="True"
-          SelectionMode="Single"
-          SelectionUnit="FullRow"
-          HeadersVisibility="Column"
-          GridLinesVisibility="All"
-          MinRowHeight="38"
-          FontSize="11"
-          Background="White"
-          Foreground="{StaticResource TextBrush}"
-          BorderThickness="1"
-          BorderBrush="#C8D5CF"
-          HorizontalGridLinesBrush="#DCE5E1"
-          VerticalGridLinesBrush="#DCE5E1"
-          AlternatingRowBackground="#F6F9F7"
-          HorizontalScrollBarVisibility="Auto"
-          VerticalScrollBarVisibility="Auto"
-          EnableRowVirtualization="False"
-          EnableColumnVirtualization="False"
-          AlternationCount="10000"
-          RowEditEnding="InvoiceItemsGrid_RowEditEnding">
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserSortColumns="True"
+                          CanUserResizeColumns="True"
+                          CanUserResizeRows="True"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="All"
+                          MinRowHeight="38"
+                          FontSize="10"
+                          Background="White"
+                          Foreground="{StaticResource TextBrush}"
+                          BorderThickness="1"
+                          BorderBrush="#C8D5CF"
+                          HorizontalGridLinesBrush="#DCE5E1"
+                          VerticalGridLinesBrush="#DCE5E1"
+                          AlternatingRowBackground="#F6F9F7"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          EnableRowVirtualization="False"
+                          EnableColumnVirtualization="False"
+                          AlternationCount="10000"
+                          RowEditEnding="InvoiceItemsGrid_RowEditEnding">
 
                     <DataGrid.Columns>
 
-                        <DataGridTemplateColumn Header="م" Width="40" IsReadOnly="True">
+                        <DataGridTemplateColumn Header="م" Width="35" IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock
@@ -503,47 +529,46 @@
                         <DataGridTextColumn Header="كود الصنف"
                                             Binding="{Binding ProductCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="100"/>
-
+                                            Width="75"/>
 
                         <!-- اسم الصنف -->
                         <DataGridTemplateColumn Header="اسم الصنف"
-                        Width="2.5*"
-                        MinWidth="280">
+                                                Width="2.5*"
+                                                MinWidth="240">
 
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding ItemName}"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Stretch"
-                       TextWrapping="Wrap"
-                       TextTrimming="None"
-                       Padding="5,5"
-                       ToolTip="{Binding ItemName}"/>
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Stretch"
+                                               TextWrapping="Wrap"
+                                               TextTrimming="None"
+                                               Padding="5,5"
+                                               ToolTip="{Binding ItemName}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
 
                             <DataGridTemplateColumn.CellEditingTemplate>
                                 <DataTemplate>
                                     <ComboBox IsEditable="True"
-          IsReadOnly="False"
-          IsTextSearchEnabled="False"
-          StaysOpenOnEdit="True"
-          DisplayMemberPath="Name"
-          MaxDropDownHeight="320"
-          MinWidth="200"
-          Text="{Binding ItemName, Mode=OneWay}"
-          Loaded="InvoiceProductComboBox_Loaded"
-SelectionChanged="InvoiceProductComboBox_SelectionChanged"
-PreviewKeyDown="InvoiceProductComboBox_PreviewKeyDown"
-DropDownClosed="InvoiceProductComboBox_DropDownClosed"
-VerticalContentAlignment="Center"
-          ToolTip="اكتب اسم الصنف أو كوده ثم اختر الصنف من النتائج">
+                                              IsReadOnly="False"
+                                              IsTextSearchEnabled="False"
+                                              StaysOpenOnEdit="True"
+                                              DisplayMemberPath="Name"
+                                              MaxDropDownHeight="320"
+                                              MinWidth="200"
+                                              Text="{Binding ItemName, Mode=OneWay}"
+                                              Loaded="InvoiceProductComboBox_Loaded"
+                                              SelectionChanged="InvoiceProductComboBox_SelectionChanged"
+                                              PreviewKeyDown="InvoiceProductComboBox_PreviewKeyDown"
+                                              DropDownClosed="InvoiceProductComboBox_DropDownClosed"
+                                              VerticalContentAlignment="Center"
+                                              ToolTip="اكتب اسم الصنف أو كوده ثم اختر الصنف من النتائج">
 
                                         <ComboBox.ItemContainerStyle>
                                             <Style TargetType="{x:Type ComboBoxItem}">
                                                 <EventSetter Event="PreviewMouseLeftButtonDown"
-                         Handler="InvoiceProductComboBoxItem_PreviewMouseLeftButtonDown"/>
+                                                             Handler="InvoiceProductComboBoxItem_PreviewMouseLeftButtonDown"/>
                                             </Style>
                                         </ComboBox.ItemContainerStyle>
 
@@ -556,10 +581,10 @@ VerticalContentAlignment="Center"
                         <DataGridTextColumn Header="الشركة"
                                             Binding="{Binding Manufacturer}"
                                             IsReadOnly="True"
-                                            Width="110"/>
+                                            Width="90"/>
 
                         <!-- الوحدة -->
-                        <DataGridTemplateColumn Header="الوحدة" Width="85">
+                        <DataGridTemplateColumn Header="الوحدة" Width="65">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding UnitName}"
@@ -583,16 +608,18 @@ VerticalContentAlignment="Center"
                         <DataGridTextColumn Header="رقم التشغيلة"
                                             Binding="{Binding BatchNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="110"/>
+                                            Width="85"/>
 
                         <!-- باركود / GS1 -->
-                        <DataGridTemplateColumn Header="باركود / GS1" Width="150">
+                        <DataGridTemplateColumn Header="باركود / GS1" Width="110">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding BarcodeInput}"
-                                               HorizontalAlignment="Center"
+                                               HorizontalAlignment="Stretch"
                                                VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"/>
+                                               TextWrapping="Wrap"
+                                               TextTrimming="None"
+                                               ToolTip="{Binding BarcodeInput}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
 
@@ -608,7 +635,7 @@ VerticalContentAlignment="Center"
                         </DataGridTemplateColumn>
 
                         <!-- الصلاحية -->
-                        <DataGridTemplateColumn Header="الصلاحية" Width="125">
+                        <DataGridTemplateColumn Header="الصلاحية" Width="95">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding ExpiryDateText}"
@@ -634,35 +661,35 @@ VerticalContentAlignment="Center"
                         <DataGridTextColumn Header="الكمية"
                                             Binding="{Binding Quantity, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="65"/>
+                                            Width="50"/>
 
                         <DataGridTextColumn Header="المجاني"
                                             Binding="{Binding FreeQuantity, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="65"/>
+                                            Width="50"/>
 
                         <DataGridTextColumn Header="وحدات/عبوة"
                                             Binding="{Binding UnitsPerPackage}"
                                             IsReadOnly="True"
-                                            Width="75"/>
+                                            Width="60"/>
 
                         <DataGridTextColumn Header="سعر الوحدة"
                                             Binding="{Binding UnitPrice, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="80"/>
+                                            Width="65"/>
 
                         <DataGridTextColumn Header="خصم %"
                                             Binding="{Binding DiscountPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="65"/>
+                                            Width="50"/>
 
                         <DataGridTextColumn Header="ضريبة %"
                                             Binding="{Binding TaxPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="70"/>
+                                            Width="55"/>
 
                         <!-- الضريبة غير قابلة للخصم -->
-                        <DataGridTemplateColumn Header="الضريبة غير قابلة للخصم" Width="125">
+                        <DataGridTemplateColumn Header="الضريبة غير قابلة للخصم" Width="100">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <CheckBox IsChecked="{Binding IsTaxNonDeductible,
@@ -679,32 +706,32 @@ VerticalContentAlignment="Center"
                         <DataGridTextColumn Header="قيمة الخصم"
                                             Binding="{Binding DiscountAmount, StringFormat=N2}"
                                             IsReadOnly="True"
-                                            Width="80"/>
+                                            Width="65"/>
 
                         <DataGridTextColumn Header="بعد الخصم"
                                             Binding="{Binding DiscountedUnitPrice, StringFormat=N2}"
                                             IsReadOnly="True"
-                                            Width="85"/>
+                                            Width="70"/>
 
                         <DataGridTextColumn Header="قيمة الضريبة"
                                             Binding="{Binding TotalTaxAmount, StringFormat=N2}"
                                             IsReadOnly="True"
-                                            Width="90"/>
+                                            Width="75"/>
 
                         <DataGridTextColumn Header="صافي الوحدة"
                                             Binding="{Binding NetUnitPrice, StringFormat=N2}"
                                             IsReadOnly="True"
-                                            Width="85"/>
+                                            Width="70"/>
 
                         <DataGridTextColumn Header="الإجمالي"
                                             Binding="{Binding Total, StringFormat=N2}"
                                             IsReadOnly="True"
-                                            Width="85"/>
+                                            Width="70"/>
 
                         <DataGridTextColumn Header="ملاحظات"
                                             Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
                                             IsReadOnly="False"
-                                            Width="120"/>
+                                            Width="85"/>
 
                     </DataGrid.Columns>
                 </DataGrid>
