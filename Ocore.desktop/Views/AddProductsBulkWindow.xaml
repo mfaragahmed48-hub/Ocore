@@ -6,6 +6,7 @@
         WindowStartupLocation="CenterOwner"
         FlowDirection="RightToLeft"
         Background="#F3F6F8">
+
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -14,71 +15,196 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="#123D35" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+        <!-- العنوان -->
+        <Border Grid.Row="0"
+                Background="#123D35"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="إضافة مجموعة أصناف" FontSize="21" FontWeight="Bold" Foreground="White"/>
+                <TextBlock Text="إضافة مجموعة أصناف"
+                           FontSize="21"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+
                 <TextBlock Text="أدخل الأصناف في صفوف متتالية أو انسخ جدولًا من Excel والصقه مباشرة."
-                           Foreground="#D7E8E2" Margin="0,5,0,0"/>
+                           Foreground="#D7E8E2"
+                           Margin="0,5,0,0"/>
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+        <!-- أدوات التحكم وتعليمات اللصق -->
+        <Border Grid.Row="1"
+                Background="White"
+                CornerRadius="8"
+                Padding="10"
+                Margin="0,0,0,10">
+
             <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button x:Name="AddRowButton" Content="＋ إضافة صف" Width="105" Height="34" Margin="3"/>
-                    <Button x:Name="RemoveRowButton" Content="－ حذف الصف المحدد" Width="145" Height="34" Margin="3"/>
-                    <Button x:Name="PasteButton" Content="📋 لصق من Excel" Width="130" Height="34" Margin="3"/>
+
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal">
+
+                    <Button x:Name="AddRowButton"
+                            Content="＋ إضافة صف"
+                            Width="105"
+                            Height="34"
+                            Margin="3"/>
+
+                    <Button x:Name="RemoveRowButton"
+                            Content="－ حذف الصف المحدد"
+                            Width="145"
+                            Height="34"
+                            Margin="3"/>
+
+                    <Button x:Name="PasteButton"
+                            Content="📋 لصق من Excel"
+                            Width="130"
+                            Height="34"
+                            Margin="3"/>
+
                 </StackPanel>
+
                 <TextBlock x:Name="HelpTextBlock"
-                           Text="ترتيب أعمدة اللصق: الاسم، التصنيف، العبوة، الوحدة الصغيرة، عدد الوحدات، سعر البيع، سعر الشراء، الكمية الافتتاحية، رقم التشغيلة، الصلاحية (yyyy-MM-dd)."
-                           TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#52616B"/>
+                           Text="يمكنك لصق جدول كامل من Excel بالترتيب الموضح، أو نسخ عمود واحد واختيار أول خلية في العمود المطلوب ثم الضغط على Ctrl+V."
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"
+                           Foreground="#52616B"/>
+
             </DockPanel>
         </Border>
 
-        <DataGrid x:Name="ProductsDataGrid" Grid.Row="2"
-                  AutoGenerateColumns="False" CanUserAddRows="False"
-                  CanUserDeleteRows="False" SelectionMode="Single"
-                  SelectionUnit="FullRow" HeadersVisibility="Column"
-                  GridLinesVisibility="All" RowHeight="36" FontSize="12"
-                  Background="White" AlternatingRowBackground="#F7FAF9"
+        <!-- جدول الأصناف -->
+        <DataGrid x:Name="ProductsDataGrid"
+                  Grid.Row="2"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="All"
+                  RowHeight="36"
+                  FontSize="12"
+                  Background="White"
+                  AlternatingRowBackground="#F7FAF9"
                   HorizontalScrollBarVisibility="Auto"
                   VerticalScrollBarVisibility="Auto">
+
             <DataGrid.Columns>
-                <DataGridTextColumn Header="اسم الصنف *" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="190"/>
-                <DataGridTemplateColumn Header="التصنيف" Width="145">
+
+                <!-- اسم الصنف -->
+                <DataGridTextColumn Header="اسم الصنف *"
+                                    Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="190"/>
+
+                <!-- التصنيف -->
+                <DataGridTemplateColumn Header="التصنيف"
+                                        Width="145">
+
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding CategoryName}" VerticalAlignment="Center" Margin="5,0"/>
+                            <TextBlock Text="{Binding CategoryName}"
+                                       VerticalAlignment="Center"
+                                       Margin="5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+
                     <DataGridTemplateColumn.CellEditingTemplate>
                         <DataTemplate>
-                            <ComboBox ItemsSource="{Binding CategoryOptions}" DisplayMemberPath="Value"
-                                      SelectedValuePath="Key" SelectedValue="{Binding CategoryId, UpdateSourceTrigger=PropertyChanged}"
+                            <ComboBox ItemsSource="{Binding CategoryOptions}"
+                                      DisplayMemberPath="Value"
+                                      SelectedValuePath="Key"
+                                      SelectedValue="{Binding CategoryId, UpdateSourceTrigger=PropertyChanged}"
                                       IsTextSearchEnabled="True"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
+
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="العبوة" Binding="{Binding UnitName}" IsReadOnly="True" Width="90"/>
-                <DataGridTextColumn Header="الوحدة الصغيرة" Binding="{Binding SmallUnitName}" IsReadOnly="True" Width="110"/>
-                <DataGridTextColumn Header="عدد الوحدات *" Binding="{Binding UnitsPerPackage, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
-                <DataGridTextColumn Header="سعر البيع" Binding="{Binding SalePrice, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
-                <DataGridTextColumn Header="سعر الشراء" Binding="{Binding PurchasePrice, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
-                <DataGridTextColumn Header="الكمية الافتتاحية" Binding="{Binding InitialQuantity, UpdateSourceTrigger=PropertyChanged}" Width="110"/>
-                <DataGridTextColumn Header="رقم التشغيلة" Binding="{Binding BatchNumber, UpdateSourceTrigger=PropertyChanged}" Width="120"/>
-                <DataGridTextColumn Header="تاريخ الصلاحية yyyy-MM-dd" Binding="{Binding ExpiryDate, UpdateSourceTrigger=PropertyChanged}" Width="155"/>
-                <DataGridTextColumn Header="حالة الصف" Binding="{Binding Status}" IsReadOnly="True" Width="220"/>
+
+                <!-- العبوة -->
+                <DataGridTextColumn Header="العبوة"
+                                    Binding="{Binding UnitName}"
+                                    IsReadOnly="True"
+                                    Width="90"/>
+
+                <!-- الوحدة الصغيرة -->
+                <DataGridTextColumn Header="الوحدة الصغيرة"
+                                    Binding="{Binding SmallUnitName}"
+                                    IsReadOnly="True"
+                                    Width="110"/>
+
+                <!-- عدد الوحدات -->
+                <DataGridTextColumn Header="عدد الوحدات *"
+                                    Binding="{Binding UnitsPerPackage, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="95"/>
+
+                <!-- سعر البيع -->
+                <DataGridTextColumn Header="سعر البيع"
+                                    Binding="{Binding SalePrice, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="95"/>
+
+                <!-- سعر الشراء -->
+                <DataGridTextColumn Header="سعر الشراء"
+                                    Binding="{Binding PurchasePrice, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="95"/>
+
+                <!-- الكمية الافتتاحية -->
+                <DataGridTextColumn Header="الكمية الافتتاحية"
+                                    Binding="{Binding InitialQuantity, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="110"/>
+
+                <!-- رقم التشغيلة -->
+                <DataGridTextColumn Header="رقم التشغيلة"
+                                    Binding="{Binding BatchNumber, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="120"/>
+
+                <!-- تاريخ الصلاحية -->
+                <DataGridTextColumn Header="تاريخ الصلاحية yyyy-MM-dd"
+                                    Binding="{Binding ExpiryDate, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="155"/>
+
+                <!-- حالة الصف -->
+                <DataGridTextColumn Header="حالة الصف"
+                                    Binding="{Binding Status}"
+                                    IsReadOnly="True"
+                                    Width="220"/>
+
             </DataGrid.Columns>
         </DataGrid>
 
-        <DockPanel Grid.Row="3" Margin="0,10,0,0">
-            <TextBlock x:Name="SummaryTextBlock" DockPanel.Dock="Right" VerticalAlignment="Center"
-                       FontWeight="Bold" Foreground="#183F36" Text="جاهز لإدخال الأصناف."/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Name="SaveButton" Content="💾 حفظ الأصناف" Width="140" Height="40" Margin="4"
-                        Background="#16865D" Foreground="White" FontWeight="Bold"/>
-                <Button x:Name="CloseButton" Content="إغلاق" Width="100" Height="40" Margin="4"/>
+        <!-- الملخص وأزرار الحفظ -->
+        <DockPanel Grid.Row="3"
+                   Margin="0,10,0,0">
+
+            <TextBlock x:Name="SummaryTextBlock"
+                       DockPanel.Dock="Right"
+                       VerticalAlignment="Center"
+                       FontWeight="Bold"
+                       Foreground="#183F36"
+                       Text="جاهز لإدخال الأصناف."/>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Left">
+
+                <Button x:Name="SaveButton"
+                        Content="💾 حفظ الأصناف"
+                        Width="140"
+                        Height="40"
+                        Margin="4"
+                        Background="#16865D"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button x:Name="CloseButton"
+                        Content="إغلاق"
+                        Width="100"
+                        Height="40"
+                        Margin="4"/>
+
             </StackPanel>
         </DockPanel>
+
     </Grid>
 </Window>

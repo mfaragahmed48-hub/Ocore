@@ -204,6 +204,7 @@ namespace Ocore.desktop.Views
             }
         }
 
+
         private void PasteFromClipboard()
         {
             try
@@ -215,7 +216,6 @@ namespace Ocore.desktop.Views
                         "تنبيه",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
-
                     return;
                 }
 
@@ -230,13 +230,26 @@ namespace Ocore.desktop.Views
                 ProductsDataGrid.CommitEdit(
                     DataGridEditingUnit.Row, true);
 
-                string[] lines = clipboardText
-                    .Replace("\r\n", "\n")
-                    .Replace('\r', '\n')
-                    .Split(
-                        new[] { '\n' },
-                        StringSplitOptions.RemoveEmptyEntries);
+                clipboardText = clipboardText.TrimEnd('\r', '\n');
 
+                string[] lines = clipboardText.Split(
+                    new[] { "\r\n", "\n", "\r" },
+                    StringSplitOptions.None);
+
+                if (lines.Length == 0)
+                    return;
+
+                // إذا لم توجد علامات Tab فهذا عمود واحد من Excel.
+                bool isSingleColumn = !lines.Any(
+                    line => line.Contains("\t"));
+
+                if (isSingleColumn)
+                {
+                    PasteSingleColumn(lines);
+                    return;
+                }
+
+                // لصق جدول كامل بالطريقة القديمة.
                 int addedCount = 0;
 
                 foreach (string line in lines)
@@ -245,9 +258,7 @@ namespace Ocore.desktop.Views
 
                     if (cells.Length == 1 &&
                         string.IsNullOrWhiteSpace(cells[0]))
-                    {
                         continue;
-                    }
 
                     BulkProductRow row =
                         new BulkProductRow(categories);
@@ -269,9 +280,11 @@ namespace Ocore.desktop.Views
                     addedCount++;
                 }
 
+                UpdateSummary();
+
                 MessageBox.Show(
                     "تمت إضافة " + addedCount +
-                    " صف من الحافظة.\nراجع البيانات قبل الحفظ.",
+                    " صف من الجدول.\nراجع البيانات قبل الحفظ.",
                     "تم اللصق",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -283,6 +296,186 @@ namespace Ocore.desktop.Views
                     "خطأ",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+        }
+
+        // لصق عمود واحد في العمود الذي اختاره المستخدم.
+        private void PasteSingleColumn(string[] values)
+        {
+            if (ProductsDataGrid.CurrentCell.Column == null)
+            {
+                MessageBox.Show(
+                    "اضغط أولاً على الخلية التي تريد بدء اللصق منها.",
+                    "تنبيه",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            int columnIndex =
+                ProductsDataGrid.CurrentCell.Column.DisplayIndex;
+
+            // الأعمدة المسموح باللصق فيها.
+            int[] editableColumns =
+            {
+        0, 1, 4, 5, 6, 7, 8, 9
+    };
+
+            if (!editableColumns.Contains(columnIndex))
+            {
+                MessageBox.Show(
+                    "هذا العمود غير قابل للتعديل أو اللصق.",
+                    "تنبيه",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            BulkProductRow currentRow =
+                ProductsDataGrid.CurrentCell.Item as BulkProductRow;
+
+            int startIndex = currentRow != null
+                ? rows.IndexOf(currentRow)
+                : ProductsDataGrid.SelectedIndex;
+
+            if (startIndex < 0)
+            {
+                MessageBox.Show(
+                    "حدد أول خلية في العمود المطلوب ثم حاول مرة أخرى.",
+                    "تنبيه",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            int pastedCount = 0;
+            int skippedCount = 0;
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                int rowIndex = startIndex + i;
+
+                // إضافة صفوف تلقائياً عند الحاجة.
+                while (rows.Count <= rowIndex)
+                    AddNewRow();
+
+                BulkProductRow row = rows[rowIndex];
+
+                // حماية الأصناف التي تم حفظها بالفعل.
+                if (row.IsSaved)
+                {
+                    skippedCount++;
+                    continue;
+                }
+
+                SetColumnValue(
+                    row,
+                    columnIndex,
+                    values[i]);
+
+                pastedCount++;
+            }
+
+            ProductsDataGrid.SelectedIndex =
+                Math.Min(startIndex, rows.Count - 1);
+
+            ProductsDataGrid.ScrollIntoView(
+                ProductsDataGrid.SelectedItem);
+
+            UpdateSummary();
+
+            MessageBox.Show(
+                "تم لصق " + pastedCount +
+                " قيمة في عمود " + GetColumnHeader(columnIndex) +
+                (skippedCount > 0
+                    ? "\nتم تخطي " + skippedCount +
+                      " صف محفوظ مسبقاً."
+                    : ""),
+                "تم اللصق",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        // وضع القيمة في الخلية المناسبة.
+        private void SetColumnValue(
+            BulkProductRow row,
+            int columnIndex,
+            string value)
+        {
+            value = (value ?? string.Empty).Trim();
+
+            switch (columnIndex)
+            {
+                case 0:
+                    row.Name = value;
+                    break;
+
+                case 1:
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        row.CategoryId = 0;
+                    }
+                    else
+                    {
+                        var category = categories.FirstOrDefault(
+                            x => x.Key > 0 &&
+                            string.Equals(
+                                x.Value,
+                                value,
+                                StringComparison.OrdinalIgnoreCase));
+
+                        if (category.Key > 0)
+                        {
+                            row.CategoryId = category.Key;
+                        }
+                        else
+                        {
+                            row.CategoryId = 0;
+                            row.Status =
+                                "تنبيه: التصنيف غير موجود";
+                        }
+                    }
+                    break;
+
+                case 4:
+                    row.UnitsPerPackage = value;
+                    break;
+
+                case 5:
+                    row.SalePrice = value;
+                    break;
+
+                case 6:
+                    row.PurchasePrice = value;
+                    break;
+
+                case 7:
+                    row.InitialQuantity = value;
+                    break;
+
+                case 8:
+                    row.BatchNumber = value;
+                    break;
+
+                case 9:
+                    row.ExpiryDate = value;
+                    break;
+            }
+        }
+
+        private string GetColumnHeader(int columnIndex)
+        {
+            switch (columnIndex)
+            {
+                case 0: return "اسم الصنف";
+                case 1: return "التصنيف";
+                case 4: return "عدد الوحدات";
+                case 5: return "سعر البيع";
+                case 6: return "سعر الشراء";
+                case 7: return "الكمية الافتتاحية";
+                case 8: return "رقم التشغيلة";
+                case 9: return "تاريخ الصلاحية";
+                default: return "غير معروف";
             }
         }
 
