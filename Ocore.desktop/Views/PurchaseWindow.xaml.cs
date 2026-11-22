@@ -937,9 +937,10 @@ namespace Ocore.desktop.Views
 
             ApplyProductToInvoiceItem(item, product);
 
+            TryLinkPendingInvoiceBarcode(item, product);
+
             // تحديث النص الظاهر بعد اختيار نتيجة فعلية.
             comboBox.Text = product.Name ?? "";
-
             UpdateTotal();
         }
 
@@ -1100,6 +1101,7 @@ namespace Ocore.desktop.Views
             }
 
             ApplyProductToInvoiceItem(item, product);
+            TryLinkPendingInvoiceBarcode(item, product);
         }
 
         private void ApplyProductToInvoiceItem(
