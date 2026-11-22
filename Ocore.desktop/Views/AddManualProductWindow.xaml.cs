@@ -90,9 +90,6 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
-                string productCode =
-                    ProductCodeTextBox.Text.Trim();
-
                 string productName =
                     ProductNameTextBox.Text.Trim();
 
@@ -101,18 +98,6 @@ namespace Ocore.desktop.Views
 
                 string barcode =
                     BarcodeTextBox.Text.Trim();
-
-                if (string.IsNullOrWhiteSpace(productCode))
-                {
-                    MessageBox.Show(
-                        "اكتب كود الصنف.",
-                        "تنبيه",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-
-                    ProductCodeTextBox.Focus();
-                    return;
-                }
 
                 if (string.IsNullOrWhiteSpace(productName))
                 {
@@ -171,7 +156,7 @@ namespace Ocore.desktop.Views
 
                 var product = new Product
                 {
-                    ProductCode = productCode,
+                    ProductCode = null,
                     Name = productName,
 
                     CategoryId = Convert.ToInt32(
