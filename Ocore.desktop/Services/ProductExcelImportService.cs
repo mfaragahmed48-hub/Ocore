@@ -3,6 +3,7 @@ using Ocore.desktop.Data;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Globalization;
 using System.Linq;
 
 namespace Ocore.desktop.Services
@@ -242,7 +243,36 @@ namespace Ocore.desktop.Services
                     throw new ArgumentException(
                         "يوجد صف فارغ في بيانات الاستيراد.");
                 }
+
+                // تطبيع كود الصنف قبل فحص التكرار أو المطابقة.
+                row.ProductCode = NormalizeImportedProductCode(
+                    row.ProductCode);
             }
+        }
+
+        private string NormalizeImportedProductCode(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+                return string.Empty;
+
+            code = code.Trim();
+
+            // لا نقبل في كود الصنف إلا الأرقام الإنجليزية من 0 إلى 9.
+            foreach (char character in code)
+            {
+                if (character < '0' || character > '9')
+                    return string.Empty;
+            }
+
+            // إزالة الأصفار من البداية مع الاحتفاظ بصفر واحد.
+            int index = 0;
+
+            while (index < code.Length - 1 && code[index] == '0')
+            {
+                index++;
+            }
+
+            return code.Substring(index);
         }
 
         private ImportPlan BuildPlan(
@@ -949,8 +979,11 @@ namespace Ocore.desktop.Services
                         "وصل تسلسل الأكواد إلى الحد الأقصى.");
                 }
 
-                string generatedCode = serial.ToString("D6");
+                // كود الصنف أرقام فقط دون أصفار بادئة.
+                string generatedCode = serial.ToString(
+                    CultureInfo.InvariantCulture);
 
+                // لا نغيّر صيغة الباركود أو أصفاره.
                 string barcodeBase =
                     "20" + serial.ToString("D10");
 
@@ -1174,6 +1207,7 @@ namespace Ocore.desktop.Services
                 if (row == null)
                     continue;
 
+                // الأكواد هنا مطبّعة بالفعل قبل فحص التكرار.
                 string code =
                     (row.ProductCode ?? string.Empty).Trim();
 
