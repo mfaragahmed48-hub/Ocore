@@ -50,7 +50,7 @@
                               Padding="6"
                               Margin="0,0,0,15"/>
 
-                    <TextBlock Text="كود الصنف"
+                    <TextBlock Text="كود الصنف (تلقائي)"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
 
@@ -58,7 +58,9 @@
                              Height="36"
                              FontSize="14"
                              Padding="8"
-                             Margin="0,0,0,15"/>
+                             Margin="0,0,0,15"
+                             IsReadOnly="True"
+                             ToolTip="يتم إنشاء كود رقمي تلقائيًا عند حفظ الصنف"/>
 
                     <TextBlock Text="اسم الصنف"
                                FontWeight="SemiBold"
