@@ -4,6 +4,7 @@ using Ocore.desktop.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
@@ -37,6 +38,9 @@ namespace Ocore.desktop.Views
 
             ProductsDataGrid.ItemsSource = rows;
 
+            // متابعة إضافة وحذف الصفوف وتعديل بياناتها.
+            rows.CollectionChanged += Rows_CollectionChanged;
+
             AddRowButton.Click += AddRowButton_Click;
             RemoveRowButton.Click += RemoveRowButton_Click;
             PasteButton.Click += PasteButton_Click;
@@ -46,8 +50,7 @@ namespace Ocore.desktop.Views
             ProductsDataGrid.PreviewKeyDown +=
                 ProductsDataGrid_PreviewKeyDown;
 
-            for (int i = 0; i < 3; i++)
-                AddNewRow();
+            AddNewRow();
 
             UpdateSummary();
         }
@@ -77,6 +80,40 @@ namespace Ocore.desktop.Views
             }
         }
 
+        // متابعة تغييرات مجموعة الصفوف.
+        private void Rows_CollectionChanged(
+            object sender,
+            NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                foreach (BulkProductRow row in e.OldItems)
+                {
+                    row.PropertyChanged -=
+                        BulkProductRow_PropertyChanged;
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (BulkProductRow row in e.NewItems)
+                {
+                    row.PropertyChanged +=
+                        BulkProductRow_PropertyChanged;
+                }
+            }
+
+            UpdateSummary();
+        }
+
+        // تحديث الملخص فور تعديل أي خلية.
+        private void BulkProductRow_PropertyChanged(
+            object sender,
+            PropertyChangedEventArgs e)
+        {
+            UpdateSummary();
+        }
+
         private void AddNewRow()
         {
             rows.Add(new BulkProductRow(categories));
@@ -89,6 +126,7 @@ namespace Ocore.desktop.Views
             AddNewRow();
 
             ProductsDataGrid.SelectedIndex = rows.Count - 1;
+
             ProductsDataGrid.ScrollIntoView(
                 ProductsDataGrid.SelectedItem);
 
@@ -98,6 +136,11 @@ namespace Ocore.desktop.Views
         private void RemoveRowButton_Click(
             object sender,
             RoutedEventArgs e)
+        {
+            RemoveSelectedRow();
+        }
+
+        private void RemoveSelectedRow()
         {
             BulkProductRow selected =
                 ProductsDataGrid.SelectedItem as BulkProductRow;
@@ -125,7 +168,6 @@ namespace Ocore.desktop.Views
             }
 
             rows.Remove(selected);
-            UpdateSummary();
         }
 
         private void PasteButton_Click(
@@ -145,6 +187,20 @@ namespace Ocore.desktop.Views
             {
                 e.Handled = true;
                 PasteFromClipboard();
+                return;
+            }
+
+            if (e.Key == Key.Delete)
+            {
+                // لا نحذف الصف إذا كان المستخدم يحرر نصًا داخل خلية.
+                if (ProductsDataGrid.CurrentColumn != null &&
+                    Keyboard.FocusedElement is System.Windows.Controls.TextBox)
+                {
+                    return;
+                }
+
+                e.Handled = true;
+                RemoveSelectedRow();
             }
         }
 
@@ -177,7 +233,8 @@ namespace Ocore.desktop.Views
                 string[] lines = clipboardText
                     .Replace("\r\n", "\n")
                     .Replace('\r', '\n')
-                    .Split(new[] { '\n' },
+                    .Split(
+                        new[] { '\n' },
                         StringSplitOptions.RemoveEmptyEntries);
 
                 int addedCount = 0;
@@ -197,8 +254,10 @@ namespace Ocore.desktop.Views
 
                     row.Name = GetCell(cells, 0);
                     row.SelectCategoryByName(GetCell(cells, 1));
+
                     row.UnitName = "p";
                     row.SmallUnitName = "u";
+
                     row.UnitsPerPackage = GetCell(cells, 4);
                     row.SalePrice = GetCell(cells, 5);
                     row.PurchasePrice = GetCell(cells, 6);
@@ -209,8 +268,6 @@ namespace Ocore.desktop.Views
                     rows.Add(row);
                     addedCount++;
                 }
-
-                UpdateSummary();
 
                 MessageBox.Show(
                     "تمت إضافة " + addedCount +
@@ -279,6 +336,7 @@ namespace Ocore.desktop.Views
                             expiryDate);
 
                     row.IsSaved = true;
+
                     row.Status = "تم الحفظ بنجاح - رقم الصنف: " +
                                  productId;
 
@@ -324,21 +382,32 @@ namespace Ocore.desktop.Views
             }
         }
 
+        // اعتبار الصف فارغًا إذا لم يدخل المستخدم أي بيانات فعلية.
         private bool IsRowEmpty(BulkProductRow row)
         {
             return string.IsNullOrWhiteSpace(row.Name) &&
-                   string.IsNullOrWhiteSpace(row.SmallUnitName) &&
-                   string.IsNullOrWhiteSpace(row.SalePrice) &&
-                   string.IsNullOrWhiteSpace(row.PurchasePrice);
+                   row.CategoryId == 0 &&
+                   IsDefaultValue(row.UnitsPerPackage, "1") &&
+                   IsDefaultValue(row.SalePrice, "0") &&
+                   IsDefaultValue(row.PurchasePrice, "0") &&
+                   IsDefaultValue(row.InitialQuantity, "0") &&
+                   string.IsNullOrWhiteSpace(row.BatchNumber) &&
+                   string.IsNullOrWhiteSpace(row.ExpiryDate);
+        }
+
+        private bool IsDefaultValue(string value, string defaultValue)
+        {
+            return string.IsNullOrWhiteSpace(value) ||
+                   string.Equals(
+                       value.Trim(),
+                       defaultValue,
+                       StringComparison.Ordinal);
         }
 
         private Product BuildProduct(BulkProductRow row)
         {
             if (string.IsNullOrWhiteSpace(row.Name))
                 throw new ArgumentException("اسم الصنف مطلوب.");
-
-            if (string.IsNullOrWhiteSpace(row.SmallUnitName))
-                throw new ArgumentException("الوحدة الصغيرة مطلوبة.");
 
             int unitsPerPackage;
 
@@ -455,7 +524,11 @@ namespace Ocore.desktop.Views
 
         private void UpdateSummary()
         {
+            if (SummaryTextBlock == null)
+                return;
+
             int saved = rows.Count(x => x.IsSaved);
+
             int pending = rows.Count(x =>
                 !x.IsSaved && !IsRowEmpty(x));
 
@@ -506,7 +579,11 @@ namespace Ocore.desktop.Views
         public string Name
         {
             get { return name; }
-            set { name = value; OnPropertyChanged("Name"); }
+            set
+            {
+                name = value;
+                OnPropertyChanged("Name");
+            }
         }
 
         public int CategoryId
@@ -534,61 +611,101 @@ namespace Ocore.desktop.Views
         public string UnitName
         {
             get { return unitName; }
-            set { unitName = value; OnPropertyChanged("UnitName"); }
+            set
+            {
+                unitName = value;
+                OnPropertyChanged("UnitName");
+            }
         }
 
         public string SmallUnitName
         {
             get { return smallUnitName; }
-            set { smallUnitName = value; OnPropertyChanged("SmallUnitName"); }
+            set
+            {
+                smallUnitName = value;
+                OnPropertyChanged("SmallUnitName");
+            }
         }
 
         public string UnitsPerPackage
         {
             get { return unitsPerPackage; }
-            set { unitsPerPackage = value; OnPropertyChanged("UnitsPerPackage"); }
+            set
+            {
+                unitsPerPackage = value;
+                OnPropertyChanged("UnitsPerPackage");
+            }
         }
 
         public string SalePrice
         {
             get { return salePrice; }
-            set { salePrice = value; OnPropertyChanged("SalePrice"); }
+            set
+            {
+                salePrice = value;
+                OnPropertyChanged("SalePrice");
+            }
         }
 
         public string PurchasePrice
         {
             get { return purchasePrice; }
-            set { purchasePrice = value; OnPropertyChanged("PurchasePrice"); }
+            set
+            {
+                purchasePrice = value;
+                OnPropertyChanged("PurchasePrice");
+            }
         }
 
         public string InitialQuantity
         {
             get { return initialQuantity; }
-            set { initialQuantity = value; OnPropertyChanged("InitialQuantity"); }
+            set
+            {
+                initialQuantity = value;
+                OnPropertyChanged("InitialQuantity");
+            }
         }
 
         public string BatchNumber
         {
             get { return batchNumber; }
-            set { batchNumber = value; OnPropertyChanged("BatchNumber"); }
+            set
+            {
+                batchNumber = value;
+                OnPropertyChanged("BatchNumber");
+            }
         }
 
         public string ExpiryDate
         {
             get { return expiryDate; }
-            set { expiryDate = value; OnPropertyChanged("ExpiryDate"); }
+            set
+            {
+                expiryDate = value;
+                OnPropertyChanged("ExpiryDate");
+            }
         }
 
         public string Status
         {
             get { return status; }
-            set { status = value; OnPropertyChanged("Status"); }
+            set
+            {
+                status = value;
+                OnPropertyChanged("Status");
+            }
         }
 
         public bool IsSaved
         {
             get { return isSaved; }
-            set { isSaved = value; OnPropertyChanged("IsSaved"); }
+            set
+            {
+                isSaved = value;
+                OnPropertyChanged("IsSaved");
+            }
         }
 
         public void SelectCategoryByName(string value)
@@ -609,9 +726,11 @@ namespace Ocore.desktop.Views
         private void OnPropertyChanged(string propertyName)
         {
             if (PropertyChanged != null)
+            {
                 PropertyChanged(
                     this,
                     new PropertyChangedEventArgs(propertyName));
+            }
         }
     }
 }
