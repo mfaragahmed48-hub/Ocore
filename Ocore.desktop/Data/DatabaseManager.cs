@@ -14,7 +14,7 @@ namespace Ocore.desktop.Data
         private readonly string backupFolder;
 
         // الإصدار 9: تأسيس نظام الضرائب.
-        private const int CurrentDatabaseVersion = 9;
+        private const int CurrentDatabaseVersion = 10;
         private const int MaximumBackupCount = 30;
 
         public static string GetStorageRootPath()
@@ -229,7 +229,11 @@ namespace Ocore.desktop.Data
                         "تعذر إكمال تهيئة قاعدة البيانات: " +
                         "جدول PrinterConfigurations غير موجود.");
                 }
-
+                // ترحيل أكواد الأصناف إلى أكواد رقمية بدون أصفار بادئة.
+                if (currentVersion < 10)
+                {
+                    ProductCodeMigration.Execute(connection);
+                }
                 SetDatabaseVersion(connection, CurrentDatabaseVersion);
 
                 if (databaseAlreadyExisted &&
