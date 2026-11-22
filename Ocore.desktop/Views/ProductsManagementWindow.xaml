@@ -97,7 +97,7 @@
                           SelectionUnit="FullRow"
                           HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal"
-                          RowHeight="34"
+                          MinRowHeight="34"
                           FontSize="12"
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto">
@@ -108,10 +108,21 @@
                                             Binding="{Binding ProductCode}"
                                             Width="90"/>
 
-                        <DataGridTextColumn Header="اسم الصنف"
-                                            Binding="{Binding Name}"
-                                            Width="*"
-                                            MinWidth="150"/>
+                        <DataGridTemplateColumn Header="اسم الصنف"
+                        Width="2*"
+                        MinWidth="180">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Stretch"
+                       Padding="4,5"
+                       FontSize="10"
+                       ToolTip="{Binding Name}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
                         <DataGridTextColumn Header="العبوة"
                                             Binding="{Binding UnitName}"
