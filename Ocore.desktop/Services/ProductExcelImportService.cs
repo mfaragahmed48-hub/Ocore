@@ -3,7 +3,6 @@ using Ocore.desktop.Data;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
-using System.Globalization;
 using System.Linq;
 
 namespace Ocore.desktop.Services
@@ -71,13 +70,18 @@ namespace Ocore.desktop.Services
                 string role = GetActiveUserRole(connection, currentUserId);
                 bool isManager = IsManager(role);
 
+                var duplicateErrors = GetDuplicateRowErrors(rows);
+
                 foreach (var row in rows)
                 {
                     var plan = BuildPlan(
                         connection,
                         null,
                         row,
-                        isManager);
+                        isManager,
+                        duplicateErrors.ContainsKey(row.RowNumber)
+                            ? duplicateErrors[row.RowNumber]
+                            : null);
 
                     result.Add(new ProductExcelImportPreviewRow
                     {
@@ -112,20 +116,27 @@ namespace Ocore.desktop.Services
                     try
                     {
                         string role = GetActiveUserRole(
-                            connection, currentUserId);
+                            connection,
+                            transaction,
+                            currentUserId);
 
                         bool isManager = IsManager(role);
 
                         var plans = new List<ImportPlan>();
 
-                        // فحص جميع الصفوف أولًا قبل أي كتابة.
+                        var duplicateErrors = GetDuplicateRowErrors(rows);
+
+                        // فحص جميع الصفوف قبل أي كتابة.
                         foreach (var row in rows)
                         {
                             var plan = BuildPlan(
                                 connection,
                                 transaction,
                                 row,
-                                isManager);
+                                isManager,
+                                duplicateErrors.ContainsKey(row.RowNumber)
+                                    ? duplicateErrors[row.RowNumber]
+                                    : null);
 
                             plans.Add(plan);
                         }
@@ -138,7 +149,8 @@ namespace Ocore.desktop.Services
                         {
                             throw new InvalidOperationException(
                                 "تم إلغاء الاستيراد لوجود أخطاء في " +
-                                errors.Count + " صف. راجع المعاينة وصحح الأخطاء.");
+                                errors.Count +
+                                " صف. راجع المعاينة وصحح الأخطاء.");
                         }
 
                         bool hasNew = plans.Any(
@@ -149,7 +161,8 @@ namespace Ocore.desktop.Services
 
                         if (hasNew &&
                             !permissionService.HasPermission(
-                                role, "Products.Create"))
+                                role,
+                                "Products.Create"))
                         {
                             throw new UnauthorizedAccessException(
                                 "ليس لديك صلاحية إضافة أصناف جديدة.");
@@ -157,7 +170,8 @@ namespace Ocore.desktop.Services
 
                         if (hasUpdates &&
                             !permissionService.HasPermission(
-                                role, "Products.Edit"))
+                                role,
+                                "Products.Edit"))
                         {
                             throw new UnauthorizedAccessException(
                                 "ليس لديك صلاحية تعديل الأصناف.");
@@ -213,12 +227,9 @@ namespace Ocore.desktop.Services
             foreach (var row in rows)
             {
                 if (row == null)
-                    throw new ArgumentException("يوجد صف فارغ في بيانات الاستيراد.");
-
-                if (!string.IsNullOrWhiteSpace(row.Error))
                 {
-                    throw new InvalidOperationException(
-                        "الصف رقم " + row.RowNumber + ": " + row.Error);
+                    throw new ArgumentException(
+                        "يوجد صف فارغ في بيانات الاستيراد.");
                 }
             }
         }
@@ -227,7 +238,8 @@ namespace Ocore.desktop.Services
             SQLiteConnection connection,
             SQLiteTransaction transaction,
             ProductExcelRow row,
-            bool isManager)
+            bool isManager,
+            string duplicateError)
         {
             var plan = new ImportPlan
             {
@@ -237,13 +249,27 @@ namespace Ocore.desktop.Services
 
             try
             {
+                if (!string.IsNullOrWhiteSpace(row.Error))
+                {
+                    throw new InvalidOperationException(row.Error);
+                }
+
+                if (!string.IsNullOrWhiteSpace(duplicateError))
+                {
+                    throw new InvalidOperationException(duplicateError);
+                }
+
                 ValidateRow(row);
 
                 int codeId = FindProductByCode(
-                    connection, transaction, row.ProductCode);
+                    connection,
+                    transaction,
+                    row.ProductCode);
 
                 int barcodeId = FindProductByBarcode(
-                    connection, transaction, row.Barcode);
+                    connection,
+                    transaction,
+                    row.Barcode);
 
                 if (codeId > 0 &&
                     barcodeId > 0 &&
@@ -257,22 +283,17 @@ namespace Ocore.desktop.Services
 
                 if (existingId == 0)
                 {
-                    if (!string.IsNullOrWhiteSpace(row.ProductCode) &&
-                        codeId < 0)
+                    if (!isManager &&
+                        (Different(row.MaxDiscountPercentage, 0) ||
+                         Different(row.MinimumStockLevel, 0)))
                     {
                         throw new InvalidOperationException(
-                            "كود الصنف مستخدم بالفعل.");
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(row.Barcode) &&
-                        barcodeId < 0)
-                    {
-                        throw new InvalidOperationException(
-                            "الباركود مستخدم بالفعل.");
+                            "إدخال حد الخصم أو الحد الأدنى للمخزون متاح للمدير فقط.");
                     }
 
                     plan.ExistingProductId = 0;
                     plan.Action = "إضافة صنف جديد";
+
                     return plan;
                 }
 
@@ -298,8 +319,10 @@ namespace Ocore.desktop.Services
                     using (var reader = command.ExecuteReader())
                     {
                         if (!reader.Read())
+                        {
                             throw new InvalidOperationException(
                                 "الصنف المطابق لم يعد موجودًا.");
+                        }
 
                         plan.ExistingProductCode =
                             Convert.ToString(reader[0]);
@@ -356,34 +379,57 @@ namespace Ocore.desktop.Services
         private void ValidateRow(ProductExcelRow row)
         {
             if (string.IsNullOrWhiteSpace(row.Name))
-                throw new InvalidOperationException("اسم الصنف مطلوب.");
+            {
+                throw new InvalidOperationException(
+                    "اسم الصنف مطلوب.");
+            }
 
             if (string.IsNullOrWhiteSpace(row.UnitName))
-                throw new InvalidOperationException("الوحدة (P) مطلوبة.");
+            {
+                throw new InvalidOperationException(
+                    "الوحدة (P) مطلوبة.");
+            }
 
             if (string.IsNullOrWhiteSpace(row.SmallUnitName))
-                throw new InvalidOperationException("الوحدة (U) مطلوبة.");
+            {
+                throw new InvalidOperationException(
+                    "الوحدة (U) مطلوبة.");
+            }
 
             if (row.UnitsPerPackage < 1)
+            {
                 throw new InvalidOperationException(
                     "معامل التحويل يجب أن يكون أكبر من صفر.");
+            }
 
             if (InvalidNumber(row.PurchasePrice) ||
                 row.PurchasePrice < 0)
-                throw new InvalidOperationException("سعر الشراء غير صحيح.");
+            {
+                throw new InvalidOperationException(
+                    "سعر الشراء غير صحيح.");
+            }
 
             if (InvalidNumber(row.SalePrice) ||
                 row.SalePrice < 0)
-                throw new InvalidOperationException("سعر البيع غير صحيح.");
+            {
+                throw new InvalidOperationException(
+                    "سعر البيع غير صحيح.");
+            }
 
             if (InvalidNumber(row.MaxDiscountPercentage) ||
                 row.MaxDiscountPercentage < 0 ||
                 row.MaxDiscountPercentage > 100)
-                throw new InvalidOperationException("حد الخصم غير صحيح.");
+            {
+                throw new InvalidOperationException(
+                    "حد الخصم غير صحيح.");
+            }
 
             if (InvalidNumber(row.MinimumStockLevel) ||
                 row.MinimumStockLevel < 0)
-                throw new InvalidOperationException("الحد الأدنى غير صحيح.");
+            {
+                throw new InvalidOperationException(
+                    "الحد الأدنى غير صحيح.");
+            }
         }
 
         private bool InvalidNumber(double value)
@@ -396,7 +442,6 @@ namespace Ocore.desktop.Services
             return Math.Abs(a - b) > 0.00000001;
         }
 
-        // القيمة -1 تعني أن الكود مستخدم في جدول آخر غير الصنف المتوقع.
         private int FindProductByCode(
             SQLiteConnection connection,
             SQLiteTransaction transaction,
@@ -406,17 +451,22 @@ namespace Ocore.desktop.Services
                 return 0;
 
             using (var command = new SQLiteCommand(
-                @"SELECT Id FROM Products
+                @"SELECT Id
+                  FROM Products
                   WHERE ProductCode = @Code
                   LIMIT 1;",
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@Code", code.Trim());
+                command.Parameters.AddWithValue(
+                    "@Code",
+                    code.Trim());
 
                 object value = command.ExecuteScalar();
 
-                return value == null ? 0 : Convert.ToInt32(value);
+                return value == null || value == DBNull.Value
+                    ? 0
+                    : Convert.ToInt32(value);
             }
         }
 
@@ -428,21 +478,66 @@ namespace Ocore.desktop.Services
             if (string.IsNullOrWhiteSpace(barcode))
                 return 0;
 
-            using (var command = new SQLiteCommand(
-                @"SELECT ProductId
-                  FROM ProductBarcodes
-                  WHERE Barcode = @Barcode
-                  LIMIT 1;",
-                connection,
-                transaction))
+            string value = barcode.Trim();
+
+            var candidates = new List<string> { value };
+
+            // نفس قواعد GTIN الموجودة في ProductService.
+            if (value.Length == 14 &&
+                value.StartsWith("00", StringComparison.Ordinal))
             {
-                command.Parameters.AddWithValue(
-                    "@Barcode", barcode.Trim());
-
-                object value = command.ExecuteScalar();
-
-                return value == null ? 0 : Convert.ToInt32(value);
+                candidates.Add(value.Substring(2));
             }
+            else if (value.Length == 14 &&
+                     value.StartsWith("0", StringComparison.Ordinal))
+            {
+                candidates.Add(value.Substring(1));
+            }
+            else if (value.Length == 13 || value.Length == 12)
+            {
+                candidates.Add(value.PadLeft(14, '0'));
+            }
+
+            // دعم باركود GS1 الذي يحتوي على AI (01).
+            try
+            {
+                var parsed = GS1BarcodeService.Parse(value);
+
+                if (!string.IsNullOrWhiteSpace(parsed.GTIN))
+                {
+                    candidates.Add(parsed.GTIN);
+                }
+            }
+            catch
+            {
+                // قد يكون الباركود رقمًا داخليًا وليس GTIN.
+                // تظل المطابقة الدقيقة والصيغ القياسية متاحة.
+            }
+
+            foreach (string candidate in candidates.Distinct())
+            {
+                using (var command = new SQLiteCommand(
+                    @"SELECT ProductId
+                      FROM ProductBarcodes
+                      WHERE Barcode = @Barcode
+                      LIMIT 1;",
+                    connection,
+                    transaction))
+                {
+                    command.Parameters.AddWithValue(
+                        "@Barcode",
+                        candidate);
+
+                    object found = command.ExecuteScalar();
+
+                    if (found != null && found != DBNull.Value)
+                    {
+                        return Convert.ToInt32(found);
+                    }
+                }
+            }
+
+            return 0;
         }
 
         private void InsertProduct(
@@ -483,20 +578,52 @@ namespace Ocore.desktop.Services
                 transaction))
             {
                 command.Parameters.AddWithValue("@Code", code);
-                command.Parameters.AddWithValue("@Name", plan.Row.Name.Trim());
-                command.Parameters.AddWithValue("@CategoryId",
-                    categoryId > 0 ? (object)categoryId : DBNull.Value);
-                command.Parameters.AddWithValue("@Unit", plan.Row.UnitName.Trim());
-                command.Parameters.AddWithValue("@SmallUnit", plan.Row.SmallUnitName.Trim());
-                command.Parameters.AddWithValue("@Units", plan.Row.UnitsPerPackage);
-                command.Parameters.AddWithValue("@Sale", plan.Row.SalePrice);
-                command.Parameters.AddWithValue("@Purchase", plan.Row.PurchasePrice);
-                command.Parameters.AddWithValue("@Discount",
-                    isManager ? plan.Row.MaxDiscountPercentage : 0);
-                command.Parameters.AddWithValue("@Minimum",
-                    isManager ? plan.Row.MinimumStockLevel : 0);
+
                 command.Parameters.AddWithValue(
-                    "@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    "@Name",
+                    plan.Row.Name.Trim());
+
+                command.Parameters.AddWithValue(
+                    "@CategoryId",
+                    categoryId > 0
+                        ? (object)categoryId
+                        : DBNull.Value);
+
+                command.Parameters.AddWithValue(
+                    "@Unit",
+                    plan.Row.UnitName.Trim());
+
+                command.Parameters.AddWithValue(
+                    "@SmallUnit",
+                    plan.Row.SmallUnitName.Trim());
+
+                command.Parameters.AddWithValue(
+                    "@Units",
+                    plan.Row.UnitsPerPackage);
+
+                command.Parameters.AddWithValue(
+                    "@Sale",
+                    plan.Row.SalePrice);
+
+                command.Parameters.AddWithValue(
+                    "@Purchase",
+                    plan.Row.PurchasePrice);
+
+                command.Parameters.AddWithValue(
+                    "@Discount",
+                    isManager
+                        ? plan.Row.MaxDiscountPercentage
+                        : 0);
+
+                command.Parameters.AddWithValue(
+                    "@Minimum",
+                    isManager
+                        ? plan.Row.MinimumStockLevel
+                        : 0);
+
+                command.Parameters.AddWithValue(
+                    "@CreatedAt",
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
                 command.ExecuteNonQuery();
             }
@@ -508,17 +635,25 @@ namespace Ocore.desktop.Services
                 connection,
                 transaction))
             {
-                productId = Convert.ToInt32(command.ExecuteScalar());
+                productId = Convert.ToInt32(
+                    command.ExecuteScalar());
             }
 
             using (var command = new SQLiteCommand(
-                @"INSERT INTO ProductBarcodes (ProductId, Barcode)
+                @"INSERT INTO ProductBarcodes
+                  (ProductId, Barcode)
                   VALUES (@ProductId, @Barcode);",
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@ProductId", productId);
-                command.Parameters.AddWithValue("@Barcode", barcode);
+                command.Parameters.AddWithValue(
+                    "@ProductId",
+                    productId);
+
+                command.Parameters.AddWithValue(
+                    "@Barcode",
+                    barcode);
+
                 command.ExecuteNonQuery();
             }
 
@@ -549,7 +684,8 @@ namespace Ocore.desktop.Services
 
             using (var command = new SQLiteCommand(
                 @"SELECT UnitName, SmallUnitName, UnitsPerPackage
-                  FROM Products WHERE Id = @Id;",
+                  FROM Products
+                  WHERE Id = @Id;",
                 connection,
                 transaction))
             {
@@ -564,18 +700,24 @@ namespace Ocore.desktop.Services
                                 Convert.ToString(reader["UnitName"]),
                                 plan.Row.UnitName.Trim(),
                                 StringComparison.OrdinalIgnoreCase) ||
+
                             !string.Equals(
                                 Convert.ToString(reader["SmallUnitName"]),
                                 plan.Row.SmallUnitName.Trim(),
                                 StringComparison.OrdinalIgnoreCase) ||
-                            Convert.ToInt32(reader["UnitsPerPackage"]) !=
+
+                            Convert.ToInt32(
+                                reader["UnitsPerPackage"]) !=
                                 plan.Row.UnitsPerPackage;
                     }
                 }
             }
 
-            if (unitsChanged && HasProductMovements(
-                connection, transaction, productId))
+            if (unitsChanged &&
+                HasProductMovements(
+                    connection,
+                    transaction,
+                    productId))
             {
                 throw new InvalidOperationException(
                     "لا يمكن تغيير الوحدات أو معامل التحويل لصنف له حركات سابقة. الصنف: " +
@@ -595,19 +737,45 @@ namespace Ocore.desktop.Services
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@Name", plan.Row.Name.Trim());
-                command.Parameters.AddWithValue("@CategoryId",
-                    categoryId > 0 ? (object)categoryId : DBNull.Value);
-                command.Parameters.AddWithValue("@Unit", plan.Row.UnitName.Trim());
-                command.Parameters.AddWithValue("@SmallUnit", plan.Row.SmallUnitName.Trim());
-                command.Parameters.AddWithValue("@Units", plan.Row.UnitsPerPackage);
-                command.Parameters.AddWithValue("@Sale", plan.Row.SalePrice);
-                command.Parameters.AddWithValue("@Purchase", plan.Row.PurchasePrice);
-                command.Parameters.AddWithValue("@Id", productId);
+                command.Parameters.AddWithValue(
+                    "@Name",
+                    plan.Row.Name.Trim());
+
+                command.Parameters.AddWithValue(
+                    "@CategoryId",
+                    categoryId > 0
+                        ? (object)categoryId
+                        : DBNull.Value);
+
+                command.Parameters.AddWithValue(
+                    "@Unit",
+                    plan.Row.UnitName.Trim());
+
+                command.Parameters.AddWithValue(
+                    "@SmallUnit",
+                    plan.Row.SmallUnitName.Trim());
+
+                command.Parameters.AddWithValue(
+                    "@Units",
+                    plan.Row.UnitsPerPackage);
+
+                command.Parameters.AddWithValue(
+                    "@Sale",
+                    plan.Row.SalePrice);
+
+                command.Parameters.AddWithValue(
+                    "@Purchase",
+                    plan.Row.PurchasePrice);
+
+                command.Parameters.AddWithValue(
+                    "@Id",
+                    productId);
 
                 if (command.ExecuteNonQuery() != 1)
+                {
                     throw new InvalidOperationException(
                         "تعذر تحديث الصنف: " + plan.Row.Name);
+                }
             }
 
             if (isManager)
@@ -621,10 +789,17 @@ namespace Ocore.desktop.Services
                     transaction))
                 {
                     command.Parameters.AddWithValue(
-                        "@Discount", plan.Row.MaxDiscountPercentage);
+                        "@Discount",
+                        plan.Row.MaxDiscountPercentage);
+
                     command.Parameters.AddWithValue(
-                        "@Minimum", plan.Row.MinimumStockLevel);
-                    command.Parameters.AddWithValue("@Id", productId);
+                        "@Minimum",
+                        plan.Row.MinimumStockLevel);
+
+                    command.Parameters.AddWithValue(
+                        "@Id",
+                        productId);
+
                     command.ExecuteNonQuery();
                 }
             }
@@ -658,7 +833,8 @@ namespace Ocore.desktop.Services
             {
                 command.Parameters.AddWithValue("@Id", productId);
 
-                return Convert.ToInt32(command.ExecuteScalar()) > 0;
+                return Convert.ToInt32(
+                    command.ExecuteScalar()) > 0;
             }
         }
 
@@ -673,18 +849,23 @@ namespace Ocore.desktop.Services
             categoryName = categoryName.Trim();
 
             using (var command = new SQLiteCommand(
-                @"SELECT Id FROM Categories
+                @"SELECT Id
+                  FROM Categories
                   WHERE Name = @Name COLLATE NOCASE
                   LIMIT 1;",
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@Name", categoryName);
+                command.Parameters.AddWithValue(
+                    "@Name",
+                    categoryName);
 
                 object value = command.ExecuteScalar();
 
-                if (value != null)
+                if (value != null && value != DBNull.Value)
+                {
                     return Convert.ToInt32(value);
+                }
             }
 
             using (var command = new SQLiteCommand(
@@ -693,7 +874,10 @@ namespace Ocore.desktop.Services
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@Name", categoryName);
+                command.Parameters.AddWithValue(
+                    "@Name",
+                    categoryName);
+
                 command.ExecuteNonQuery();
             }
 
@@ -702,7 +886,8 @@ namespace Ocore.desktop.Services
                 connection,
                 transaction))
             {
-                return Convert.ToInt32(command.ExecuteScalar());
+                return Convert.ToInt32(
+                    command.ExecuteScalar());
             }
         }
 
@@ -714,9 +899,13 @@ namespace Ocore.desktop.Services
         {
             if (!string.IsNullOrWhiteSpace(code) &&
                 !string.IsNullOrWhiteSpace(barcode))
+            {
                 return;
+            }
 
-            EnsureProductCodeSequence(connection, transaction);
+            EnsureProductCodeSequence(
+                connection,
+                transaction);
 
             while (true)
             {
@@ -733,30 +922,45 @@ namespace Ocore.desktop.Services
                 long serial;
 
                 using (var command = new SQLiteCommand(
-                    "SELECT LastValue FROM ProductCodeSequence WHERE Id = 1;",
+                    @"SELECT LastValue
+                      FROM ProductCodeSequence
+                      WHERE Id = 1;",
                     connection,
                     transaction))
                 {
-                    serial = Convert.ToInt64(command.ExecuteScalar());
+                    serial = Convert.ToInt64(
+                        command.ExecuteScalar());
                 }
 
                 if (serial > 9999999999L)
+                {
                     throw new InvalidOperationException(
                         "وصل تسلسل الأكواد إلى الحد الأقصى.");
+                }
 
                 string generatedCode = serial.ToString("D6");
-                string barcodeBase = "20" + serial.ToString("D10");
+
+                string barcodeBase =
+                    "20" + serial.ToString("D10");
+
                 string generatedBarcode =
-                    barcodeBase + CalculateEan13CheckDigit(barcodeBase);
+                    barcodeBase +
+                    CalculateEan13CheckDigit(barcodeBase);
 
                 bool codeExists = Exists(
-                    connection, transaction,
-                    "SELECT COUNT(*) FROM Products WHERE ProductCode = @Value;",
+                    connection,
+                    transaction,
+                    @"SELECT COUNT(*)
+                      FROM Products
+                      WHERE ProductCode = @Value;",
                     generatedCode);
 
                 bool barcodeExists = Exists(
-                    connection, transaction,
-                    "SELECT COUNT(*) FROM ProductBarcodes WHERE Barcode = @Value;",
+                    connection,
+                    transaction,
+                    @"SELECT COUNT(*)
+                      FROM ProductBarcodes
+                      WHERE Barcode = @Value;",
                     generatedBarcode);
 
                 if (codeExists || barcodeExists)
@@ -768,9 +972,12 @@ namespace Ocore.desktop.Services
                 if (string.IsNullOrWhiteSpace(barcode))
                     barcode = generatedBarcode;
 
-                // تحقق إضافي من القيم التي جاءت من ملف Excel.
-                if (Exists(connection, transaction,
-                    "SELECT COUNT(*) FROM Products WHERE ProductCode = @Value;",
+                if (Exists(
+                    connection,
+                    transaction,
+                    @"SELECT COUNT(*)
+                      FROM Products
+                      WHERE ProductCode = @Value;",
                     code))
                 {
                     if (code == generatedCode)
@@ -780,8 +987,12 @@ namespace Ocore.desktop.Services
                         "كود الصنف مستخدم بالفعل: " + code);
                 }
 
-                if (Exists(connection, transaction,
-                    "SELECT COUNT(*) FROM ProductBarcodes WHERE Barcode = @Value;",
+                if (Exists(
+                    connection,
+                    transaction,
+                    @"SELECT COUNT(*)
+                      FROM ProductBarcodes
+                      WHERE Barcode = @Value;",
                     barcode))
                 {
                     if (barcode == generatedBarcode)
@@ -799,6 +1010,18 @@ namespace Ocore.desktop.Services
             SQLiteConnection connection,
             SQLiteTransaction transaction)
         {
+            using (var command = new SQLiteCommand(@"
+                CREATE TABLE IF NOT EXISTS ProductCodeSequence
+                (
+                    Id INTEGER PRIMARY KEY CHECK (Id = 1),
+                    LastValue INTEGER NOT NULL
+                );",
+                connection,
+                transaction))
+            {
+                command.ExecuteNonQuery();
+            }
+
             long maximumExistingCode;
 
             using (var command = new SQLiteCommand(@"
@@ -814,7 +1037,8 @@ namespace Ocore.desktop.Services
             }
 
             using (var command = new SQLiteCommand(@"
-                INSERT OR IGNORE INTO ProductCodeSequence (Id, LastValue)
+                INSERT OR IGNORE INTO ProductCodeSequence
+                    (Id, LastValue)
                 VALUES (1, @InitialValue);
 
                 UPDATE ProductCodeSequence
@@ -824,7 +1048,8 @@ namespace Ocore.desktop.Services
                 transaction))
             {
                 command.Parameters.AddWithValue(
-                    "@InitialValue", maximumExistingCode);
+                    "@InitialValue",
+                    maximumExistingCode);
 
                 command.ExecuteNonQuery();
             }
@@ -838,7 +1063,9 @@ namespace Ocore.desktop.Services
             {
                 int digit = barcodeBase[i] - '0';
 
-                sum += (i % 2 == 0) ? digit : digit * 3;
+                sum += (i % 2 == 0)
+                    ? digit
+                    : digit * 3;
             }
 
             return (10 - (sum % 10)) % 10;
@@ -851,11 +1078,16 @@ namespace Ocore.desktop.Services
             string value)
         {
             using (var command = new SQLiteCommand(
-                sql, connection, transaction))
+                sql,
+                connection,
+                transaction))
             {
-                command.Parameters.AddWithValue("@Value", value);
+                command.Parameters.AddWithValue(
+                    "@Value",
+                    value);
 
-                return Convert.ToInt32(command.ExecuteScalar()) > 0;
+                return Convert.ToInt32(
+                    command.ExecuteScalar()) > 0;
             }
         }
 
@@ -864,20 +1096,112 @@ namespace Ocore.desktop.Services
             int userId)
         {
             using (var command = new SQLiteCommand(
-                @"SELECT Role FROM Users
-                  WHERE Id = @UserId AND IsActive = 1;",
+                @"SELECT Role
+                  FROM Users
+                  WHERE Id = @UserId
+                    AND IsActive = 1;",
                 connection))
             {
-                command.Parameters.AddWithValue("@UserId", userId);
+                command.Parameters.AddWithValue(
+                    "@UserId",
+                    userId);
 
                 object value = command.ExecuteScalar();
 
-                if (value == null)
+                if (value == null || value == DBNull.Value)
+                {
                     throw new UnauthorizedAccessException(
                         "المستخدم غير موجود أو حسابه غير نشط.");
+                }
 
                 return Convert.ToString(value);
             }
+        }
+
+        private string GetActiveUserRole(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            int userId)
+        {
+            using (var command = new SQLiteCommand(
+                @"SELECT Role
+                  FROM Users
+                  WHERE Id = @UserId
+                    AND IsActive = 1;",
+                connection,
+                transaction))
+            {
+                command.Parameters.AddWithValue(
+                    "@UserId",
+                    userId);
+
+                object value = command.ExecuteScalar();
+
+                if (value == null || value == DBNull.Value)
+                {
+                    throw new UnauthorizedAccessException(
+                        "المستخدم غير موجود أو حسابه غير نشط.");
+                }
+
+                return Convert.ToString(value);
+            }
+        }
+
+        private Dictionary<int, string> GetDuplicateRowErrors(
+            IList<ProductExcelRow> rows)
+        {
+            var errors = new Dictionary<int, string>();
+
+            var codes = new Dictionary<string, int>(
+                StringComparer.OrdinalIgnoreCase);
+
+            var barcodes = new Dictionary<string, int>(
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in rows)
+            {
+                if (row == null)
+                    continue;
+
+                string code =
+                    (row.ProductCode ?? string.Empty).Trim();
+
+                string barcode =
+                    (row.Barcode ?? string.Empty).Trim();
+
+                if (!string.IsNullOrWhiteSpace(code))
+                {
+                    if (codes.ContainsKey(code))
+                    {
+                        errors[row.RowNumber] =
+                            "كود الصنف مكرر داخل ملف Excel (موجود أيضًا في الصف " +
+                            codes[code] + ").";
+                    }
+                    else
+                    {
+                        codes.Add(code, row.RowNumber);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(barcode))
+                {
+                    if (barcodes.ContainsKey(barcode))
+                    {
+                        if (!errors.ContainsKey(row.RowNumber))
+                        {
+                            errors[row.RowNumber] =
+                                "الباركود مكرر داخل ملف Excel (موجود أيضًا في الصف " +
+                                barcodes[barcode] + ").";
+                        }
+                    }
+                    else
+                    {
+                        barcodes.Add(barcode, row.RowNumber);
+                    }
+                }
+            }
+
+            return errors;
         }
 
         private bool IsManager(string role)
@@ -893,28 +1217,38 @@ namespace Ocore.desktop.Services
             List<ProductExcelImportPreviewRow> rows)
         {
             bool hasNew = rows.Any(
-                x => !x.HasError && x.Action == "إضافة صنف جديد");
+                x => !x.HasError &&
+                     x.Action == "إضافة صنف جديد");
 
             bool hasUpdates = rows.Any(
-                x => !x.HasError && x.Action == "تحديث صنف موجود");
+                x => !x.HasError &&
+                     x.Action == "تحديث صنف موجود");
 
             if (hasNew &&
-                !permissionService.HasPermission(role, "Products.Create"))
+                !permissionService.HasPermission(
+                    role,
+                    "Products.Create"))
             {
                 foreach (var row in rows.Where(
-                    x => !x.HasError && x.Action == "إضافة صنف جديد"))
+                    x => !x.HasError &&
+                         x.Action == "إضافة صنف جديد"))
                 {
-                    row.Error = "لا توجد صلاحية لإضافة أصناف جديدة.";
+                    row.Error =
+                        "لا توجد صلاحية لإضافة أصناف جديدة.";
                 }
             }
 
             if (hasUpdates &&
-                !permissionService.HasPermission(role, "Products.Edit"))
+                !permissionService.HasPermission(
+                    role,
+                    "Products.Edit"))
             {
                 foreach (var row in rows.Where(
-                    x => !x.HasError && x.Action == "تحديث صنف موجود"))
+                    x => !x.HasError &&
+                         x.Action == "تحديث صنف موجود"))
                 {
-                    row.Error = "لا توجد صلاحية لتعديل الأصناف.";
+                    row.Error =
+                        "لا توجد صلاحية لتعديل الأصناف.";
                 }
             }
         }
@@ -930,12 +1264,18 @@ namespace Ocore.desktop.Services
             string username;
 
             using (var command = new SQLiteCommand(
-                "SELECT Username FROM Users WHERE Id = @UserId;",
+                @"SELECT Username
+                  FROM Users
+                  WHERE Id = @UserId;",
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@UserId", userId);
-                username = Convert.ToString(command.ExecuteScalar());
+                command.Parameters.AddWithValue(
+                    "@UserId",
+                    userId);
+
+                username = Convert.ToString(
+                    command.ExecuteScalar());
             }
 
             using (var command = new SQLiteCommand(
@@ -948,13 +1288,30 @@ namespace Ocore.desktop.Services
                 connection,
                 transaction))
             {
-                command.Parameters.AddWithValue("@UserId", userId);
-                command.Parameters.AddWithValue("@Username", username);
-                command.Parameters.AddWithValue("@ActionType", actionType);
-                command.Parameters.AddWithValue("@EntityId", productId);
-                command.Parameters.AddWithValue("@Details", details);
                 command.Parameters.AddWithValue(
-                    "@DeviceName", Environment.MachineName);
+                    "@UserId",
+                    userId);
+
+                command.Parameters.AddWithValue(
+                    "@Username",
+                    username);
+
+                command.Parameters.AddWithValue(
+                    "@ActionType",
+                    actionType);
+
+                command.Parameters.AddWithValue(
+                    "@EntityId",
+                    productId);
+
+                command.Parameters.AddWithValue(
+                    "@Details",
+                    details);
+
+                command.Parameters.AddWithValue(
+                    "@DeviceName",
+                    Environment.MachineName);
+
                 command.Parameters.AddWithValue(
                     "@CreatedAt",
                     DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
