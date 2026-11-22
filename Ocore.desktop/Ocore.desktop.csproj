@@ -282,7 +282,6 @@
     <Compile Include="Views\PrinterSettingsWindow.xaml.cs">
       <DependentUpon>PrinterSettingsWindow.xaml</DependentUpon>
     </Compile>
-<Compile Include="Views\ProductsManagementWindow.Excel.cs" />
     <Compile Include="Views\ProductsManagementWindow.xaml.cs">
       <DependentUpon>ProductsManagementWindow.xaml</DependentUpon>
     </Compile>
