@@ -162,6 +162,7 @@
     <Compile Include="Models\Supplier.cs" />
     <Compile Include="Models\TaxModels.cs" />
     <Compile Include="Services\ExpenseService.cs" />
+<Compile Include="Services\ProductExcelImportService.cs" />
     <Compile Include="Services\ExpiryAlertService.cs" />
     <Compile Include="Services\GS1BarcodeService.cs" />
     <Compile Include="Services\Printing\PrinterConfigurationDefaults.cs" />
