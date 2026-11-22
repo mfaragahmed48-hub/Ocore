@@ -297,12 +297,30 @@
                         Background="#A83232"
                         Foreground="White"/>
 
+                <Button x:Name="ExportProductsExcelButton"
+        Content="📤 تصدير Excel"
+        Width="125"
+        Height="38"
+        Margin="3"
+        Background="#217346"
+        Foreground="White"
+        FontWeight="Bold"/>
+
+                <Button x:Name="ImportProductsExcelButton"
+        Content="📥 استيراد Excel"
+        Width="135"
+        Height="38"
+        Margin="3"
+        Background="#2874A6"
+        Foreground="White"
+        FontWeight="Bold"/>
                 <Button x:Name="RefreshButton"
                         Content="🔄 تحديث"
                         Width="90"
                         Height="38"
                         Margin="3"/>
 
+                
                 <Button x:Name="CloseButton"
                         Content="إغلاق"
                         Width="80"
