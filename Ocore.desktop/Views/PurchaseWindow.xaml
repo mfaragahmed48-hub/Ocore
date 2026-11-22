@@ -99,8 +99,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="7"
-          MinWidth="0">
+    <Grid Margin="7" MinWidth="0">
 
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -149,7 +148,7 @@
             </Grid>
         </Border>
 
-        <!-- بيانات المورد والفاتورة والباركود -->
+        <!-- بيانات المورد والفاتورة والباركود العام -->
         <Border Grid.Row="1"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -179,7 +178,6 @@
                                 SelectedDateFormat="Short"/>
                 </StackPanel>
 
-                <!-- منطقة مسح الباركود في مكان نوع المستند -->
                 <Border Grid.Column="2"
                         Background="#F7FAF8"
                         BorderBrush="{StaticResource BorderBrush}"
@@ -249,8 +247,9 @@
             </Grid>
         </Border>
 
-        <!-- إضافة صنف -->
+        <!-- نموذج الإدخال القديم: مخفي مؤقتًا للحفاظ على مراجع الكود الحالي -->
         <Border Grid.Row="2"
+                Visibility="Collapsed"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
@@ -259,7 +258,6 @@
                 Margin="0,0,0,5">
 
             <StackPanel>
-
                 <DockPanel Margin="2,0,2,4">
                     <TextBlock Text="إضافة صنف إلى الفاتورة"
                                FontSize="12"
@@ -416,7 +414,7 @@
             </StackPanel>
         </Border>
 
-        <!-- جدول الأصناف: يأخذ المساحة المتبقية -->
+        <!-- جدول الأصناف -->
         <Border Grid.Row="3"
                 Background="White"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -443,11 +441,28 @@
                                Foreground="{StaticResource PrimaryBrush}"
                                VerticalAlignment="Center"/>
 
-                    <TextBlock Grid.Column="1"
-                               Text="فاتورة شراء - يمكن تعديل بيانات البنود قبل الحفظ"
-                               FontSize="9"
-                               Foreground="{StaticResource MutedBrush}"
-                               VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+
+                        <TextBlock Text="أدخل الصنف بالكود أو الاسم، وامسح باركود التشغيلة والصلاحية داخل الصف"
+                                   FontSize="9"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+
+                        <Button Content="+ إضافة صف"
+                                Width="90"
+                                Style="{StaticResource PrimaryButton}"
+                                Margin="2,0"
+                                Click="AddInvoiceRowButton_Click"/>
+
+                        <Button Content="حذف الصف"
+                                Width="85"
+                                Style="{StaticResource DangerButton}"
+                                Margin="2,0"
+                                Click="RemoveInvoiceRowButton_Click"/>
+                    </StackPanel>
                 </Grid>
 
                 <DataGrid x:Name="InvoiceItemsGrid"
@@ -475,6 +490,7 @@
                           RowEditEnding="InvoiceItemsGrid_RowEditEnding">
 
                     <DataGrid.Columns>
+
                         <DataGridTemplateColumn Header="م" Width="40" IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -486,9 +502,20 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="كود الصنف" Binding="{Binding ProductCode}" IsReadOnly="True" Width="90"/>
-                        <DataGridTextColumn Header="اسم الصنف" Binding="{Binding ItemName}" IsReadOnly="True" Width="160"/>
-                        <DataGridTextColumn Header="الشركة" Binding="{Binding Manufacturer}" IsReadOnly="True" Width="110"/>
+                        <DataGridTextColumn Header="كود الصنف"
+                                            Binding="{Binding ProductCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="100"/>
+
+                        <DataGridTextColumn Header="اسم الصنف"
+                                            Binding="{Binding ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="180"/>
+
+                        <DataGridTextColumn Header="الشركة"
+                                            Binding="{Binding Manufacturer}"
+                                            IsReadOnly="True"
+                                            Width="110"/>
 
                         <DataGridTemplateColumn Header="الوحدة" Width="85">
                             <DataGridTemplateColumn.CellTemplate>
@@ -498,6 +525,7 @@
                                                VerticalAlignment="Center"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
+
                             <DataGridTemplateColumn.CellEditingTemplate>
                                 <DataTemplate>
                                     <ComboBox ItemsSource="{Binding AvailableUnits}"
@@ -510,7 +538,31 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="رقم التشغيلة" Binding="{Binding BatchNumber}" IsReadOnly="True" Width="95"/>
+                        <DataGridTextColumn Header="رقم التشغيلة"
+                                            Binding="{Binding BatchNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="110"/>
+
+                        <DataGridTemplateColumn Header="باركود / GS1" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding BarcodeInput}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding BarcodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             Height="26"
+                                             FontSize="10"
+                                             ToolTip="امسح باركود الصنف أو GS1 ثم اضغط Enter"
+                                             KeyDown="InvoiceRowBarcodeTextBox_KeyDown"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
 
                         <DataGridTemplateColumn Header="الصلاحية" Width="125">
                             <DataGridTemplateColumn.CellTemplate>
@@ -535,14 +587,35 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
-                        <DataGridTextColumn Header="المجاني" Binding="{Binding FreeQuantity, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
-                        <DataGridTextColumn Header="وحدات/عبوة" Binding="{Binding UnitsPerPackage}" IsReadOnly="True" Width="75"/>
-                        <DataGridTextColumn Header="سعر الوحدة" Binding="{Binding UnitPrice, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="80"/>
+                        <DataGridTextColumn Header="الكمية"
+                                            Binding="{Binding Quantity, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="65"/>
 
-                        <DataGridTextColumn Header="خصم %" Binding="{Binding DiscountPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="65"/>
+                        <DataGridTextColumn Header="المجاني"
+                                            Binding="{Binding FreeQuantity, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="65"/>
 
-                        <DataGridTextColumn Header="ضريبة %" Binding="{Binding TaxPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="70"/>
+                        <DataGridTextColumn Header="وحدات/عبوة"
+                                            Binding="{Binding UnitsPerPackage}"
+                                            IsReadOnly="True"
+                                            Width="75"/>
+
+                        <DataGridTextColumn Header="سعر الوحدة"
+                                            Binding="{Binding UnitPrice, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="80"/>
+
+                        <DataGridTextColumn Header="خصم %"
+                                            Binding="{Binding DiscountPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="65"/>
+
+                        <DataGridTextColumn Header="ضريبة %"
+                                            Binding="{Binding TaxPercent, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="70"/>
 
                         <DataGridTemplateColumn Header="الضريبة غير قابلة للخصم" Width="125">
                             <DataGridTemplateColumn.CellTemplate>
@@ -558,16 +631,36 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="قيمة الخصم" Binding="{Binding DiscountAmount, StringFormat=N2}" IsReadOnly="True" Width="80"/>
+                        <DataGridTextColumn Header="قيمة الخصم"
+                                            Binding="{Binding DiscountAmount, StringFormat=N2}"
+                                            IsReadOnly="True"
+                                            Width="80"/>
 
-                        <DataGridTextColumn Header="بعد الخصم" Binding="{Binding DiscountedUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
+                        <DataGridTextColumn Header="بعد الخصم"
+                                            Binding="{Binding DiscountedUnitPrice, StringFormat=N2}"
+                                            IsReadOnly="True"
+                                            Width="85"/>
 
-                        <DataGridTextColumn Header="قيمة الضريبة" Binding="{Binding TotalTaxAmount, StringFormat=N2}" IsReadOnly="True" Width="90"/>
+                        <DataGridTextColumn Header="قيمة الضريبة"
+                                            Binding="{Binding TotalTaxAmount, StringFormat=N2}"
+                                            IsReadOnly="True"
+                                            Width="90"/>
 
-                        <DataGridTextColumn Header="صافي الوحدة" Binding="{Binding NetUnitPrice, StringFormat=N2}" IsReadOnly="True" Width="85"/>
+                        <DataGridTextColumn Header="صافي الوحدة"
+                                            Binding="{Binding NetUnitPrice, StringFormat=N2}"
+                                            IsReadOnly="True"
+                                            Width="85"/>
 
-                        <DataGridTextColumn Header="الإجمالي" Binding="{Binding Total, StringFormat=N2}" IsReadOnly="True" Width="85"/>
-                        <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="False" Width="120"/>
+                        <DataGridTextColumn Header="الإجمالي"
+                                            Binding="{Binding Total, StringFormat=N2}"
+                                            IsReadOnly="True"
+                                            Width="85"/>
+
+                        <DataGridTextColumn Header="ملاحظات"
+                                            Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                                            IsReadOnly="False"
+                                            Width="120"/>
+
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
