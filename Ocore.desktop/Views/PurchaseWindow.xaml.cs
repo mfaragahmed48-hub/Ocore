@@ -1136,6 +1136,60 @@ namespace Ocore.desktop.Views
 
             UpdateTotal();
         }
+        private void TryLinkPendingInvoiceBarcode(
+    PurchaseInvoiceItem item,
+    Product product)
+        {
+            if (item == null || product == null)
+                return;
+
+            string barcode;
+
+            if (!pendingInvoiceBarcodeLinks.TryGetValue(
+                item,
+                out barcode))
+                return;
+
+            var confirmation = MessageBox.Show(
+                "تم اختيار الصنف: " + product.Name +
+                "\nيوجد باركود GS1 غير مربوط بهذا الصنف:\n" + barcode +
+                "\n\nهل تريد ربط هذا الباركود بالصنف؟",
+                "تأكيد ربط الباركود",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                pendingInvoiceBarcodeLinks.Remove(item);
+                return;
+            }
+
+            try
+            {
+                productService.LinkInternationalBarcode(
+                    currentUserId,
+                    product.Id,
+                    barcode);
+
+                pendingInvoiceBarcodeLinks.Remove(item);
+
+                MessageBox.Show(
+                    "تم ربط الباركود بالصنف بنجاح.",
+                    "نجاح",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                pendingInvoiceBarcodeLinks.Remove(item);
+
+                MessageBox.Show(
+                    "تعذر ربط الباركود:\n" + ex.Message,
+                    "خطأ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
         private void InvoiceRowBarcodeTextBox_KeyDown(
             object sender,
             System.Windows.Input.KeyEventArgs e)
