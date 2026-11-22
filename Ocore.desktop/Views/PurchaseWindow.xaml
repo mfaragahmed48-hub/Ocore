@@ -478,6 +478,8 @@
                           AlternatingRowBackground="#F6F9F7"
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto"
+                          EnableRowVirtualization="False"
+                          EnableColumnVirtualization="False"
                           AlternationCount="10000"
                           RowEditEnding="InvoiceItemsGrid_RowEditEnding">
 
@@ -499,10 +501,11 @@
                                             IsReadOnly="False"
                                             Width="100"/>
 
-                        <!-- اسم الصنف: عرض مرن ولف النص -->
+                        <!-- اسم الصنف -->
                         <DataGridTemplateColumn Header="اسم الصنف"
                                                 Width="2*"
                                                 MinWidth="220">
+
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding ItemName}"
@@ -524,15 +527,14 @@
                                               DisplayMemberPath="Name"
                                               MaxDropDownHeight="320"
                                               MinWidth="200"
-                                              Text="{Binding ItemName,
-                                                             Mode=TwoWay,
-                                                             UpdateSourceTrigger=PropertyChanged}"
+                                              Text="{Binding ItemName, Mode=OneWay}"
                                               Loaded="InvoiceProductComboBox_Loaded"
                                               SelectionChanged="InvoiceProductComboBox_SelectionChanged"
                                               VerticalContentAlignment="Center"
                                               ToolTip="اكتب اسم الصنف أو كوده ثم اختر الصنف من النتائج"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
+
                         </DataGridTemplateColumn>
 
                         <DataGridTextColumn Header="الشركة"
@@ -540,6 +542,7 @@
                                             IsReadOnly="True"
                                             Width="110"/>
 
+                        <!-- الوحدة -->
                         <DataGridTemplateColumn Header="الوحدة" Width="85">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -566,6 +569,7 @@
                                             IsReadOnly="False"
                                             Width="110"/>
 
+                        <!-- باركود / GS1 -->
                         <DataGridTemplateColumn Header="باركود / GS1" Width="150">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -587,6 +591,7 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
 
+                        <!-- الصلاحية -->
                         <DataGridTemplateColumn Header="الصلاحية" Width="125">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -640,6 +645,7 @@
                                             IsReadOnly="False"
                                             Width="70"/>
 
+                        <!-- الضريبة غير قابلة للخصم -->
                         <DataGridTemplateColumn Header="الضريبة غير قابلة للخصم" Width="125">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>

@@ -1,5 +1,4 @@
-﻿
-using Ocore.desktop.Models;
+﻿using Ocore.desktop.Models;
 using Ocore.desktop.Services;
 using System;
 using System.Collections.Generic;
@@ -29,11 +28,15 @@ namespace Ocore.desktop.Views
         private ICollectionView productsView;
         private TextBox productEditableTextBox;
 
+        private readonly Dictionary<ComboBox, DispatcherTimer>
+            invoiceProductSearchTimers =
+                new Dictionary<ComboBox, DispatcherTimer>();
+
         private string pendingInternationalBarcode;
         private int? scannedProductId;
         private readonly Dictionary<PurchaseInvoiceItem, string>
-    pendingInvoiceBarcodeLinks =
-        new Dictionary<PurchaseInvoiceItem, string>();
+            pendingInvoiceBarcodeLinks =
+                new Dictionary<PurchaseInvoiceItem, string>();
         private readonly Dictionary<PurchaseInvoiceItem, double>
             packagePrices = new Dictionary<PurchaseInvoiceItem, double>();
 
@@ -366,7 +369,6 @@ namespace Ocore.desktop.Views
                 BarcodeScanTextBox.SelectAll();
             }
         }
-
         private void LinkPendingBarcodeButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -678,7 +680,6 @@ namespace Ocore.desktop.Views
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
-
         private void AddItemButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -841,6 +842,7 @@ namespace Ocore.desktop.Views
             SalePriceTextBox.Clear();
             ProductComboBox.Focus();
         }
+
         private void InvoiceProductComboBox_Loaded(
             object sender,
             RoutedEventArgs e)
@@ -859,35 +861,41 @@ namespace Ocore.desktop.Views
             if (textBox == null)
                 return;
 
-            // لكل صف View مستقل حتى لا يؤثر البحث في صف على بقية الصفوف.
-            var view = new ListCollectionView(allProducts);
+            var existingView =
+                comboBox.Tag as ListCollectionView;
 
-            view.Filter = product =>
+            if (existingView == null)
             {
-                var p = product as Product;
+                var view = new ListCollectionView(allProducts);
 
-                if (p == null)
-                    return false;
+                view.Filter = product =>
+                {
+                    var p = product as Product;
 
-                string search = (textBox.Text ?? "").Trim();
+                    if (p == null)
+                        return false;
 
-                if (string.IsNullOrWhiteSpace(search))
-                    return true;
+                    string search =
+                        (comboBox.Text ?? "").Trim();
 
-                return
-                    (!string.IsNullOrWhiteSpace(p.Name) &&
-                     p.Name.IndexOf(
-                         search,
-                         StringComparison.CurrentCultureIgnoreCase) >= 0)
-                    ||
-                    (!string.IsNullOrWhiteSpace(p.ProductCode) &&
-                     p.ProductCode.IndexOf(
-                         search,
-                         StringComparison.CurrentCultureIgnoreCase) >= 0);
-            };
+                    if (string.IsNullOrWhiteSpace(search))
+                        return true;
 
-            comboBox.Tag = view;
-            comboBox.ItemsSource = view;
+                    return
+                        (!string.IsNullOrWhiteSpace(p.Name) &&
+                         p.Name.IndexOf(
+                             search,
+                             StringComparison.CurrentCultureIgnoreCase) >= 0)
+                        ||
+                        (!string.IsNullOrWhiteSpace(p.ProductCode) &&
+                         p.ProductCode.IndexOf(
+                             search,
+                             StringComparison.CurrentCultureIgnoreCase) >= 0);
+                };
+
+                comboBox.Tag = view;
+                comboBox.ItemsSource = view;
+            }
 
             textBox.Tag = comboBox;
 
@@ -896,6 +904,35 @@ namespace Ocore.desktop.Views
 
             textBox.TextChanged +=
                 InvoiceProductSearchTextBox_TextChanged;
+
+            if (!invoiceProductSearchTimers.ContainsKey(comboBox))
+            {
+                var timer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(150)
+                };
+
+                timer.Tick += (timerSender, timerArgs) =>
+                {
+                    timer.Stop();
+
+                    var currentView =
+                        comboBox.Tag as ListCollectionView;
+
+                    if (currentView == null)
+                        return;
+
+                    currentView.Refresh();
+
+                    if (!string.IsNullOrWhiteSpace(comboBox.Text) &&
+                        comboBox.Items.Count > 0)
+                    {
+                        comboBox.IsDropDownOpen = true;
+                    }
+                };
+
+                invoiceProductSearchTimers[comboBox] = timer;
+            }
         }
 
         private void InvoiceProductSearchTextBox_TextChanged(
@@ -909,16 +946,28 @@ namespace Ocore.desktop.Views
             if (textBox == null || comboBox == null || view == null)
                 return;
 
-            // الفلتر يقرأ من TextBox نفسه لضمان استخدام أحدث حرف مكتوب.
-            view.Refresh();
+            var selectedProduct =
+                comboBox.SelectedItem as Product;
 
-            if (!string.IsNullOrWhiteSpace(textBox.Text) &&
-                comboBox.Items.Count > 0)
+            if (selectedProduct != null &&
+                !string.Equals(
+                    (textBox.Text ?? "").Trim(),
+                    (selectedProduct.Name ?? "").Trim(),
+                    StringComparison.CurrentCultureIgnoreCase))
             {
-                comboBox.IsDropDownOpen = true;
+                comboBox.SelectedIndex = -1;
+            }
+
+            DispatcherTimer timer;
+
+            if (invoiceProductSearchTimers.TryGetValue(
+                comboBox,
+                out timer))
+            {
+                timer.Stop();
+                timer.Start();
             }
         }
-
         private void InvoiceProductComboBox_SelectionChanged(
             object sender,
             SelectionChangedEventArgs e)
@@ -939,12 +988,13 @@ namespace Ocore.desktop.Views
 
             TryLinkPendingInvoiceBarcode(item, product);
 
-            // تحديث النص الظاهر بعد اختيار نتيجة فعلية.
             comboBox.Text = product.Name ?? "";
             UpdateTotal();
         }
 
-        private void AddInvoiceRowButton_Click(object sender, RoutedEventArgs e)
+        private void AddInvoiceRowButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             var item = new PurchaseInvoiceItem
             {
@@ -1020,24 +1070,12 @@ namespace Ocore.desktop.Views
                         StringComparison.CurrentCultureIgnoreCase));
             }
 
-            Product exactName = allProducts.FirstOrDefault(p =>
+            return allProducts.FirstOrDefault(p =>
                 !string.IsNullOrWhiteSpace(p.Name) &&
                 string.Equals(
                     p.Name.Trim(),
                     search,
                     StringComparison.CurrentCultureIgnoreCase));
-
-            if (exactName != null)
-                return exactName;
-
-            var matches = allProducts.Where(p =>
-                !string.IsNullOrWhiteSpace(p.Name) &&
-                p.Name.IndexOf(
-                    search,
-                    StringComparison.CurrentCultureIgnoreCase) >= 0)
-                .ToList();
-
-            return matches.Count == 1 ? matches[0] : null;
         }
 
         private void ResolveInvoiceItemProduct(
@@ -1079,22 +1117,6 @@ namespace Ocore.desktop.Views
                 item.UnitPrice = 0;
 
                 packagePrices.Remove(item);
-
-                bool ambiguousName = !searchByCode &&
-                    allProducts.Count(p =>
-                        !string.IsNullOrWhiteSpace(p.Name) &&
-                        p.Name.IndexOf(
-                            search,
-                            StringComparison.CurrentCultureIgnoreCase) >= 0) > 1;
-
-                if (ambiguousName)
-                {
-                    MessageBox.Show(
-                        "يوجد أكثر من صنف يحتوي اسمه على النص المدخل. اكتب اسمًا أدق أو استخدم كود الصنف.",
-                        "تحديد الصنف",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
 
                 UpdateTotal();
                 return;
@@ -1138,9 +1160,10 @@ namespace Ocore.desktop.Views
 
             UpdateTotal();
         }
+
         private void TryLinkPendingInvoiceBarcode(
-    PurchaseInvoiceItem item,
-    Product product)
+            PurchaseInvoiceItem item,
+            Product product)
         {
             if (item == null || product == null)
                 return;
@@ -1225,6 +1248,7 @@ namespace Ocore.desktop.Views
             if (item == null ||
                 string.IsNullOrWhiteSpace(scannedValue))
                 return;
+
             bool offerBarcodeLink = false;
             GS1BarcodeData barcodeData = null;
             Product matchedProduct = null;
@@ -1292,6 +1316,7 @@ namespace Ocore.desktop.Views
             {
                 offerBarcodeLink = true;
             }
+
             if (matchedProduct != null)
             {
                 ApplyProductToInvoiceItem(item, matchedProduct);
@@ -1301,6 +1326,7 @@ namespace Ocore.desktop.Views
             {
                 pendingInvoiceBarcodeLinks[item] = barcodeData.GTIN;
             }
+
             // لا نستبدل البيانات اليدوية إذا لم يرسلها الباركود.
             if (barcodeData != null &&
                 !string.IsNullOrWhiteSpace(barcodeData.BatchNumber))
@@ -1447,7 +1473,6 @@ namespace Ocore.desktop.Views
 
             bool unitColumn = columnHeader == "الوحدة";
             bool codeColumn = columnHeader == "كود الصنف";
-            bool nameColumn = columnHeader == "اسم الصنف";
 
             string editedText = null;
 
@@ -1457,14 +1482,6 @@ namespace Ocore.desktop.Views
 
                 if (textBox != null)
                     editedText = textBox.Text;
-            }
-            else if (nameColumn)
-            {
-                // عمود اسم الصنف أصبح ComboBox قابلًا للبحث.
-                var comboBox = e.EditingElement as ComboBox;
-
-                if (comboBox != null)
-                    editedText = comboBox.Text;
             }
 
             Dispatcher.BeginInvoke(
@@ -1479,12 +1496,8 @@ namespace Ocore.desktop.Views
                             editedText,
                             true);
 
-                    if (item != null && nameColumn)
-                        ResolveInvoiceItemProduct(
-                            item,
-                            editedText,
-                            false);
-
+                    // لا يتم ربط الصنف من النص المكتوب في خانة الاسم.
+                    // الربط يتم فقط عند اختيار نتيجة من القائمة.
                     UpdateTotal();
                 }),
                 DispatcherPriority.Background);
@@ -1501,7 +1514,6 @@ namespace Ocore.desktop.Views
                 }),
                 DispatcherPriority.Background);
         }
-
         private void SaveInvoiceButton_Click(
             object sender,
             RoutedEventArgs e)
