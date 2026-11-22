@@ -169,6 +169,7 @@
     <Compile Include="Services\Printing\PrinterSettingsNavigationService.cs" />
     <Compile Include="Services\Printing\PrintingDeviceService.cs" />
     <Compile Include="Services\Printing\PrintingProfileService.cs" />
+    <Compile Include="Services\ProductExcelService.cs" />
     <Compile Include="Services\ShiftClosurePrintingService.cs" />
     <Compile Include="Services\ShiftHandoverService.cs" />
     <Compile Include="Services\ShiftService.cs" />
