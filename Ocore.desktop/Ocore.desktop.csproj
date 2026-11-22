@@ -133,6 +133,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Data\DatabaseBackupService.cs" />
+    <Compile Include="Data\ProductCodeMigration.cs" />
     <Compile Include="Data\TaxDatabaseSchema.cs" />
     <Compile Include="Models\AuditLog.cs" />
     <Compile Include="Models\Customer.cs" />
