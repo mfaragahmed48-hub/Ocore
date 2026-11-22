@@ -97,7 +97,7 @@
                           SelectionUnit="FullRow"
                           HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal"
-                          MinRowHeight="34"
+                          MinRowHeight="42"
                           FontSize="12"
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto">
@@ -109,17 +109,18 @@
                                             Width="90"/>
 
                         <DataGridTemplateColumn Header="اسم الصنف"
-                        Width="2*"
-                        MinWidth="180">
+                                                Width="2*"
+                                                MinWidth="220">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding Name}"
-                       TextWrapping="Wrap"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Stretch"
-                       Padding="4,5"
-                       FontSize="10"
-                       ToolTip="{Binding Name}"/>
+                                               TextWrapping="Wrap"
+                                               TextTrimming="None"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Stretch"
+                                               Padding="6,7"
+                                               FontSize="12"
+                                               ToolTip="{Binding Name}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -153,8 +154,8 @@
                                             Width="100"/>
 
                         <DataGridTextColumn Header="المنتهي"
-                    Binding="{Binding ExpiredQuantity, StringFormat=N3}"
-                    Width="90">
+                                            Binding="{Binding ExpiredQuantity, StringFormat=N3}"
+                                            Width="90">
                             <DataGridTextColumn.CellStyle>
                                 <Style TargetType="{x:Type DataGridCell}">
                                     <Setter Property="Background" Value="#F8D7DA"/>
@@ -168,6 +169,7 @@
                                 </Style>
                             </DataGridTextColumn.CellStyle>
                         </DataGridTextColumn>
+
                         <DataGridTextColumn Header="الباركود"
                                             Binding="{Binding Barcode}"
                                             Width="110"/>
@@ -230,22 +232,22 @@
             <WrapPanel HorizontalAlignment="Center">
 
                 <Button x:Name="AddProductButton"
-        Content="➕ إضافة صنف"
-        Width="115"
-        Height="38"
-        Margin="3"
-        Background="#16865D"
-        Foreground="White"
-        FontWeight="Bold"/>
+                        Content="➕ إضافة صنف"
+                        Width="115"
+                        Height="38"
+                        Margin="3"
+                        Background="#16865D"
+                        Foreground="White"
+                        FontWeight="Bold"/>
 
                 <Button x:Name="AddProductsBulkButton"
-        Content="📋 إضافة مجموعة أصناف"
-        Width="165"
-        Height="38"
-        Margin="3"
-        Background="#246B58"
-        Foreground="White"
-        FontWeight="Bold"/>
+                        Content="📋 إضافة مجموعة أصناف"
+                        Width="165"
+                        Height="38"
+                        Margin="3"
+                        Background="#246B58"
+                        Foreground="White"
+                        FontWeight="Bold"/>
 
                 <Button x:Name="EditProductButton"
                         Content="✏️ تعديل صنف"
@@ -298,29 +300,29 @@
                         Foreground="White"/>
 
                 <Button x:Name="ExportProductsExcelButton"
-        Content="📤 تصدير Excel"
-        Width="125"
-        Height="38"
-        Margin="3"
-        Background="#217346"
-        Foreground="White"
-        FontWeight="Bold"/>
+                        Content="📤 تصدير Excel"
+                        Width="125"
+                        Height="38"
+                        Margin="3"
+                        Background="#217346"
+                        Foreground="White"
+                        FontWeight="Bold"/>
 
                 <Button x:Name="ImportProductsExcelButton"
-        Content="📥 استيراد Excel"
-        Width="135"
-        Height="38"
-        Margin="3"
-        Background="#2874A6"
-        Foreground="White"
-        FontWeight="Bold"/>
+                        Content="📥 استيراد Excel"
+                        Width="135"
+                        Height="38"
+                        Margin="3"
+                        Background="#2874A6"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
                 <Button x:Name="RefreshButton"
                         Content="🔄 تحديث"
                         Width="90"
                         Height="38"
                         Margin="3"/>
 
-                
                 <Button x:Name="CloseButton"
                         Content="إغلاق"
                         Width="80"
