@@ -996,7 +996,7 @@ namespace Ocore.desktop.Views
 
             invoiceItems.Remove(selectedItem);
             packagePrices.Remove(selectedItem);
-
+            pendingInvoiceBarcodeLinks.Remove(selectedItem);
             RefreshInvoiceGrid();
             UpdateTotal();
         }
@@ -1428,7 +1428,7 @@ namespace Ocore.desktop.Views
 
             invoiceItems.Remove(selectedItem);
             packagePrices.Remove(selectedItem);
-
+            pendingInvoiceBarcodeLinks.Remove(selectedItem);
             RefreshInvoiceGrid();
             UpdateTotal();
         }
@@ -1657,6 +1657,7 @@ namespace Ocore.desktop.Views
 
                 invoiceItems.Clear();
                 packagePrices.Clear();
+                pendingInvoiceBarcodeLinks.Clear();
                 scannedProductId = null;
                 pendingInternationalBarcode = null;
                 LinkPendingBarcodeButton.IsEnabled = false;
