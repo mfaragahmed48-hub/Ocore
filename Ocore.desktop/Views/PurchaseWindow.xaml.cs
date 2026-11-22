@@ -28,16 +28,12 @@ namespace Ocore.desktop.Views
         private List<Product> allProducts;
         private ICollectionView productsView;
         private TextBox productEditableTextBox;
-        // الباركود الدولي الذي ينتظر تأكيد ربطه بصنف
+
         private string pendingInternationalBarcode;
-        // الصنف الذي تم التعرف عليه من آخر باركود معروف
         private int? scannedProductId;
+
         private readonly Dictionary<PurchaseInvoiceItem, double>
             packagePrices = new Dictionary<PurchaseInvoiceItem, double>();
-
-        // ==========================================
-        // إعدادات تكبير جدول أصناف الفاتورة فقط
-        // ==========================================
 
         private ScaleTransform zoomTransform;
 
@@ -58,7 +54,6 @@ namespace Ocore.desktop.Views
             purchaseService = new PurchaseService();
 
             invoiceItems = new ObservableCollection<PurchaseInvoiceItem>();
-
             allProducts = new List<Product>();
 
             InvoiceDatePicker.SelectedDate = DateTime.Today;
@@ -77,26 +72,15 @@ namespace Ocore.desktop.Views
             InvoiceItemsGrid.CellEditEnding +=
                 InvoiceItemsGrid_CellEditEnding;
 
-            InvoiceItemsGrid.RowEditEnding +=
-                InvoiceItemsGrid_RowEditEnding;
-
             LoadSuppliers();
             LoadProducts();
             UpdateTotal();
         }
 
-        // ==========================================
-        // تكبير وتصغير جدول الأصناف فقط
-        // ==========================================
-
         private void InitializeZoom()
         {
             zoomTransform = new ScaleTransform(1.0, 1.0);
-
-            // تطبيق التكبير على جدول الأصناف فقط.
-            // بقية الشاشة لا تتأثر.
             InvoiceItemsGrid.LayoutTransform = zoomTransform;
-
             PreviewMouseWheel += PurchaseWindow_PreviewMouseWheel;
         }
 
@@ -107,9 +91,7 @@ namespace Ocore.desktop.Views
             if ((System.Windows.Input.Keyboard.Modifiers &
                  System.Windows.Input.ModifierKeys.Control) !=
                 System.Windows.Input.ModifierKeys.Control)
-            {
                 return;
-            }
 
             if (zoomTransform == null)
                 return;
@@ -131,10 +113,6 @@ namespace Ocore.desktop.Views
             e.Handled = true;
         }
 
-        // ==========================================
-        // تحميل الموردين
-        // ==========================================
-
         private void LoadSuppliers()
         {
             try
@@ -154,10 +132,6 @@ namespace Ocore.desktop.Views
                     MessageBoxImage.Error);
             }
         }
-
-        // ==========================================
-        // تحميل الأصناف
-        // ==========================================
 
         private void LoadProducts()
         {
@@ -182,7 +156,6 @@ namespace Ocore.desktop.Views
                     MessageBoxImage.Error);
             }
         }
-
 
         private bool FilterProducts(object item)
         {
@@ -211,7 +184,6 @@ namespace Ocore.desktop.Views
 
             return nameMatches || codeMatches;
         }
-
 
         private void ProductComboBox_Loaded(
             object sender,
@@ -246,10 +218,6 @@ namespace Ocore.desktop.Views
             if (ProductComboBox.Items.Count > 0)
                 ProductComboBox.IsDropDownOpen = true;
         }
-
-        // ==========================================
-        // قراءة الباركود الدولي وربطه بالصنف
-        // ==========================================
 
         private void BarcodeScanTextBox_KeyDown(
             object sender,
@@ -320,7 +288,6 @@ namespace Ocore.desktop.Views
                     ProductComboBox.SelectedItem = product;
                     ProductComboBox.Text = product.Name;
 
-                    // لا نستبدل البيانات اليدوية إذا لم يرسلها الباركود.
                     if (!string.IsNullOrWhiteSpace(
                         barcodeData.BatchNumber))
                     {
@@ -359,8 +326,6 @@ namespace Ocore.desktop.Views
                         "هذا الباركود غير مرتبط بأي صنف. اختر الصنف يدويًا، ثم اضغط (ربط بالصنف المحدد)."
                         + " GTIN: " + barcodeData.GTIN;
 
-                    // نملأ بيانات التشغيلة والصلاحية إن وجدت،
-                    // دون ربط الباركود تلقائيًا.
                     if (!string.IsNullOrWhiteSpace(
                         barcodeData.BatchNumber))
                     {
@@ -400,10 +365,6 @@ namespace Ocore.desktop.Views
             }
         }
 
-        // ==========================================
-        // تأكيد ربط الباركود بالصنف المحدد
-        // ==========================================
-
         private void LinkPendingBarcodeButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -413,7 +374,6 @@ namespace Ocore.desktop.Views
             {
                 MessageBox.Show(
                     "لا يوجد باركود جديد ينتظر الربط.");
-
                 return;
             }
 
@@ -457,6 +417,7 @@ namespace Ocore.desktop.Views
                     currentUserId,
                     selectedProduct.Id,
                     barcodeToLink);
+
                 scannedProductId = selectedProduct.Id;
                 pendingInternationalBarcode = null;
                 LinkPendingBarcodeButton.IsEnabled = false;
@@ -483,11 +444,6 @@ namespace Ocore.desktop.Views
             }
         }
 
-
-        // ==========================================
-        // اختيار الصنف
-        // ==========================================
-
         private void ProductComboBox_SelectionChanged(
             object sender,
             SelectionChangedEventArgs e)
@@ -498,8 +454,6 @@ namespace Ocore.desktop.Views
             PurchaseUnitComboBox.ItemsSource = null;
             PurchaseUnitComboBox.IsEnabled = false;
             UnitPriceTextBox.Clear();
-
-            // مسح سعر البيع عند إلغاء اختيار الصنف
             SalePriceTextBox.Clear();
 
             if (product == null)
@@ -538,16 +492,11 @@ namespace Ocore.desktop.Views
                     "0.00",
                     CultureInfo.CurrentCulture);
 
-            // عرض سعر البيع المسجل بالفعل في بيانات الصنف
             SalePriceTextBox.Text =
                 product.SalePrice.ToString(
                     "0.00",
                     CultureInfo.CurrentCulture);
         }
-
-        // ==========================================
-        // اختيار وحدة الشراء
-        // ==========================================
 
         private void PurchaseUnitComboBox_SelectionChanged(
             object sender,
@@ -598,10 +547,6 @@ namespace Ocore.desktop.Views
                     product.SmallUnitName.Trim(),
                     StringComparison.OrdinalIgnoreCase);
         }
-
-        // ==========================================
-        // إضافة صنف جديد
-        // ==========================================
 
         private void AddNewProductButton_Click(
             object sender,
@@ -720,10 +665,8 @@ namespace Ocore.desktop.Views
             ProductComboBox.Text = newProduct.Name;
 
             QuantityTextBox.Text = "1";
-
             BatchNumberTextBox.Clear();
             ExpiryDatePicker.SelectedDate = null;
-
             ProductComboBox.Focus();
 
             MessageBox.Show(
@@ -733,10 +676,6 @@ namespace Ocore.desktop.Views
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
-
-        // ==========================================
-        // إضافة بند إلى الفاتورة
-        // ==========================================
 
         private void AddItemButton_Click(
             object sender,
@@ -758,7 +697,6 @@ namespace Ocore.desktop.Views
                 return;
             }
 
-            // منع إضافة صنف مختلف عن الصنف الذي تعرف عليه الباركود
             if (scannedProductId.HasValue &&
                 product.Id != scannedProductId.Value)
             {
@@ -780,9 +718,7 @@ namespace Ocore.desktop.Views
 
             if (PurchaseUnitComboBox.SelectedItem == null)
             {
-                MessageBox.Show(
-                    "اختر وحدة الشراء أولاً.");
-
+                MessageBox.Show("اختر وحدة الشراء أولاً.");
                 PurchaseUnitComboBox.Focus();
                 return;
             }
@@ -806,9 +742,7 @@ namespace Ocore.desktop.Views
                 || unitPrice < 0
                 || IsInvalidNumber(unitPrice))
             {
-                MessageBox.Show(
-                    "أدخل سعر شراء صحيحاً.");
-
+                MessageBox.Show("أدخل سعر شراء صحيحاً.");
                 UnitPriceTextBox.Focus();
                 return;
             }
@@ -866,27 +800,21 @@ namespace Ocore.desktop.Views
                 ProductId = product.Id,
                 DrugCatalogId = product.DrugCatalogId,
                 ItemName = product.Name,
-
                 ProductCode = product.ProductCode ?? "",
                 Manufacturer = "",
-
                 UnitName = selectedUnit,
                 PackageUnitName = packageUnit,
                 SmallUnitName = smallUnit,
                 UnitsPerPackage = unitsPerPackage,
-
                 BatchNumber = batchNumber,
-
                 ExpiryDate = expiryDate,
                 ExpiryDateText = expiryDate.HasValue
                     ? expiryDate.Value.ToString(
                         "yyyy-MM-dd",
                         CultureInfo.InvariantCulture)
                     : "",
-
                 Quantity = quantity,
                 UnitPrice = unitPrice,
-
                 FreeQuantity = 0,
                 DiscountPercent = 0,
                 TaxPercent = 0,
@@ -894,34 +822,371 @@ namespace Ocore.desktop.Views
             };
 
             invoiceItems.Add(item);
-
             packagePrices[item] = product.PurchasePrice;
 
-            // انتهت عملية استخدام الباركود للصنف الذي تمت إضافته
             scannedProductId = null;
             RefreshInvoiceGrid();
             UpdateTotal();
 
             BatchNumberTextBox.Clear();
             QuantityTextBox.Text = "1";
-
             ExpiryDatePicker.SelectedDate = null;
-
             ProductComboBox.SelectedIndex = -1;
             ProductComboBox.Text = "";
-
             PurchaseUnitComboBox.ItemsSource = null;
             PurchaseUnitComboBox.IsEnabled = false;
-
             UnitPriceTextBox.Clear();
             SalePriceTextBox.Clear();
-
             ProductComboBox.Focus();
         }
 
-        // ==========================================
-        // تغيير الوحدة داخل جدول الفاتورة
-        // ==========================================
+        private void AddInvoiceRowButton_Click(object sender, RoutedEventArgs e)
+        {
+            var item = new PurchaseInvoiceItem
+            {
+                Quantity = 1,
+                FreeQuantity = 0,
+                DiscountPercent = 0,
+                TaxPercent = 0,
+                IsTaxDeductible = false,
+                BarcodeInput = "",
+                BatchNumber = "",
+                ExpiryDate = null,
+                Notes = ""
+            };
+
+            invoiceItems.Add(item);
+            RefreshInvoiceGrid();
+            UpdateTotal();
+
+            InvoiceItemsGrid.SelectedItem = item;
+            InvoiceItemsGrid.ScrollIntoView(item);
+            InvoiceItemsGrid.Focus();
+        }
+
+        private void RemoveInvoiceRowButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            var selectedItem =
+                InvoiceItemsGrid.SelectedItem as PurchaseInvoiceItem;
+
+            if (selectedItem == null)
+            {
+                MessageBox.Show(
+                    "حدد الصف الذي تريد حذفه أولاً.",
+                    "حذف صف",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                "هل تريد حذف الصف المحدد من الفاتورة؟",
+                "تأكيد حذف الصف",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            invoiceItems.Remove(selectedItem);
+            packagePrices.Remove(selectedItem);
+
+            RefreshInvoiceGrid();
+            UpdateTotal();
+        }
+
+        private Product FindProductForInvoiceEntry(
+            string value,
+            bool searchByCode)
+        {
+            string search = (value ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(search))
+                return null;
+
+            if (searchByCode)
+            {
+                return allProducts.FirstOrDefault(p =>
+                    !string.IsNullOrWhiteSpace(p.ProductCode) &&
+                    string.Equals(
+                        p.ProductCode.Trim(),
+                        search,
+                        StringComparison.CurrentCultureIgnoreCase));
+            }
+
+            Product exactName = allProducts.FirstOrDefault(p =>
+                !string.IsNullOrWhiteSpace(p.Name) &&
+                string.Equals(
+                    p.Name.Trim(),
+                    search,
+                    StringComparison.CurrentCultureIgnoreCase));
+
+            if (exactName != null)
+                return exactName;
+
+            var matches = allProducts.Where(p =>
+                !string.IsNullOrWhiteSpace(p.Name) &&
+                p.Name.IndexOf(
+                    search,
+                    StringComparison.CurrentCultureIgnoreCase) >= 0)
+                .ToList();
+
+            return matches.Count == 1 ? matches[0] : null;
+        }
+
+        private void ResolveInvoiceItemProduct(
+            PurchaseInvoiceItem item,
+            string enteredValue,
+            bool searchByCode)
+        {
+            if (item == null)
+                return;
+
+            string search = (enteredValue ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(search))
+            {
+                item.ProductId = 0;
+                item.DrugCatalogId = null;
+                item.UnitName = "";
+                item.PackageUnitName = "";
+                item.SmallUnitName = "";
+                item.UnitsPerPackage = 1;
+                item.UnitPrice = 0;
+
+                packagePrices.Remove(item);
+                UpdateTotal();
+                return;
+            }
+
+            Product product =
+                FindProductForInvoiceEntry(search, searchByCode);
+
+            if (product == null)
+            {
+                item.ProductId = 0;
+                item.DrugCatalogId = null;
+                item.UnitName = "";
+                item.PackageUnitName = "";
+                item.SmallUnitName = "";
+                item.UnitsPerPackage = 1;
+                item.UnitPrice = 0;
+
+                packagePrices.Remove(item);
+
+                bool ambiguousName = !searchByCode &&
+                    allProducts.Count(p =>
+                        !string.IsNullOrWhiteSpace(p.Name) &&
+                        p.Name.IndexOf(
+                            search,
+                            StringComparison.CurrentCultureIgnoreCase) >= 0) > 1;
+
+                if (ambiguousName)
+                {
+                    MessageBox.Show(
+                        "يوجد أكثر من صنف يحتوي اسمه على النص المدخل. اكتب اسمًا أدق أو استخدم كود الصنف.",
+                        "تحديد الصنف",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+
+                UpdateTotal();
+                return;
+            }
+
+            ApplyProductToInvoiceItem(item, product);
+        }
+
+        private void ApplyProductToInvoiceItem(
+            PurchaseInvoiceItem item,
+            Product product)
+        {
+            if (item == null || product == null)
+                return;
+
+            item.ProductId = product.Id;
+            item.DrugCatalogId = product.DrugCatalogId;
+            item.ProductCode = product.ProductCode ?? "";
+            item.ItemName = product.Name ?? "";
+
+            item.PackageUnitName =
+                string.IsNullOrWhiteSpace(product.UnitName)
+                    ? "وحدة"
+                    : product.UnitName.Trim();
+
+            item.SmallUnitName =
+                string.IsNullOrWhiteSpace(product.SmallUnitName)
+                    ? ""
+                    : product.SmallUnitName.Trim();
+
+            item.UnitsPerPackage =
+                product.UnitsPerPackage > 0
+                    ? product.UnitsPerPackage
+                    : 1;
+
+            item.UnitName = item.PackageUnitName;
+            item.UnitPrice = product.PurchasePrice;
+
+            packagePrices[item] = product.PurchasePrice;
+
+            UpdateTotal();
+        }
+
+        private void InvoiceRowBarcodeTextBox_KeyDown(
+            object sender,
+            System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Enter)
+                return;
+
+            e.Handled = true;
+
+            var textBox = sender as TextBox;
+            var item = textBox?.DataContext as PurchaseInvoiceItem;
+
+            if (textBox == null || item == null)
+                return;
+
+            string scannedValue =
+                (textBox.Text ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(scannedValue))
+                return;
+
+            item.BarcodeInput = scannedValue;
+
+            ProcessInvoiceRowBarcode(item, scannedValue);
+        }
+
+        private void ProcessInvoiceRowBarcode(
+            PurchaseInvoiceItem item,
+            string scannedValue)
+        {
+            if (item == null ||
+                string.IsNullOrWhiteSpace(scannedValue))
+                return;
+
+            GS1BarcodeData barcodeData = null;
+            Product matchedProduct = null;
+            string parseError = null;
+
+            try
+            {
+                barcodeData =
+                    GS1BarcodeService.Parse(scannedValue);
+
+                if (!string.IsNullOrWhiteSpace(barcodeData.GTIN))
+                {
+                    int? productId =
+                        productService.FindProductIdByBarcode(
+                            barcodeData.GTIN);
+
+                    if (productId.HasValue)
+                    {
+                        matchedProduct = allProducts.FirstOrDefault(
+                            p => p.Id == productId.Value);
+                    }
+
+                    if (matchedProduct == null)
+                    {
+                        matchedProduct = allProducts.FirstOrDefault(p =>
+                            !string.IsNullOrWhiteSpace(p.Barcode) &&
+                            (string.Equals(
+                                p.Barcode.Trim(),
+                                barcodeData.GTIN,
+                                StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(
+                                p.Barcode.Trim(),
+                                scannedValue,
+                                StringComparison.OrdinalIgnoreCase)));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                parseError = ex.Message;
+            }
+
+            // دعم الباركود العادي المخزن مباشرة في بيانات الصنف.
+            if (matchedProduct == null)
+            {
+                matchedProduct = allProducts.FirstOrDefault(p =>
+                    (!string.IsNullOrWhiteSpace(p.Barcode) &&
+                     string.Equals(
+                        p.Barcode.Trim(),
+                        scannedValue,
+                        StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(p.ProductCode) &&
+                     string.Equals(
+                        p.ProductCode.Trim(),
+                        scannedValue,
+                        StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (matchedProduct != null)
+                ApplyProductToInvoiceItem(item, matchedProduct);
+
+            // لا نستبدل البيانات اليدوية إذا لم يرسلها الباركود.
+            if (barcodeData != null &&
+                !string.IsNullOrWhiteSpace(barcodeData.BatchNumber))
+            {
+                item.BatchNumber = barcodeData.BatchNumber;
+            }
+
+            if (barcodeData != null &&
+                barcodeData.ExpiryDate.HasValue)
+            {
+                item.ExpiryDate = barcodeData.ExpiryDate.Value.Date;
+            }
+
+            item.BarcodeInput = "";
+
+            RefreshInvoiceGrid();
+            UpdateTotal();
+
+            if (matchedProduct != null)
+            {
+                MessageBox.Show(
+                    "تم التعرف على الصنف داخل الصف: " +
+                    matchedProduct.Name +
+                    (barcodeData != null &&
+                     !string.IsNullOrWhiteSpace(barcodeData.BatchNumber)
+                        ? "\nالتشغيلة: " + barcodeData.BatchNumber
+                        : "") +
+                    (barcodeData != null &&
+                     barcodeData.ExpiryDate.HasValue
+                        ? "\nالصلاحية: " +
+                          barcodeData.ExpiryDate.Value.ToString("yyyy-MM-dd")
+                        : ""),
+                    "تمت قراءة الباركود",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            else if (barcodeData != null)
+            {
+                MessageBox.Show(
+                    "تمت قراءة بيانات GS1، لكن رقم GTIN غير مرتبط بصنف في النظام. اختر الصنف يدويًا في نفس الصف. تم الاحتفاظ بالتشغيلة والصلاحية إن وُجدتا.",
+                    "الصنف غير مربوط",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            else
+            {
+                MessageBox.Show(
+                    "تعذر التعرف على الباركود كصنف معروف." +
+                    (string.IsNullOrWhiteSpace(parseError)
+                        ? ""
+                        : "\nتفاصيل القراءة: " + parseError) +
+                    "\nيمكنك اختيار الصنف يدويًا بالكود أو الاسم.",
+                    "باركود غير معروف",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            InvoiceItemsGrid.Focus();
+        }
 
         private void UpdateItemUnitPrice(
             PurchaseInvoiceItem item)
@@ -965,17 +1230,12 @@ namespace Ocore.desktop.Views
             }
         }
 
-        // ==========================================
-        // حذف بند من الفاتورة قبل الحفظ
-        // ==========================================
-
         private void RemoveItemButton_Click(
             object sender,
             RoutedEventArgs e)
         {
             var selectedItem =
-                InvoiceItemsGrid.SelectedItem
-                as PurchaseInvoiceItem;
+                InvoiceItemsGrid.SelectedItem as PurchaseInvoiceItem;
 
             if (selectedItem == null)
             {
@@ -1000,10 +1260,6 @@ namespace Ocore.desktop.Views
             UpdateTotal();
         }
 
-        // ==========================================
-        // تحديث الإجمالي عند تعديل خلية
-        // ==========================================
-
         private void InvoiceItemsGrid_CellEditEnding(
             object sender,
             DataGridCellEditEndingEventArgs e)
@@ -1011,15 +1267,42 @@ namespace Ocore.desktop.Views
             var item =
                 e.Row.Item as PurchaseInvoiceItem;
 
-            bool unitColumn =
-                e.Column.Header != null
-                && e.Column.Header.ToString() == "الوحدة";
+            string columnHeader =
+                e.Column.Header == null
+                    ? ""
+                    : e.Column.Header.ToString();
+
+            bool unitColumn = columnHeader == "الوحدة";
+            bool codeColumn = columnHeader == "كود الصنف";
+            bool nameColumn = columnHeader == "اسم الصنف";
+
+            string editedText = null;
+
+            if (codeColumn || nameColumn)
+            {
+                var textBox = e.EditingElement as TextBox;
+
+                if (textBox != null)
+                    editedText = textBox.Text;
+            }
 
             Dispatcher.BeginInvoke(
                 new Action(() =>
                 {
-                    if (unitColumn && item != null)
+                    if (item != null && unitColumn)
                         UpdateItemUnitPrice(item);
+
+                    if (item != null && codeColumn)
+                        ResolveInvoiceItemProduct(
+                            item,
+                            editedText,
+                            true);
+
+                    if (item != null && nameColumn)
+                        ResolveInvoiceItemProduct(
+                            item,
+                            editedText,
+                            false);
 
                     UpdateTotal();
                 }),
@@ -1038,10 +1321,6 @@ namespace Ocore.desktop.Views
                 DispatcherPriority.Background);
         }
 
-        // ==========================================
-        // حفظ الفاتورة
-        // ==========================================
-
         private void SaveInvoiceButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -1056,8 +1335,7 @@ namespace Ocore.desktop.Views
 
             if (SupplierComboBox.SelectedValue == null)
             {
-                MessageBox.Show(
-                    "اختر المورد أولاً.");
+                MessageBox.Show("اختر المورد أولاً.");
                 return;
             }
 
@@ -1070,8 +1348,7 @@ namespace Ocore.desktop.Views
 
             if (InvoiceDatePicker.SelectedDate == null)
             {
-                MessageBox.Show(
-                    "حدد تاريخ فاتورة الشراء.");
+                MessageBox.Show("حدد تاريخ فاتورة الشراء.");
                 return;
             }
 
@@ -1084,6 +1361,19 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
+                if (item.ProductId <= 0)
+                {
+                    MessageBox.Show(
+                        "يوجد صف لم يتم ربطه بصنف صحيح. أدخل كود الصنف أو اختر اسمه من الجدول قبل حفظ الفاتورة.",
+                        "صنف غير محدد",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    InvoiceItemsGrid.SelectedItem = item;
+                    InvoiceItemsGrid.ScrollIntoView(item);
+                    return;
+                }
+
                 if (item.Quantity <= 0 ||
                     IsInvalidNumber(item.Quantity) ||
                     !IsWholeNumber(item.Quantity))
@@ -1091,7 +1381,6 @@ namespace Ocore.desktop.Views
                     MessageBox.Show(
                         "توجد كمية مشتراة غير صحيحة في الفاتورة.\n"
                         + "يجب أن تكون عددًا صحيحًا أكبر من صفر.");
-
                     return;
                 }
 
@@ -1102,7 +1391,6 @@ namespace Ocore.desktop.Views
                     MessageBox.Show(
                         "توجد كمية مجانية غير صحيحة.\n"
                         + "يجب أن تكون عددًا صحيحًا غير سالب.");
-
                     return;
                 }
 
@@ -1111,7 +1399,6 @@ namespace Ocore.desktop.Views
                 {
                     MessageBox.Show(
                         "يوجد سعر شراء غير صحيح في الفاتورة.");
-
                     return;
                 }
 
@@ -1121,17 +1408,15 @@ namespace Ocore.desktop.Views
                 {
                     MessageBox.Show(
                         "نسبة الخصم يجب أن تكون بين صفر و100.");
-
                     return;
                 }
 
                 if (item.TaxPercent < 0 ||
-    item.TaxPercent > 100 ||
-    IsInvalidNumber(item.TaxPercent))
+                    item.TaxPercent > 100 ||
+                    IsInvalidNumber(item.TaxPercent))
                 {
                     MessageBox.Show(
                         "نسبة الضريبة يجب أن تكون بين صفر و100.");
-
                     return;
                 }
 
@@ -1140,7 +1425,6 @@ namespace Ocore.desktop.Views
                 {
                     MessageBox.Show(
                         "إجمالي أحد الأصناف غير صحيح.");
-
                     return;
                 }
 
@@ -1149,7 +1433,6 @@ namespace Ocore.desktop.Views
                 {
                     MessageBox.Show(
                         "يوجد صنف بتاريخ صلاحية منتهٍ.");
-
                     return;
                 }
 
@@ -1158,14 +1441,12 @@ namespace Ocore.desktop.Views
                 {
                     MessageBox.Show(
                         "يوجد دواء مرتبط بدليل الأدوية بدون تاريخ صلاحية.");
-
                     return;
                 }
             }
 
             int supplierId =
-                Convert.ToInt32(
-                    SupplierComboBox.SelectedValue);
+                Convert.ToInt32(SupplierComboBox.SelectedValue);
 
             var result = MessageBox.Show(
                 "إجمالي الفاتورة: "
@@ -1198,8 +1479,8 @@ namespace Ocore.desktop.Views
                 scannedProductId = null;
                 pendingInternationalBarcode = null;
                 LinkPendingBarcodeButton.IsEnabled = false;
-                InvoiceDatePicker.SelectedDate =
-                    DateTime.Today;
+
+                InvoiceDatePicker.SelectedDate = DateTime.Today;
 
                 RefreshInvoiceGrid();
                 UpdateTotal();
@@ -1208,7 +1489,6 @@ namespace Ocore.desktop.Views
                 QuantityTextBox.Text = "1";
                 UnitPriceTextBox.Clear();
                 SalePriceTextBox.Clear();
-
                 ExpiryDatePicker.SelectedDate = null;
 
                 ProductComboBox.SelectedIndex = -1;
@@ -1227,10 +1507,6 @@ namespace Ocore.desktop.Views
             }
         }
 
-        // ==========================================
-        // التحقق من الحاجة لتاريخ الصلاحية
-        // ==========================================
-
         private bool FindProductRequiresExpiry(int productId)
         {
             Product product = allProducts.Find(
@@ -1239,10 +1515,6 @@ namespace Ocore.desktop.Views
             return product != null &&
                    product.DrugCatalogId.HasValue;
         }
-
-        // ==========================================
-        // أدوات قراءة الأرقام
-        // ==========================================
 
         private bool TryReadNumber(
             string text,
@@ -1279,10 +1551,6 @@ namespace Ocore.desktop.Views
                     MidpointRounding.AwayFromZero)) < 0.0000001;
         }
 
-        // ==========================================
-        // تحديث الجدول والإجمالي
-        // ==========================================
-
         private void RefreshInvoiceGrid()
         {
             InvoiceItemsGrid.Items.Refresh();
@@ -1313,10 +1581,6 @@ namespace Ocore.desktop.Views
                     CultureInfo.CurrentCulture)
                 + " جنيه";
         }
-
-        // ==========================================
-        // إغلاق النافذة
-        // ==========================================
 
         private void CloseButton_Click(
             object sender,
