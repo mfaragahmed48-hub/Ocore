@@ -31,7 +31,9 @@ namespace Ocore.desktop.Views
 
         private string pendingInternationalBarcode;
         private int? scannedProductId;
-
+        private readonly Dictionary<PurchaseInvoiceItem, string>
+    pendingInvoiceBarcodeLinks =
+        new Dictionary<PurchaseInvoiceItem, string>();
         private readonly Dictionary<PurchaseInvoiceItem, double>
             packagePrices = new Dictionary<PurchaseInvoiceItem, double>();
 
@@ -1167,7 +1169,7 @@ namespace Ocore.desktop.Views
             if (item == null ||
                 string.IsNullOrWhiteSpace(scannedValue))
                 return;
-
+            bool offerBarcodeLink = false;
             GS1BarcodeData barcodeData = null;
             Product matchedProduct = null;
             string parseError = null;
@@ -1225,9 +1227,24 @@ namespace Ocore.desktop.Views
                         StringComparison.OrdinalIgnoreCase)));
             }
 
+            // الاحتفاظ بباركود GS1 غير المرتبط لعرض خيار ربطه
+            // بعد اختيار الصنف يدويًا داخل نفس الصف.
+            if (matchedProduct == null &&
+                barcodeData != null &&
+                barcodeData.IsGS1 &&
+                !string.IsNullOrWhiteSpace(barcodeData.GTIN))
+            {
+                offerBarcodeLink = true;
+            }
             if (matchedProduct != null)
+            {
                 ApplyProductToInvoiceItem(item, matchedProduct);
-
+                pendingInvoiceBarcodeLinks.Remove(item);
+            }
+            else if (offerBarcodeLink)
+            {
+                pendingInvoiceBarcodeLinks[item] = barcodeData.GTIN;
+            }
             // لا نستبدل البيانات اليدوية إذا لم يرسلها الباركود.
             if (barcodeData != null &&
                 !string.IsNullOrWhiteSpace(barcodeData.BatchNumber))
