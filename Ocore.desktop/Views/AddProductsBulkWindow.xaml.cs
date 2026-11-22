@@ -197,8 +197,8 @@ namespace Ocore.desktop.Views
 
                     row.Name = GetCell(cells, 0);
                     row.SelectCategoryByName(GetCell(cells, 1));
-                    row.UnitName = GetCell(cells, 2);
-                    row.SmallUnitName = GetCell(cells, 3);
+                    row.UnitName = "p";
+                    row.SmallUnitName = "u";
                     row.UnitsPerPackage = GetCell(cells, 4);
                     row.SalePrice = GetCell(cells, 5);
                     row.PurchasePrice = GetCell(cells, 6);
@@ -380,10 +380,8 @@ namespace Ocore.desktop.Views
             {
                 Name = row.Name.Trim(),
                 CategoryId = categoryId,
-                UnitName = string.IsNullOrWhiteSpace(row.UnitName)
-                    ? "علبة"
-                    : row.UnitName.Trim(),
-                SmallUnitName = row.SmallUnitName.Trim(),
+                UnitName = "p",
+                SmallUnitName = "u",
                 UnitsPerPackage = unitsPerPackage,
                 SalePrice = salePrice,
                 PurchasePrice = purchasePrice,
@@ -479,8 +477,8 @@ namespace Ocore.desktop.Views
     {
         private string name;
         private int categoryId;
-        private string unitName = "علبة";
-        private string smallUnitName = "قرص";
+        private string unitName = "p";
+        private string smallUnitName = "u";
         private string unitsPerPackage = "1";
         private string salePrice = "0";
         private string purchasePrice = "0";

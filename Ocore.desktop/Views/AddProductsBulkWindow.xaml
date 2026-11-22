@@ -59,8 +59,8 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="العبوة" Binding="{Binding UnitName, UpdateSourceTrigger=PropertyChanged}" Width="90"/>
-                <DataGridTextColumn Header="الوحدة الصغيرة *" Binding="{Binding SmallUnitName, UpdateSourceTrigger=PropertyChanged}" Width="110"/>
+                <DataGridTextColumn Header="العبوة" Binding="{Binding UnitName}" IsReadOnly="True" Width="90"/>
+                <DataGridTextColumn Header="الوحدة الصغيرة" Binding="{Binding SmallUnitName}" IsReadOnly="True" Width="110"/>
                 <DataGridTextColumn Header="عدد الوحدات *" Binding="{Binding UnitsPerPackage, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
                 <DataGridTextColumn Header="سعر البيع" Binding="{Binding SalePrice, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
                 <DataGridTextColumn Header="سعر الشراء" Binding="{Binding PurchasePrice, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
