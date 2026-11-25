@@ -351,6 +351,9 @@ namespace Ocore.desktop.Views
         {
             var db = new DatabaseManager();
             cs = "Data Source=" + db.GetDatabasePath() + ";Version=3;";
+
+            // Initialize the expense table before KPI opens its read connection.
+            ExpenseService.EnsureDatabaseSchema(cs);
         }
 
         public KpiData Get(int userId, DateTime fromDate, DateTime toDate)

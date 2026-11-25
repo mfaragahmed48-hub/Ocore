@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
@@ -38,8 +37,15 @@ namespace Ocore.desktop.Services
             EnsureSchema();
         }
 
-        private void EnsureSchema()
+        public static void EnsureDatabaseSchema(string connectionString)
         {
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new ArgumentException(
+                    "مسار الاتصال بقاعدة البيانات غير صحيح.",
+                    "connectionString");
+            }
+
             using (var connection =
                 new SQLiteConnection(connectionString))
             {
@@ -89,6 +95,11 @@ namespace Ocore.desktop.Services
                     command.ExecuteNonQuery();
                 }
             }
+        }
+
+        private void EnsureSchema()
+        {
+            EnsureDatabaseSchema(connectionString);
         }
 
         public static string[] GetCategories()
