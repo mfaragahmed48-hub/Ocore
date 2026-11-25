@@ -21,7 +21,7 @@ namespace Ocore.desktop.Services
             permissionService = new PermissionService();
         }
 
-        // ملخص المبيعات والتكلفة والأرباح
+        // ملخص المبيعات والتكلفة والأرباح، بنفس قواعد KPI
         public SalesReportSummary GetSummary(
             int userId,
             DateTime fromDate,
@@ -40,10 +40,14 @@ namespace Ocore.desktop.Services
                 "Data Source=" + databaseManager.GetDatabasePath() +
                 ";Version=3;";
 
+            // تهيئة جدول المصروفات قبل قراءة ملخص التقرير.
+            ExpenseService.EnsureDatabaseSchema(connectionString);
+
             using (var connection = new SQLiteConnection(connectionString))
             {
                 connection.Open();
 
+                // إجمالي الفواتير المكتملة قبل خصم المرتجعات.
                 string salesSql = @"
 SELECT
     COUNT(*) AS InvoiceCount,
@@ -56,31 +60,46 @@ AND CreatedAt < @ToDate;";
                 using (var command = new SQLiteCommand(salesSql, connection))
                 {
                     AddDateParameters(command, fromDate, toDate);
-
                     using (var reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
-                            result.InvoiceCount =
-                                Convert.ToInt32(reader["InvoiceCount"]);
-
-                            result.TotalSales =
-                                Convert.ToDouble(reader["TotalSales"]);
+                            result.InvoiceCount = Convert.ToInt32(reader["InvoiceCount"]);
+                            result.TotalSales = Convert.ToDouble(reader["TotalSales"]);
                         }
                     }
                 }
 
+                // قيمة المرتجعات المكتملة خلال الفترة، بنفس طريقة KPI.
+                string returnsSql = @"
+SELECT COALESCE(SUM(
+    CASE
+        WHEN LOWER(COALESCE(sri.TaxStatus, 'Legacy')) = 'calculated'
+        THEN COALESCE(sri.TaxableAmount, 0)
+           + COALESCE(sri.VatAmount, 0)
+           + COALESCE(sri.ScheduleTaxAmount, 0)
+        ELSE COALESCE(sri.Total, 0) - COALESCE(sri.DiscountAmount, 0)
+    END
+), 0)
+FROM SalesReturnItems sri
+INNER JOIN SalesReturns sr ON sr.Id = sri.ReturnId
+WHERE sr.Status = 'Completed'
+AND sr.CreatedAt >= @FromDate
+AND sr.CreatedAt < @ToDate;";
+
+                using (var command = new SQLiteCommand(returnsSql, connection))
+                {
+                    AddDateParameters(command, fromDate, toDate);
+                    result.TotalReturns = Convert.ToDouble(command.ExecuteScalar());
+                }
+
+                // تكلفة الكميات المباعة خلال الفترة.
                 string costSql = @"
-SELECT COALESCE(
-    SUM(a.Quantity * b.PurchasePrice), 0
-)
+SELECT COALESCE(SUM(a.Quantity * b.PurchasePrice), 0)
 FROM SalesInvoiceBatchAllocations a
-INNER JOIN SalesInvoiceItems si
-    ON si.Id = a.InvoiceItemId
-INNER JOIN SalesInvoices inv
-    ON inv.Id = si.InvoiceId
-INNER JOIN Batches b
-    ON b.Id = a.BatchId
+INNER JOIN SalesInvoiceItems si ON si.Id = a.InvoiceItemId
+INNER JOIN SalesInvoices inv ON inv.Id = si.InvoiceId
+INNER JOIN Batches b ON b.Id = a.BatchId
 WHERE inv.Status = 'Completed'
 AND inv.CreatedAt >= @FromDate
 AND inv.CreatedAt < @ToDate;";
@@ -88,49 +107,101 @@ AND inv.CreatedAt < @ToDate;";
                 using (var command = new SQLiteCommand(costSql, connection))
                 {
                     AddDateParameters(command, fromDate, toDate);
-
-                    result.TotalCost =
-                        Convert.ToDouble(command.ExecuteScalar());
+                    result.TotalCost = Convert.ToDouble(command.ExecuteScalar());
                 }
 
-                // التأكد من اكتمال تكلفة جميع الأصناف المباعة
-                string completenessSql = @"
+                // عكس تكلفة المرتجعات التي أعيدت فعليًا إلى المخزون فقط.
+                string returnedCostSql = @"
+SELECT COALESCE(SUM(a.Quantity * b.PurchasePrice), 0)
+FROM SalesReturnBatchAllocations a
+INNER JOIN SalesReturnItems sri ON sri.Id = a.ReturnItemId
+INNER JOIN SalesReturns sr ON sr.Id = sri.ReturnId
+INNER JOIN Batches b ON b.Id = a.BatchId
+WHERE sr.Status = 'Completed'
+AND sr.CreatedAt >= @FromDate
+AND sr.CreatedAt < @ToDate
+AND a.Restocked = 1;";
+
+                using (var command = new SQLiteCommand(returnedCostSql, connection))
+                {
+                    AddDateParameters(command, fromDate, toDate);
+                    result.TotalCost -= Convert.ToDouble(command.ExecuteScalar());
+                }
+
+                // مصروفات الفترة غير الملغاة، بنفس شرط KPI.
+                string expensesSql = @"
+SELECT COALESCE(SUM(Amount), 0)
+FROM ExpenseTransactions
+WHERE IsVoided = 0
+AND CreatedAt >= @FromDate
+AND CreatedAt < @ToDate;";
+
+                using (var command = new SQLiteCommand(expensesSql, connection))
+                {
+                    AddDateParameters(command, fromDate, toDate);
+                    result.TotalExpenses = Convert.ToDouble(command.ExecuteScalar());
+                }
+
+                // التحقق من اكتمال تخصيص تكلفة جميع الأصناف المباعة.
+                string salesCompletenessSql = @"
 SELECT COUNT(*)
 FROM SalesInvoiceItems si
-INNER JOIN SalesInvoices inv
-    ON inv.Id = si.InvoiceId
+INNER JOIN SalesInvoices inv ON inv.Id = si.InvoiceId
 WHERE inv.Status = 'Completed'
 AND inv.CreatedAt >= @FromDate
 AND inv.CreatedAt < @ToDate
 AND (
     si.PackageQuantity <= 0
     OR ABS(
-        si.PackageQuantity -
-        COALESCE(
-            (
-                SELECT SUM(a.Quantity)
-                FROM SalesInvoiceBatchAllocations a
-                WHERE a.InvoiceItemId = si.Id
-            ), 0
+        si.PackageQuantity - COALESCE(
+            (SELECT SUM(a.Quantity)
+             FROM SalesInvoiceBatchAllocations a
+             WHERE a.InvoiceItemId = si.Id), 0
         )
     ) > 0.000001
 );";
 
-                using (var command = new SQLiteCommand(
-                    completenessSql, connection))
+                int incompleteSales;
+                using (var command = new SQLiteCommand(salesCompletenessSql, connection))
                 {
                     AddDateParameters(command, fromDate, toDate);
-
-                    int incompleteItems =
-                        Convert.ToInt32(command.ExecuteScalar());
-
-                    result.IsCostComplete = incompleteItems == 0;
+                    incompleteSales = Convert.ToInt32(command.ExecuteScalar());
                 }
+
+                // التحقق من اكتمال تخصيص كل مرتجع في الفترة.
+                string returnsCompletenessSql = @"
+SELECT COUNT(*)
+FROM SalesReturnItems sri
+INNER JOIN SalesReturns sr ON sr.Id = sri.ReturnId
+WHERE sr.Status = 'Completed'
+AND sr.CreatedAt >= @FromDate
+AND sr.CreatedAt < @ToDate
+AND (
+    sri.PackageQuantity <= 0
+    OR ABS(
+        sri.PackageQuantity - COALESCE(
+            (SELECT SUM(a.Quantity)
+             FROM SalesReturnBatchAllocations a
+             WHERE a.ReturnItemId = sri.Id), 0
+        )
+    ) > 0.000001
+);";
+
+                int incompleteReturns;
+                using (var command = new SQLiteCommand(returnsCompletenessSql, connection))
+                {
+                    AddDateParameters(command, fromDate, toDate);
+                    incompleteReturns = Convert.ToInt32(command.ExecuteScalar());
+                }
+
+                result.IsCostComplete = incompleteSales == 0 && incompleteReturns == 0;
             }
 
+            // إجمالي المبيعات الصافي بعد المرتجعات، ثم الربح بعد التكلفة والمصروفات.
+            result.TotalSales -= result.TotalReturns;
             result.NetProfit = result.IsCostComplete
                 ? Math.Round(
-                    result.TotalSales - result.TotalCost,
+                    result.TotalSales - result.TotalCost - result.TotalExpenses,
                     2,
                     MidpointRounding.AwayFromZero)
                 : 0;

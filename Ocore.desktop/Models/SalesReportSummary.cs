@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 
 namespace Ocore.desktop.Models
 {
@@ -12,6 +13,10 @@ namespace Ocore.desktop.Models
 
         public double TotalSales { get; set; }
 
+        public double TotalReturns { get; set; }
+
+        public double TotalExpenses { get; set; }
+
         public double TotalCost { get; set; }
 
         public double NetProfit { get; set; }
@@ -22,6 +27,8 @@ namespace Ocore.desktop.Models
         {
             InvoiceCount = 0;
             TotalSales = 0;
+            TotalReturns = 0;
+            TotalExpenses = 0;
             TotalCost = 0;
             NetProfit = 0;
             IsCostComplete = true;
