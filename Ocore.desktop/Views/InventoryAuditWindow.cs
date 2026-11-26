@@ -1128,7 +1128,7 @@ namespace Ocore.desktop.Views
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 8, 0, 0)
             };
-            buttons.Children.Add(MakeButton("إضافة المحدد للجلسة", () =>
+            Action addSelectedAction = ()
             {
                 var ids = choose.SelectedItems.Cast<object>()
                     .OfType<DataRowView>()
@@ -1154,7 +1154,8 @@ namespace Ocore.desktop.Views
                 }
                 catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
                 catch (Exception ex) { Error(ex.Message); }
-            };
+            }
+            ;
             buttons.Children.Add(MakeButton("إضافة المحدد للجرد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
             {
