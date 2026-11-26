@@ -234,7 +234,7 @@ namespace Ocore.desktop.Views
                 AddPrintSection(document, "تفاصيل قرارات التكلفة", decisions);
                 AddPrintSection(document, "مقارنة بالجرد السابق", comparison);
                 AddPrintSection(document, "الأهداف المتكرر بها العجز", repeated);
-                dialog.PrintDocument(document.DocumentPaginator, "تقرير الجرد رقم " + sessionId);
+                dialog.PrintDocument(((System.Windows.Documents.IDocumentPaginatorSource)document).DocumentPaginator, "تقرير الجرد رقم " + sessionId);
             }
             catch (Exception ex)
             {
