@@ -133,6 +133,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Data\DatabaseBackupService.cs" />
+    <Compile Include="Data\InventoryAuditSchema.cs" />
     <Compile Include="Data\ProductCodeMigration.cs" />
     <Compile Include="Data\TaxDatabaseSchema.cs" />
     <Compile Include="Models\AuditLog.cs" />
@@ -163,6 +164,9 @@
     <Compile Include="Models\Supplier.cs" />
     <Compile Include="Models\TaxModels.cs" />
     <Compile Include="Services\ExpenseService.cs" />
+    <Compile Include="Services\InventoryAuditQueryService.cs" />
+    <Compile Include="Services\InventoryAuditService.cs" />
+    <Compile Include="Services\InventoryProductTrackingService.cs" />
     <Compile Include="Services\ProductExcelImportService.cs" />
     <Compile Include="Services\ExpiryAlertService.cs" />
     <Compile Include="Services\GS1BarcodeService.cs" />
@@ -193,6 +197,9 @@
       <DependentUpon>ExpensesWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\ExpiryAlertsWindow.cs" />
+    <Compile Include="Views\InventoryAuditReportsWindow.cs" />
+    <Compile Include="Views\InventoryAuditWindow.cs" />
+    <Compile Include="Views\InventoryProductTrackingWindow.cs" />
     <Compile Include="Views\PrinterSettingsHubWindow.xaml.cs">
       <DependentUpon>PrinterSettingsHubWindow.xaml</DependentUpon>
     </Compile>
