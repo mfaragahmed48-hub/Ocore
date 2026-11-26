@@ -365,7 +365,6 @@ namespace Ocore.desktop.Views
             factory.SetValue(ComboBox.HeightProperty, 30.0);
             factory.SetValue(ComboBox.VerticalContentAlignmentProperty, VerticalAlignment.Center);
             factory.AddHandler(FrameworkElement.LoadedEvent, new RoutedEventHandler(AuditProductComboBox_Loaded));
-            factory.AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(AuditProductComboBox_SelectionChanged));
             return new DataTemplate { VisualTree = factory };
         }
 
@@ -386,11 +385,16 @@ namespace Ocore.desktop.Views
             if (combo == null || row == null || availableProductsTable == null) return;
             combo.Tag = "initializing";
             combo.IsEnabled = IsEntryRow(row);
+
+            // اربط حدث الاختيار مباشرةً بالـ ComboBox بعد تحميله.
+            combo.SelectionChanged -= AuditProductComboBox_SelectionChanged;
+
             var view = new DataView(availableProductsTable);
             auditProductViews[combo] = view;
             combo.ItemsSource = view;
             if (!IsEntryRow(row) && row.Row.Table.Columns.Contains("ProductId"))
                 combo.SelectedValue = row["ProductId"] == DBNull.Value ? null : row["ProductId"];
+
             combo.ApplyTemplate();
             var editor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
             if (editor != null)
@@ -398,6 +402,9 @@ namespace Ocore.desktop.Views
                 editor.TextChanged -= AuditProductSearchTextChanged;
                 editor.TextChanged += AuditProductSearchTextChanged;
             }
+
+            // ابدأ استقبال الاختيارات بعد اكتمال تهيئة القائمة.
+            combo.SelectionChanged += AuditProductComboBox_SelectionChanged;
             combo.Tag = "ready";
         }
 
