@@ -2,9 +2,13 @@
 using System.Data;
 using System.Globalization;
 using System.Linq;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Ocore.desktop.Services;
 
 namespace Ocore.desktop.Views
@@ -15,9 +19,11 @@ namespace Ocore.desktop.Views
         private readonly InventoryAuditService auditService;
         private readonly InventoryAuditQueryService queryService;
         private DataGrid sessionsGrid, itemsGrid, pendingGrid, eventsGrid;
-        private TextBox reasonBox, pQuantityBox, uQuantityBox, noteBox, barcodeSearchBox;
+        private TextBox reasonBox, noteBox;
         private DataView itemsView;
-        private TextBlock progressText, selectedSessionText, pUnitLabel, uUnitLabel;
+        private DataTable availableBatchesTable, availableProductsTable;
+        private readonly Dictionary<ComboBox, DataView> auditProductViews = new Dictionary<ComboBox, DataView>();
+        private TextBlock progressText, selectedSessionText;
         private int selectedSessionId;
 
         public InventoryAuditWindow(int userId, string role)
@@ -37,7 +43,8 @@ namespace Ocore.desktop.Views
             FlowDirection = FlowDirection.RightToLeft;
             Background = new SolidColorBrush(Color.FromRgb(243, 246, 248));
             Content = BuildLayout();
-            Loaded += (sender, args) => barcodeSearchBox.Focus();
+            Loaded += (sender, args) => Dispatcher.BeginInvoke(new Action(FocusEntrySearchRow), DispatcherPriority.Loaded);
+            LoadAvailableProducts();
             LoadSessions();
         }
 
@@ -96,8 +103,7 @@ namespace Ocore.desktop.Views
             root.Children.Add(sessionCard);
 
             var sessionActions = new WrapPanel { Margin = new Thickness(0, 0, 0, 5) };
-            sessionActions.Children.Add(MakeButton("بدء جرد شامل", CreateFullSession));
-            sessionActions.Children.Add(MakeButton("بدء جرد محدد", CreateSelectedSession));
+            sessionActions.Children.Add(MakeButton("فاتورة جرد جديدة", StartNewInvoice));
             sessionActions.Children.Add(MakeButton("تحديث", RefreshAll));
             sessionActions.Children.Add(MakeButton("تقارير الجرد", OpenInventoryReports));
             sessionActions.Children.Add(MakeButton("إعدادات التتبع", OpenTrackingSettings));
@@ -123,79 +129,31 @@ namespace Ocore.desktop.Views
             invoiceBody.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             invoiceBody.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var entryCard = new Border { Background = Brushes.White, BorderBrush = border, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5), Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 5) };
+            var entryCard = new Border { Background = Brushes.White, BorderBrush = border, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5), Padding = new Thickness(7), Margin = new Thickness(0, 0, 0, 5) };
             var entryGrid = new Grid();
-            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.7, GridUnitType.Star) });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
-            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
-            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            barcodeSearchBox = new TextBox { Height = 32, Margin = new Thickness(2), Padding = new Thickness(8, 4, 8, 4), FontSize = 12, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "ابحث باسم الصنف أو الكود أو الباركود" };
-            barcodeSearchBox.TextChanged += BarcodeSearchBox_TextChanged;
-            barcodeSearchBox.KeyDown += (sender, args) =>
+            var entryHint = new TextBlock
             {
-                if (args.Key == System.Windows.Input.Key.Enter && itemsGrid != null && itemsGrid.Items.Count > 0)
-                {
-                    itemsGrid.SelectedIndex = 0;
-                    pQuantityBox.Focus();
-                    pQuantityBox.SelectAll();
-                    args.Handled = true;
-                }
+                Text = "اختر الصنف من خانة البحث في السطر الفارغ، ثم أدخل الكمية الفعلية P وU في سطر كل تشغيلة أو تاريخ صلاحية. سيظهر سطر بحث جديد تلقائيًا بعد إضافة الصنف.",
+                FontSize = 11,
+                Foreground = primary,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(4, 2, 8, 2)
             };
-            Grid.SetColumn(barcodeSearchBox, 0);
-            entryGrid.Children.Add(barcodeSearchBox);
-
-            pUnitLabel = new TextBlock { Text = "P", FontSize = 11, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 0, 2, 0) };
-            Grid.SetColumn(pUnitLabel, 1);
-            entryGrid.Children.Add(pUnitLabel);
-            pQuantityBox = new TextBox { Height = 32, Margin = new Thickness(2), Padding = new Thickness(6, 3, 6, 3), FontSize = 13, TextAlignment = TextAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "العدد الفعلي للوحدة الأساسية P" };
-            pQuantityBox.KeyDown += (sender, args) =>
-            {
-                if (args.Key == System.Windows.Input.Key.Enter)
-                {
-                    uQuantityBox.Focus();
-                    uQuantityBox.SelectAll();
-                    args.Handled = true;
-                }
-            };
-            Grid.SetColumn(pQuantityBox, 2);
-            entryGrid.Children.Add(pQuantityBox);
-
-            uUnitLabel = new TextBlock { Text = "U", FontSize = 11, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 0, 2, 0) };
-            Grid.SetColumn(uUnitLabel, 3);
-            entryGrid.Children.Add(uUnitLabel);
-            uQuantityBox = new TextBox { Height = 32, Margin = new Thickness(2), Padding = new Thickness(6, 3, 6, 3), FontSize = 13, TextAlignment = TextAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "العدد الفعلي للوحدات الصغيرة U" };
-            uQuantityBox.KeyDown += (sender, args) =>
-            {
-                if (args.Key == System.Windows.Input.Key.Enter)
-                {
-                    SaveSelectedCount();
-                    args.Handled = true;
-                }
-            };
-            Grid.SetColumn(uQuantityBox, 4);
-            entryGrid.Children.Add(uQuantityBox);
-
-            var saveButton = MakeButton("حفظ العد", SaveSelectedCount);
-            Grid.SetColumn(saveButton, 5);
-            entryGrid.Children.Add(saveButton);
-            var addButton = MakeButton("إضافة أصناف", AddItemsToOpenSession);
-            Grid.SetColumn(addButton, 6);
-            entryGrid.Children.Add(addButton);
-            var clearSearchButton = MakeButton("مسح البحث", () => { barcodeSearchBox.Clear(); barcodeSearchBox.Focus(); });
-            Grid.SetColumn(clearSearchButton, 7);
-            entryGrid.Children.Add(clearSearchButton);
+            Grid.SetColumn(entryHint, 0); entryGrid.Children.Add(entryHint);
+            var addEntryButton = MakeButton("+ إضافة سطر بحث", AddInvoiceSearchRow);
+            Grid.SetColumn(addEntryButton, 1); entryGrid.Children.Add(addEntryButton);
             entryCard.Child = entryGrid;
             Grid.SetRow(entryCard, 0);
             invoiceBody.Children.Add(entryCard);
 
-            itemsGrid = CreateGrid();
+            itemsGrid = CreateItemsGrid();
             itemsGrid.SelectionMode = DataGridSelectionMode.Extended;
             itemsGrid.SelectionChanged += ItemsGrid_SelectionChanged;
+            itemsGrid.CellEditEnding += ItemsGrid_CellEditEnding;
             itemsGrid.MinHeight = 180;
             itemsGrid.RowHeight = 34;
             itemsGrid.FontSize = 11;
@@ -255,6 +213,375 @@ namespace Ocore.desktop.Views
             Grid.SetRow(footer, 6);
             root.Children.Add(footer);
             return root;
+        }
+
+        private DataGrid CreateItemsGrid()
+        {
+            var grid = new DataGrid
+            {
+                AutoGenerateColumns = true,
+                IsReadOnly = false,
+                CanUserAddRows = false,
+                CanUserDeleteRows = false,
+                SelectionUnit = DataGridSelectionUnit.FullRow,
+                SelectionMode = DataGridSelectionMode.Extended,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.All,
+                RowHeight = 38,
+                FontSize = 11,
+                Margin = new Thickness(0, 5, 0, 0),
+                AlternatingRowBackground = new SolidColorBrush(Color.FromRgb(246, 249, 247)),
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            };
+            grid.AutoGeneratingColumn += ItemsGrid_AutoGeneratingColumn;
+            return grid;
+        }
+
+        private void ItemsGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs args)
+        {
+            string name = args.PropertyName;
+            if (name == "IsEntryRow") { args.Cancel = true; return; }
+            if (name == "ProductName")
+            {
+                args.Cancel = true;
+                var column = new DataGridTemplateColumn
+                {
+                    Header = "بحث واختيار الصنف",
+                    Width = new DataGridLength(2.2, DataGridLengthUnitType.Star),
+                    MinWidth = 230,
+                    CellTemplate = CreateAuditProductDisplayTemplate(),
+                    CellEditingTemplate = CreateAuditProductTemplate(),
+                    SortMemberPath = "ProductName"
+                };
+                itemsGrid.Columns.Add(column);
+                column.DisplayIndex = 0;
+                return;
+            }
+            if (name == "PUnitName" || name == "UUnitName" || name == "UnitsPerPackageSnapshot" ||
+                name == "Id" || name == "ProductId" || name == "BatchId" ||
+                name == "TargetType" || name == "TargetKey" || name == "AssignedUserId" ||
+                name == "CountedBy" || name == "PurchasePriceSnapshot" ||
+                name == "SourceRecordId" || name == "SessionId" || name == "EmployeeUserId")
+            { args.Cancel = true; return; }
+
+            args.Column.IsReadOnly = name != "ActualPQuantity" && name != "ActualUQuantity";
+            if (name == "ActualPQuantity") { args.Column.Header = "الفعلي P"; args.Column.Width = 75; }
+            else if (name == "ActualUQuantity") { args.Column.Header = "الفعلي U"; args.Column.Width = 75; }
+            else if (name == "Unit" || name == "UnitSnapshot") args.Column.Header = "الوحدات (P/U)";
+            else if (name == "BookQuantity") args.Column.Header = "الرصيد الدفتري";
+            else if (name == "ActualQuantity") args.Column.Header = "الفعلي المكافئ P";
+            else if (name == "VarianceQuantity") args.Column.Header = "الفرق";
+            else if (name == "ItemStatus") args.Column.Header = "حالة البند";
+            else if (name == "BatchNumber") args.Column.Header = "رقم التشغيلة";
+            else if (name == "ExpiryDate") args.Column.Header = "الصلاحية";
+            else if (name == "ProductCode") args.Column.Header = "كود الصنف";
+            else if (name == "TargetKind") args.Column.Header = "نوع التتبع";
+            else if (name == "AssignedEmployee") args.Column.Header = "المسؤول";
+            else if (name == "CountedByName") args.Column.Header = "تم العد بواسطة";
+            else if (name == "ManagerNote") args.Column.Header = "ملاحظة المدير";
+        }
+
+        private DataTemplate CreateAuditProductDisplayTemplate()
+        {
+            var factory = new FrameworkElementFactory(typeof(TextBlock));
+            factory.SetBinding(TextBlock.TextProperty, new Binding("ProductName"));
+            factory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+            factory.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+            factory.SetValue(TextBlock.MarginProperty, new Thickness(5, 3, 5, 3));
+            return new DataTemplate { VisualTree = factory };
+        }
+
+        private DataTemplate CreateAuditProductTemplate()
+        {
+            var factory = new FrameworkElementFactory(typeof(ComboBox));
+            factory.SetValue(ComboBox.IsEditableProperty, true);
+            factory.SetValue(ComboBox.IsTextSearchEnabledProperty, false);
+            factory.SetValue(ComboBox.StaysOpenOnEditProperty, true);
+            factory.SetValue(ComboBox.DisplayMemberPathProperty, "ProductName");
+            factory.SetValue(ComboBox.SelectedValuePathProperty, "ProductId");
+            factory.SetValue(ComboBox.MinWidthProperty, 210.0);
+            factory.SetValue(ComboBox.HeightProperty, 30.0);
+            factory.SetValue(ComboBox.VerticalContentAlignmentProperty, VerticalAlignment.Center);
+            factory.AddHandler(FrameworkElement.LoadedEvent, new RoutedEventHandler(AuditProductComboBox_Loaded));
+            factory.AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(AuditProductComboBox_SelectionChanged));
+            return new DataTemplate { VisualTree = factory };
+        }
+
+        private void LoadAvailableProducts()
+        {
+            try
+            {
+                availableBatchesTable = queryService.GetAvailableBatches(currentUserId);
+                availableProductsTable = availableBatchesTable.DefaultView.ToTable(true, "ProductId", "ProductName", "ProductCode", "Barcode");
+            }
+            catch (Exception ex) { Error("تعذر تحميل قائمة أصناف الجرد: " + ex.Message); }
+        }
+
+        private void AuditProductComboBox_Loaded(object sender, RoutedEventArgs e)
+        {
+            var combo = sender as ComboBox;
+            var row = combo == null ? null : combo.DataContext as DataRowView;
+            if (combo == null || row == null || availableProductsTable == null) return;
+            combo.Tag = "initializing";
+            combo.IsEnabled = IsEntryRow(row);
+            var view = new DataView(availableProductsTable);
+            auditProductViews[combo] = view;
+            combo.ItemsSource = view;
+            if (!IsEntryRow(row) && row.Row.Table.Columns.Contains("ProductId"))
+                combo.SelectedValue = row["ProductId"] == DBNull.Value ? null : row["ProductId"];
+            combo.ApplyTemplate();
+            var editor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
+            if (editor != null)
+            {
+                editor.TextChanged -= AuditProductSearchTextChanged;
+                editor.TextChanged += AuditProductSearchTextChanged;
+            }
+            combo.Tag = "ready";
+        }
+
+        private void AuditProductSearchTextChanged(object sender, TextChangedEventArgs e)
+        {
+            var editor = sender as TextBox;
+            var combo = editor == null ? null : FindAncestorComboBox(editor);
+            if (combo == null || !auditProductViews.ContainsKey(combo)) return;
+            var row = combo.DataContext as DataRowView;
+            if (row == null || !IsEntryRow(row)) return;
+            string term = editor.Text.Trim().Replace("'", "''");
+            auditProductViews[combo].RowFilter = string.IsNullOrWhiteSpace(term) ? "" :
+                "ProductName LIKE '%" + term + "%' OR ProductCode LIKE '%" + term + "%' OR Barcode LIKE '%" + term + "%'";
+            if (combo.Items.Count > 0) combo.IsDropDownOpen = true;
+        }
+
+        private static ComboBox FindAncestorComboBox(DependencyObject child)
+        {
+            DependencyObject parent = child;
+            while (parent != null && !(parent is ComboBox))
+                parent = System.Windows.Media.VisualTreeHelper.GetParent(parent);
+            return parent as ComboBox;
+        }
+
+        private void AuditProductComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var combo = sender as ComboBox;
+            if (combo == null || !string.Equals(Convert.ToString(combo.Tag), "ready", StringComparison.Ordinal)) return;
+            var entryRow = combo.DataContext as DataRowView;
+            var product = combo.SelectedItem as DataRowView;
+            if (entryRow == null || !IsEntryRow(entryRow) || product == null) return;
+            combo.Tag = "processing";
+            int productId = Convert.ToInt32(product["ProductId"]);
+            Dispatcher.BeginInvoke(new Action(() => AddProductToInvoiceRow(productId, combo)), DispatcherPriority.Background);
+        }
+
+        private void AddProductToInvoiceRow(int productId, ComboBox sourceCombo)
+        {
+            if (availableBatchesTable == null)
+            {
+                if (sourceCombo != null) sourceCombo.Tag = "ready";
+                Warn("قائمة الأصناف غير جاهزة. اضغط تحديث ثم حاول مرة أخرى.");
+                return;
+            }
+            var batchIds = availableBatchesTable.Rows.Cast<DataRow>()
+                .Where(row => Convert.ToInt32(row["ProductId"]) == productId)
+                .Select(row => Convert.ToInt32(row["BatchId"])).Where(id => id > 0).Distinct().ToList();
+            if (batchIds.Count == 0)
+            {
+                if (sourceCombo != null) sourceCombo.Tag = "ready";
+                Warn("لا توجد تشغيلات متاحة لهذا الصنف.");
+                return;
+            }
+            var selectedSession = sessionsGrid.SelectedItem as DataRowView;
+            if (selectedSessionId > 0 &&
+                (selectedSession == null || !string.Equals(Convert.ToString(selectedSession["Status"]), "Open", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (sourceCombo != null) sourceCombo.Tag = "ready";
+                Warn("هذه الجلسة ليست مفتوحة. اضغط «فاتورة جرد جديدة» لبدء جرد جديد.");
+                return;
+            }
+            try
+            {
+                if (selectedSessionId <= 0)
+                {
+                    string reason = string.IsNullOrWhiteSpace(reasonBox.Text) ? "جرد سريع من فاتورة الجرد" : reasonBox.Text.Trim();
+                    selectedSessionId = auditService.CreateSession(currentUserId, reason, batchIds);
+                }
+                else auditService.AddTargetsToOpenSession(currentUserId, selectedSessionId, batchIds);
+
+                LoadSessions(selectedSessionId);
+                var first = itemsGrid.Items.Cast<object>().OfType<DataRowView>()
+                    .FirstOrDefault(item => !IsEntryRow(item) &&
+                        Convert.ToInt32(item["ProductId"]) == productId &&
+                        (Convert.ToString(item["ItemStatus"]) == "Pending" || Convert.ToString(item["ItemStatus"]) == "RecountRequired"));
+                if (first != null)
+                {
+                    itemsGrid.SelectedItem = first;
+                    itemsGrid.ScrollIntoView(first);
+                    var pColumn = itemsGrid.Columns.FirstOrDefault(column => column.SortMemberPath == "ActualPQuantity");
+                    if (pColumn != null)
+                    {
+                        itemsGrid.CurrentCell = new DataGridCellInfo(first, pColumn);
+                        itemsGrid.BeginEdit();
+                    }
+                }
+            }
+            catch (UnauthorizedAccessException ex) { if (sourceCombo != null) sourceCombo.Tag = "ready"; Warn(ex.Message); }
+            catch (Exception ex) { if (sourceCombo != null) sourceCombo.Tag = "ready"; Error(ex.Message); }
+        }
+
+        private static bool IsEntryRow(DataRowView row)
+        {
+            return row != null && row.Row.Table.Columns.Contains("IsEntryRow") &&
+                   row["IsEntryRow"] != DBNull.Value && Convert.ToBoolean(row["IsEntryRow"]);
+        }
+
+        private DataTable CreateEmptyEntryTable()
+        {
+            var table = new DataTable();
+            table.Columns.Add("Id", typeof(int));
+            table.Columns.Add("ProductName", typeof(string));
+            table.Columns.Add("ProductCode", typeof(string));
+            table.Columns.Add("Barcode", typeof(string));
+            table.Columns.Add("TargetKind", typeof(string));
+            table.Columns.Add("BatchNumber", typeof(string));
+            table.Columns.Add("ExpiryDate", typeof(string));
+            table.Columns.Add("Unit", typeof(string));
+            table.Columns.Add("PUnitName", typeof(string));
+            table.Columns.Add("UUnitName", typeof(string));
+            table.Columns.Add("UnitsPerPackageSnapshot", typeof(int));
+            table.Columns.Add("BookQuantity", typeof(double));
+            table.Columns.Add("ActualQuantity", typeof(double));
+            table.Columns.Add("ActualPQuantity", typeof(int));
+            table.Columns.Add("ActualUQuantity", typeof(int));
+            table.Columns.Add("VarianceQuantity", typeof(double));
+            table.Columns.Add("ItemStatus", typeof(string));
+            table.Columns.Add("AssignedUserId", typeof(int));
+            table.Columns.Add("AssignedEmployee", typeof(string));
+            table.Columns.Add("CountedBy", typeof(int));
+            table.Columns.Add("CountedByName", typeof(string));
+            table.Columns.Add("ManagerNote", typeof(string));
+            table.Columns.Add("PurchasePriceSnapshot", typeof(double));
+            table.Columns.Add("BatchId", typeof(int));
+            table.Columns.Add("ProductId", typeof(int));
+            table.Columns.Add("TargetType", typeof(string));
+            table.Columns.Add("TargetKey", typeof(string));
+            table.Columns.Add("IsEntryRow", typeof(bool));
+            AppendEntryRow(table);
+            return table;
+        }
+
+        private void AppendEntryRow(DataTable table)
+        {
+            if (table == null) return;
+            if (!table.Columns.Contains("IsEntryRow")) table.Columns.Add("IsEntryRow", typeof(bool));
+            var row = table.NewRow();
+            foreach (DataColumn column in table.Columns)
+            {
+                if (column.ColumnName == "IsEntryRow") row[column] = true;
+                else if (column.ColumnName == "Id" || column.ColumnName == "ProductId" || column.ColumnName == "BatchId")
+                    row[column] = Convert.ChangeType(-1, column.DataType, CultureInfo.InvariantCulture);
+                else if (column.DataType == typeof(string)) row[column] = "";
+                else if (column.DataType == typeof(bool)) row[column] = false;
+                else if (column.DataType.IsValueType) row[column] = Activator.CreateInstance(column.DataType);
+            }
+            if (table.Columns.Contains("ItemStatus")) row["ItemStatus"] = "";
+            if (table.Columns.Contains("ProductName")) row["ProductName"] = "";
+            table.Rows.Add(row);
+        }
+
+        private void AddInvoiceSearchRow()
+        {
+            if (selectedSessionId > 0)
+            {
+                var session = sessionsGrid.SelectedItem as DataRowView;
+                if (session == null || !string.Equals(Convert.ToString(session["Status"]), "Open", StringComparison.OrdinalIgnoreCase))
+                {
+                    Warn("إضافة سطر بحث متاحة في الجلسة المفتوحة فقط.");
+                    return;
+                }
+            }
+            if (itemsView == null)
+            {
+                itemsView = CreateEmptyEntryTable().DefaultView;
+                itemsGrid.ItemsSource = itemsView;
+            }
+            var entry = itemsGrid.Items.Cast<object>().OfType<DataRowView>().LastOrDefault(IsEntryRow);
+            if (entry == null)
+            {
+                AppendEntryRow(itemsView.Table);
+                entry = itemsGrid.Items.Cast<object>().OfType<DataRowView>().LastOrDefault(IsEntryRow);
+            }
+            if (entry != null)
+            {
+                itemsGrid.SelectedItem = entry;
+                itemsGrid.ScrollIntoView(entry);
+                var searchColumn = itemsGrid.Columns.FirstOrDefault(c => Convert.ToString(c.Header) == "بحث واختيار الصنف");
+                if (searchColumn != null)
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        itemsGrid.CurrentCell = new DataGridCellInfo(entry, searchColumn);
+                        itemsGrid.BeginEdit();
+                    }), DispatcherPriority.Background);
+                }
+            }
+        }
+
+        private void FocusEntrySearchRow()
+        {
+            var entry = itemsGrid.Items.Cast<object>().OfType<DataRowView>().LastOrDefault(IsEntryRow);
+            if (entry == null) return;
+            var searchColumn = itemsGrid.Columns.FirstOrDefault(c => Convert.ToString(c.Header) == "بحث واختيار الصنف");
+            if (searchColumn == null) return;
+            itemsGrid.SelectedItem = entry;
+            itemsGrid.ScrollIntoView(entry);
+            itemsGrid.CurrentCell = new DataGridCellInfo(entry, searchColumn);
+            itemsGrid.BeginEdit();
+        }
+
+        private void StartNewInvoice()
+        {
+            selectedSessionId = 0;
+            sessionsGrid.SelectedItem = null;
+            selectedSessionText.Text = "فاتورة جرد جديدة — اختر أول صنف من سطر البحث";
+            progressText.Text = "لم تبدأ الجلسة بعد";
+            itemsView = CreateEmptyEntryTable().DefaultView;
+            itemsGrid.ItemsSource = itemsView;
+            pendingGrid.ItemsSource = null;
+            eventsGrid.ItemsSource = null;
+            Dispatcher.BeginInvoke(new Action(FocusEntrySearchRow), DispatcherPriority.Loaded);
+        }
+
+        private void ItemsGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction != DataGridEditAction.Commit) return;
+            string property = e.Column.SortMemberPath;
+            if (property != "ActualPQuantity" && property != "ActualUQuantity") return;
+            var row = e.Row.Item as DataRowView;
+            if (row == null || IsEntryRow(row)) return;
+            Dispatcher.BeginInvoke(new Action(() => SaveEditedCount(row)), DispatcherPriority.Background);
+        }
+
+        private void SaveEditedCount(DataRowView row)
+        {
+            try
+            {
+                string pText = Convert.ToString(row["ActualPQuantity"]);
+                string uText = Convert.ToString(row["ActualUQuantity"]);
+                int actualP, actualU;
+                if (string.IsNullOrWhiteSpace(pText) || string.IsNullOrWhiteSpace(uText)) return;
+                if (!int.TryParse(pText, NumberStyles.None, CultureInfo.InvariantCulture, out actualP) ||
+                    !int.TryParse(uText, NumberStyles.None, CultureInfo.InvariantCulture, out actualU) ||
+                    actualP < 0 || actualU < 0)
+                { Warn("أدخل عددًا صحيحًا غير سالب في حقلي P وU."); return; }
+                int factor = Convert.ToInt32(row["UnitsPerPackageSnapshot"]);
+                if (factor <= 1 && actualU != 0) { Warn("هذا الصنف لا يحتوي على وحدات U منفصلة؛ أدخل صفرًا."); return; }
+                if (factor > 1 && actualU >= factor) { Warn("عدد وحدات U يجب أن يكون أقل من معامل التحويل (" + factor + ")."); return; }
+                int itemId = Convert.ToInt32(row["Id"]);
+                auditService.SaveCount(currentUserId, selectedSessionId, itemId, actualP, actualU);
+                LoadSessions(selectedSessionId);
+                SelectNextUncountedItem(itemId);
+            }
+            catch (Exception ex) { Error("تعذر حفظ كمية السطر: " + ex.Message); }
         }
 
         private static DataGrid CreateGrid()
@@ -347,23 +674,9 @@ namespace Ocore.desktop.Views
             return button;
         }
 
-        private void BarcodeSearchBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            ApplyItemFilter();
-        }
 
-        private void ApplyItemFilter()
-        {
-            if (itemsView == null) return;
-            string value = barcodeSearchBox == null ? "" : barcodeSearchBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                itemsView.RowFilter = "";
-                return;
-            }
-            string escaped = value.Replace("'", "''");
-            itemsView.RowFilter = "ProductCode LIKE '%" + escaped + "%' OR Barcode LIKE '%" + escaped + "%' OR ProductName LIKE '%" + escaped + "%'";
-        }
+
+
 
         private void LoadSessions(int preferredId = 0)
         {
@@ -371,25 +684,21 @@ namespace Ocore.desktop.Views
             if (sessionsGrid.Items.Count == 0)
             {
                 selectedSessionId = 0;
-                itemsGrid.ItemsSource = null;
+                selectedSessionText.Text = "فاتورة جرد جديدة — اختر أول صنف من سطر البحث";
+                progressText.Text = "لم تبدأ الجلسة بعد";
+                itemsView = CreateEmptyEntryTable().DefaultView;
+                itemsGrid.ItemsSource = itemsView;
                 pendingGrid.ItemsSource = null;
                 eventsGrid.ItemsSource = null;
-                itemsView = null;
-                selectedSessionText.Text = "لا توجد جلسات جرد حتى الآن";
-                progressText.Text = "التقدم: —";
+                Dispatcher.BeginInvoke(new Action(FocusEntrySearchRow), DispatcherPriority.Loaded);
                 return;
             }
-
             DataRowView selected = null;
             foreach (var value in sessionsGrid.Items)
             {
                 var row = value as DataRowView;
-                if (row != null && Convert.ToInt32(row["Id"]) ==
-                    (preferredId > 0 ? preferredId : selectedSessionId))
-                {
-                    selected = row;
-                    break;
-                }
+                if (row != null && Convert.ToInt32(row["Id"]) == (preferredId > 0 ? preferredId : selectedSessionId))
+                { selected = row; break; }
             }
             sessionsGrid.SelectedItem = selected ?? sessionsGrid.Items[0];
             if (sessionsGrid.SelectedItem != null) LoadSelectedSession();
@@ -402,23 +711,10 @@ namespace Ocore.desktop.Views
 
         private void ItemsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateUnitLabels();
+            // يتم إدخال P وU مباشرة داخل صف التشغيلة.
         }
 
-        private void UpdateUnitLabels()
-        {
-            var item = itemsGrid == null ? null : itemsGrid.SelectedItem as DataRowView;
-            if (item == null)
-            {
-                pUnitLabel.Text = "P";
-                uUnitLabel.Text = "U";
-                return;
-            }
-            string pName = item.Row.Table.Columns.Contains("PUnitName") ? Convert.ToString(item["PUnitName"]) : "";
-            string uName = item.Row.Table.Columns.Contains("UUnitName") ? Convert.ToString(item["UUnitName"]) : "";
-            pUnitLabel.Text = string.IsNullOrWhiteSpace(pName) ? "P" : pName + " (P)";
-            uUnitLabel.Text = string.IsNullOrWhiteSpace(uName) ? "U" : uName + " (U)";
-        }
+
 
         private void LoadSelectedSession()
         {
@@ -427,9 +723,14 @@ namespace Ocore.desktop.Views
             selectedSessionId = Convert.ToInt32(row["Id"]);
             selectedSessionText.Text = "الجلسة: " + row["SessionNumber"] +
                 " | الحالة: " + row["Status"] + " | السبب: " + row["Reason"];
-            itemsView = queryService.GetItems(selectedSessionId, currentUserId).DefaultView;
+
+            DataTable itemTable = queryService.GetItems(selectedSessionId, currentUserId);
+            if (!itemTable.Columns.Contains("IsEntryRow")) itemTable.Columns.Add("IsEntryRow", typeof(bool));
+            bool isOpen = string.Equals(Convert.ToString(row["Status"]), "Open", StringComparison.OrdinalIgnoreCase);
+            if (isOpen) AppendEntryRow(itemTable);
+            itemsView = itemTable.DefaultView;
             itemsGrid.ItemsSource = itemsView;
-            ApplyItemFilter();
+
             pendingGrid.ItemsSource = queryService.GetPendingMovements(selectedSessionId, currentUserId).DefaultView;
             eventsGrid.ItemsSource = queryService.GetSessionEvents(selectedSessionId, currentUserId).DefaultView;
             int total = Convert.ToInt32(row["TotalItems"]);
@@ -441,10 +742,9 @@ namespace Ocore.desktop.Views
             progressText.Text = string.Format(CultureInfo.CurrentCulture,
                 "الإنجاز: {0:0.0}% | تم عدها: {1}/{2} | معتمد: {3} | حركات معلقة: {4} | فاشلة: {5}",
                 percent, counted, total, approved, pending, failed);
-            UpdateUnitLabels();
         }
 
-        private void RefreshAll() { LoadSessions(selectedSessionId); }
+        private void RefreshAll() { LoadAvailableProducts(); LoadSessions(selectedSessionId); }
 
         private void CreateFullSession()
         {
@@ -458,7 +758,7 @@ namespace Ocore.desktop.Views
                 int id = auditService.CreateSession(currentUserId, reasonBox.Text.Trim());
                 reasonBox.Clear();
                 LoadSessions(id);
-                Info("تم إنشاء جلسة الجرد الشامل. أدخل العدد الفعلي لكل تشغيلة بوحدتي P وU.");
+                Info("تم إنشاء جلسة الجرد الشامل. أدخل العدد الفعلي P وU في كل سطر.");
             });
         }
 
@@ -615,68 +915,29 @@ namespace Ocore.desktop.Views
             picker.ShowDialog();
         }
 
-        private void SaveSelectedCount()
-        {
-            var item = itemsGrid.SelectedItem as DataRowView;
-            if (item == null)
-            {
-                Warn("حدد تشغيلة من جدول تفاصيل الجرد أولًا.");
-                return;
-            }
-            int actualP, actualU;
-            if (!int.TryParse(pQuantityBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out actualP) ||
-                !int.TryParse(uQuantityBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out actualU))
-            {
-                Warn("أدخل عددًا صحيحًا غير سالب في حقلي P وU.");
-                return;
-            }
-            if (actualP < 0 || actualU < 0)
-            {
-                Warn("الكميات لا يمكن أن تكون سالبة.");
-                return;
-            }
-            int factor = Convert.ToInt32(item["UnitsPerPackageSnapshot"]);
-            if (factor <= 1 && actualU != 0)
-            {
-                Warn("هذا الصنف لا يحتوي على وحدات U منفصلة؛ أدخل صفرًا في خانة U.");
-                return;
-            }
-            if (factor > 1 && actualU >= factor)
-            {
-                Warn("عدد وحدات U يجب أن يكون أقل من معامل التحويل (" + factor + ").");
-                return;
-            }
-            RunAction(() =>
-            {
-                int savedItemId = Convert.ToInt32(item["Id"]);
-                auditService.SaveCount(currentUserId, selectedSessionId,
-                    savedItemId, actualP, actualU);
-                pQuantityBox.Clear();
-                uQuantityBox.Clear();
-                LoadSessions(selectedSessionId);
-                SelectNextUncountedItem(savedItemId);
-                barcodeSearchBox.Clear();
-            });
-        }
+
 
         private void SelectNextUncountedItem(int previousItemId)
         {
             foreach (var value in itemsGrid.Items)
             {
                 var row = value as DataRowView;
-                if (row == null) continue;
+                if (row == null || IsEntryRow(row)) continue;
                 string status = Convert.ToString(row["ItemStatus"]);
                 int id = Convert.ToInt32(row["Id"]);
                 if (id != previousItemId && (status == "Pending" || status == "RecountRequired"))
                 {
                     itemsGrid.SelectedItem = row;
                     itemsGrid.ScrollIntoView(row);
-                    pQuantityBox.Focus();
-                    pQuantityBox.SelectAll();
+                    var pColumn = itemsGrid.Columns.FirstOrDefault(column => column.SortMemberPath == "ActualPQuantity");
+                    if (pColumn != null)
+                    {
+                        itemsGrid.CurrentCell = new DataGridCellInfo(row, pColumn);
+                        itemsGrid.BeginEdit();
+                    }
                     return;
                 }
             }
-            pQuantityBox.Focus();
             Info("تم حفظ العد. لا توجد بنود أخرى غير معدودة.");
         }
 
@@ -694,7 +955,7 @@ namespace Ocore.desktop.Views
         private void ApproveSelectedItem()
         {
             var item = itemsGrid.SelectedItem as DataRowView;
-            if (item == null) { Warn("حدد بند الجرد للمراجعة."); return; }
+            if (item == null || IsEntryRow(item)) { Warn("حدد بند جرد فعليًا للمراجعة."); return; }
             RunAction(() =>
             {
                 auditService.ApproveItem(currentUserId, selectedSessionId,
@@ -706,7 +967,7 @@ namespace Ocore.desktop.Views
 
         private void ApproveSelectedItems()
         {
-            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().ToList();
+            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().Where(x => !IsEntryRow(x)).ToList();
             if (selected.Count == 0) { Warn("حدد بندًا واحدًا على الأقل للاعتماد الجماعي."); return; }
             if (MessageBox.Show("سيتم اعتماد " + selected.Count +
                 " بندًا في معاملة واحدة. إذا تعذر اعتماد أي بند فلن يتم اعتماد أي بند. هل تريد المتابعة؟",
@@ -724,7 +985,7 @@ namespace Ocore.desktop.Views
 
         private void CancelSelectedItems()
         {
-            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().ToList();
+            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().Where(x => !IsEntryRow(x)).ToList();
             if (selected.Count == 0 || string.IsNullOrWhiteSpace(noteBox.Text))
             {
                 Warn("حدد البنود المطلوب إلغاؤها واكتب سبب الإلغاء.");
@@ -745,7 +1006,7 @@ namespace Ocore.desktop.Views
         private void RequestSelectedRecount()
         {
             var item = itemsGrid.SelectedItem as DataRowView;
-            if (item == null || string.IsNullOrWhiteSpace(noteBox.Text))
+            if (item == null || IsEntryRow(item) || string.IsNullOrWhiteSpace(noteBox.Text))
             {
                 Warn("حدد بندًا واكتب سبب طلب إعادة العد.");
                 return;
@@ -761,7 +1022,7 @@ namespace Ocore.desktop.Views
 
         private void ReopenSelectedItems()
         {
-            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().ToList();
+            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().Where(x => !IsEntryRow(x)).ToList();
             if (selected.Count == 0 || string.IsNullOrWhiteSpace(noteBox.Text))
             {
                 Warn("حدد البنود المعتمدة واكتب سبب إعادة المراجعة.");
@@ -778,7 +1039,7 @@ namespace Ocore.desktop.Views
 
         private void CancelReopenedSelectedItems()
         {
-            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().ToList();
+            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().Where(x => !IsEntryRow(x)).ToList();
             if (selected.Count == 0 || string.IsNullOrWhiteSpace(noteBox.Text))
             {
                 Warn("حدد البنود التي أُعيدت مراجعتها واكتب سبب إلغاء المراجعة.");
