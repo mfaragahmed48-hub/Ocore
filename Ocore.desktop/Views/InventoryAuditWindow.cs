@@ -133,6 +133,7 @@ namespace Ocore.desktop.Views
             actions.Children.Add(MakeButton("إلغاء البنود المحددة", CancelSelectedItems));
             actions.Children.Add(MakeButton("طلب إعادة عد", RequestSelectedRecount));
             actions.Children.Add(MakeButton("إعادة مراجعة المحدد", ReopenSelectedItems));
+            actions.Children.Add(MakeButton("إلغاء المراجعة والعودة للاعتماد السابق", CancelReopenedSelectedItems));
             actions.Children.Add(MakeButton("إغلاق الجلسة", CloseSelectedSession));
             actions.Children.Add(MakeButton("إلغاء الجلسة", CancelSelectedSession));
             actions.Children.Add(MakeButton("إعادة معالجة الحركات", RetryPending));
@@ -592,6 +593,36 @@ namespace Ocore.desktop.Views
                     selected.Select(x => Convert.ToInt32(x["Id"])), noteBox.Text.Trim());
                 noteBox.Clear();
                 LoadSessions(selectedSessionId);
+            });
+        }
+
+        private void CancelReopenedSelectedItems()
+        {
+            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>().ToList();
+            if (selected.Count == 0 || string.IsNullOrWhiteSpace(noteBox.Text))
+            {
+                Warn("حدد البنود التي أُعيدت مراجعتها واكتب سبب إلغاء المراجعة.");
+                return;
+            }
+
+            if (MessageBox.Show(
+                "سيتم إرجاع البنود المحددة إلى حالة الاعتماد السابقة، مع الإبقاء على تسوية المخزون القديمة دون عكسها أو تكرارها. هل تريد المتابعة؟",
+                "تأكيد إلغاء المراجعة",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            RunAction(() =>
+            {
+                auditService.CancelReopenedItems(
+                    currentUserId,
+                    selectedSessionId,
+                    selected.Select(x => Convert.ToInt32(x["Id"])),
+                    noteBox.Text.Trim());
+
+                noteBox.Clear();
+                LoadSessions(selectedSessionId);
+                Info("تم إلغاء المراجعة والعودة للاعتماد السابق دون عكس تسوية المخزون.");
             });
         }
 

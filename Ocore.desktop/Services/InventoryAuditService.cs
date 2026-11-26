@@ -19,6 +19,46 @@ namespace Ocore.desktop.Services
             var db = new DatabaseManager();
             db.InitializeDatabase();
             connectionString = "Data Source=" + db.GetDatabasePath() + ";Version=3;";
+            EnsureReopenSnapshotStorage();
+        }
+
+
+        private void EnsureReopenSnapshotStorage()
+        {
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                using (var command = new SQLiteCommand(@"
+CREATE TABLE IF NOT EXISTS InventoryCountReopenSnapshots
+(
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    CountItemId INTEGER NOT NULL,
+    SessionId INTEGER NOT NULL,
+    PreviousActualQuantity REAL NULL,
+    PreviousActualPQuantity INTEGER NULL,
+    PreviousActualUQuantity INTEGER NULL,
+    PreviousUnitsPerPackageSnapshot INTEGER NULL,
+    PreviousCountedBy INTEGER NULL,
+    PreviousCountedAt TEXT NULL,
+    PreviousManagerNote TEXT NULL,
+    PreviousApprovedBy INTEGER NULL,
+    PreviousApprovedAt TEXT NULL,
+    PreviousAppliedQuantity REAL NULL,
+    PreviousNetVarianceQuantity REAL NULL,
+    PreviousClosedBy INTEGER NULL,
+    PreviousClosedAt TEXT NULL,
+    ReopenedBy INTEGER NOT NULL,
+    ReopenedAt TEXT NOT NULL,
+    RestoredBy INTEGER NULL,
+    RestoredAt TEXT NULL,
+    RestoreReason TEXT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_InventoryCountReopenSnapshots_Active
+ON InventoryCountReopenSnapshots(CountItemId,RestoredAt);", connection))
+                {
+                    command.ExecuteNonQuery();
+                }
+            }
         }
 
         public int CreateSession(int managerId, string reason, IEnumerable<int> selectedBatchIds = null)
@@ -105,8 +145,30 @@ ORDER BY p.Id,
 
                             string expiry = Convert.ToString(reader["ExpiryDate"]);
                             int batchId = Convert.ToInt32(reader["BatchId"]);
-                            string targetType = "Batch";
-                            string targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
+                            bool trackBatchNumber = Convert.ToInt32(reader["TrackBatchNumber"]) == 1;
+                            bool trackExpiryDate = Convert.ToInt32(reader["TrackExpiryDate"]) == 1;
+
+                            string targetType;
+                            string targetKey;
+
+                            if (trackBatchNumber)
+                            {
+                                targetType = "Batch";
+                                targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
+                            }
+                            else if (trackExpiryDate)
+                            {
+                                targetType = "ExpiryGroup";
+                                string expiryKey = string.IsNullOrWhiteSpace(expiry)
+                                    ? "~NONE~"
+                                    : expiry.Trim();
+                                targetKey = "E:" + productId.ToString(CultureInfo.InvariantCulture) + ":" + expiryKey;
+                            }
+                            else
+                            {
+                                targetType = "Product";
+                                targetKey = "P:" + productId.ToString(CultureInfo.InvariantCulture);
+                            }
 
                             Target target;
 
@@ -123,8 +185,8 @@ ORDER BY p.Id,
                                     UnitsPerPackage = Convert.ToInt32(reader["UnitsPerPackage"]),
                                     TargetType = targetType,
                                     TargetKey = targetKey,
-                                    Expiry = expiry,
-                                    Batch = Convert.ToString(reader["BatchNumber"]),
+                                    Expiry = targetType == "Batch" || targetType == "ExpiryGroup" ? expiry : "",
+                                    Batch = targetType == "Batch" ? Convert.ToString(reader["BatchNumber"]) : "",
                                     Batches = new List<TargetBatch>()
                                 };
                                 targetsByKey.Add(targetKey, target);
@@ -1424,7 +1486,7 @@ WHERE snap.CountItemId=@I
        + COALESCE((SELECT SUM(d.DifferenceQuantity)
                    FROM InventoryCountItemCostDecisions d
                    WHERE d.CountItemId=@I AND d.SourceBatchId=snap.BatchId),0)
-       + COALESCE((SELECT SUM(m.Quantity)
+       + COALESCE((SELECT SUM(CASE WHEN m.MovementType='Sale' THEN -m.Quantity ELSE m.Quantity END)
                    FROM InventoryCountPendingMovements m
                    WHERE m.CountItemId=@I AND m.BatchId=snap.BatchId
                      AND m.ProcessingStatus='Processed'),0)
@@ -1472,6 +1534,35 @@ WHERE b.ProductId=@P
                         }
 
                         using (var command = new SQLiteCommand(@"
+INSERT INTO InventoryCountReopenSnapshots
+(CountItemId,SessionId,PreviousActualQuantity,PreviousActualPQuantity,
+ PreviousActualUQuantity,PreviousUnitsPerPackageSnapshot,PreviousCountedBy,
+ PreviousCountedAt,PreviousManagerNote,PreviousApprovedBy,PreviousApprovedAt,
+ PreviousAppliedQuantity,PreviousNetVarianceQuantity,PreviousClosedBy,
+ PreviousClosedAt,ReopenedBy,ReopenedAt)
+SELECT i.Id,i.SessionId,i.ActualQuantity,i.ActualPQuantity,
+       i.ActualUQuantity,i.UnitsPerPackageSnapshot,i.CountedBy,
+       i.CountedAt,i.ManagerNote,i.ApprovedBy,i.ApprovedAt,
+       i.AppliedQuantity,i.NetVarianceQuantity,s.ClosedBy,s.ClosedAt,@U,@N
+FROM InventoryCountItems i
+INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
+WHERE i.Id=@I AND i.SessionId=@S AND i.ItemStatus='Approved'
+  AND NOT EXISTS
+  (
+      SELECT 1 FROM InventoryCountReopenSnapshots old
+      WHERE old.CountItemId=i.Id AND old.RestoredAt IS NULL
+  );", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@U", managerId);
+                            command.Parameters.AddWithValue("@N", Now());
+                            command.Parameters.AddWithValue("@I", id);
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException(
+                                    "تعذر حفظ نسخة الاعتماد السابق؛ لم تتم إعادة فتح البند.");
+                        }
+
+                        using (var command = new SQLiteCommand(@"
 UPDATE InventoryCountItems
 SET ItemStatus='RecountRequired',ManagerNote=@R,
     LockUserId=NULL,LockToken=NULL,LockUntil=NULL
@@ -1502,6 +1593,208 @@ WHERE Id=@S;", connection, transaction))
                     Event(connection, transaction, sessionId, null,
                         "SessionPartiallyReopened", managerId,
                         "إعادة فتح جزئية؛ العدد: " + ids.Count + "؛ السبب: " + reason.Trim());
+
+                    transaction.Commit();
+                }
+            }
+        }
+
+
+        public void CancelReopenedItems(
+            int managerId, int sessionId, IEnumerable<int> itemIds, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ArgumentException("سبب إلغاء المراجعة مطلوب.");
+
+            var ids = (itemIds ?? Enumerable.Empty<int>()).Where(x => x > 0).ToList();
+            if (ids.Count == 0)
+                throw new ArgumentException("حدد بندًا واحدًا على الأقل.");
+            if (ids.Distinct().Count() != ids.Count)
+                throw new ArgumentException("لا يمكن تحديد البند نفسه أكثر من مرة.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    EnsureManager(connection, transaction, managerId);
+                    using (var command = new SQLiteCommand(
+                        "SELECT Status FROM InventoryCountSessions WHERE Id=@S;",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        string status = Convert.ToString(command.ExecuteScalar());
+                        if (status != "PartiallyApproved" && status != "Submitted" && status != "Open")
+                            throw new InvalidOperationException("لا توجد مراجعة مفتوحة يمكن إلغاؤها في هذه الجلسة.");
+                    }
+
+                    var affectedProducts = new SortedSet<int>();
+                    int? originalClosedBy = null;
+                    string originalClosedAt = null;
+
+                    foreach (int id in ids)
+                    {
+                        int productId, snapshotId;
+                        string itemStatus;
+                        double? currentQuantity, previousQuantity;
+                        int? currentP, currentU, previousP, previousU;
+                        int? previousClosedBy;
+                        string previousClosedAt;
+
+                        using (var command = new SQLiteCommand(@"
+SELECT i.ProductId,i.ItemStatus,i.ActualQuantity,i.ActualPQuantity,i.ActualUQuantity,
+       snap.Id AS SnapshotId,snap.PreviousActualQuantity,
+       snap.PreviousActualPQuantity,snap.PreviousActualUQuantity,
+       snap.PreviousClosedBy,snap.PreviousClosedAt
+FROM InventoryCountItems i
+INNER JOIN InventoryCountReopenSnapshots snap
+        ON snap.CountItemId=i.Id AND snap.SessionId=i.SessionId
+       AND snap.RestoredAt IS NULL
+WHERE i.Id=@I AND i.SessionId=@S
+ORDER BY snap.Id DESC LIMIT 1;", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@I", id);
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            using (var reader = command.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new InvalidOperationException("لا توجد نسخة محفوظة للاعتماد السابق لهذا البند.");
+
+                                itemStatus = Convert.ToString(reader["ItemStatus"]);
+                                if (itemStatus != "RecountRequired" && itemStatus != "Counting" &&
+                                    itemStatus != "Counted" && itemStatus != "Review")
+                                    throw new InvalidOperationException(
+                                        "يمكن إلغاء المراجعة للبند المفتوح فقط؛ لا يمكن التراجع عن اعتماد جديد.");
+
+                                productId = Convert.ToInt32(reader["ProductId"]);
+                                snapshotId = Convert.ToInt32(reader["SnapshotId"]);
+                                currentQuantity = reader["ActualQuantity"] == DBNull.Value
+                                    ? (double?)null : Convert.ToDouble(reader["ActualQuantity"]);
+                                currentP = reader["ActualPQuantity"] == DBNull.Value
+                                    ? (int?)null : Convert.ToInt32(reader["ActualPQuantity"]);
+                                currentU = reader["ActualUQuantity"] == DBNull.Value
+                                    ? (int?)null : Convert.ToInt32(reader["ActualUQuantity"]);
+                                previousQuantity = reader["PreviousActualQuantity"] == DBNull.Value
+                                    ? (double?)null : Convert.ToDouble(reader["PreviousActualQuantity"]);
+                                previousP = reader["PreviousActualPQuantity"] == DBNull.Value
+                                    ? (int?)null : Convert.ToInt32(reader["PreviousActualPQuantity"]);
+                                previousU = reader["PreviousActualUQuantity"] == DBNull.Value
+                                    ? (int?)null : Convert.ToInt32(reader["PreviousActualUQuantity"]);
+                                previousClosedBy = reader["PreviousClosedBy"] == DBNull.Value
+                                    ? (int?)null : Convert.ToInt32(reader["PreviousClosedBy"]);
+                                previousClosedAt = reader["PreviousClosedAt"] == DBNull.Value
+                                    ? null : Convert.ToString(reader["PreviousClosedAt"]);
+                            }
+                        }
+
+                        if (!originalClosedBy.HasValue && previousClosedBy.HasValue)
+                            originalClosedBy = previousClosedBy;
+                        if (string.IsNullOrWhiteSpace(originalClosedAt) &&
+                            !string.IsNullOrWhiteSpace(previousClosedAt))
+                            originalClosedAt = previousClosedAt;
+
+                        using (var command = new SQLiteCommand(@"
+UPDATE InventoryCountItems
+SET ActualQuantity=(SELECT PreviousActualQuantity FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    ActualPQuantity=(SELECT PreviousActualPQuantity FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    ActualUQuantity=(SELECT PreviousActualUQuantity FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    UnitsPerPackageSnapshot=(SELECT PreviousUnitsPerPackageSnapshot FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    CountedBy=(SELECT PreviousCountedBy FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    CountedAt=(SELECT PreviousCountedAt FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    ManagerNote=(SELECT PreviousManagerNote FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    ApprovedBy=(SELECT PreviousApprovedBy FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    ApprovedAt=(SELECT PreviousApprovedAt FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    AppliedQuantity=(SELECT PreviousAppliedQuantity FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    NetVarianceQuantity=(SELECT PreviousNetVarianceQuantity FROM InventoryCountReopenSnapshots WHERE Id=@R),
+    ItemStatus='Approved',LockUserId=NULL,LockToken=NULL,LockUntil=NULL
+WHERE Id=@I AND SessionId=@S
+  AND ItemStatus IN ('RecountRequired','Counting','Counted','Review');",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@R", snapshotId);
+                            command.Parameters.AddWithValue("@I", id);
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException(
+                                    "تغيرت حالة البند أثناء إلغاء المراجعة؛ لم يتم استرجاع الاعتماد السابق.");
+                        }
+
+                        RevisionPAndU(connection, transaction, id,
+                            currentQuantity, previousQuantity,
+                            currentP, currentU, previousP, previousU,
+                            itemStatus, "Approved", managerId,
+                            "إلغاء المراجعة والعودة للاعتماد السابق: " + reason.Trim());
+
+                        using (var command = new SQLiteCommand(@"
+UPDATE InventoryCountReopenSnapshots
+SET RestoredBy=@U,RestoredAt=@N,RestoreReason=@R
+WHERE Id=@I AND RestoredAt IS NULL;", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@U", managerId);
+                            command.Parameters.AddWithValue("@N", Now());
+                            command.Parameters.AddWithValue("@R", reason.Trim());
+                            command.Parameters.AddWithValue("@I", snapshotId);
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException("تعذر إغلاق سجل المراجعة بعد استرجاع الاعتماد السابق.");
+                        }
+
+                        Event(connection, transaction, sessionId, id,
+                            "ItemReopenCancelled", managerId,
+                            "استرجاع الاعتماد السابق دون عكس تسوية المخزون: " + reason.Trim());
+                        affectedProducts.Add(productId);
+                    }
+
+                    foreach (int productId in affectedProducts)
+                        ProcessPendingMovementsForProduct(connection, transaction, productId, managerId);
+
+                    int unfinished, pending;
+                    using (var command = new SQLiteCommand(@"
+SELECT COUNT(*) FROM InventoryCountItems
+WHERE SessionId=@S AND ItemStatus NOT IN ('Approved','Cancelled');",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        unfinished = Convert.ToInt32(command.ExecuteScalar());
+                    }
+                    using (var command = new SQLiteCommand(@"
+SELECT COUNT(*) FROM InventoryCountPendingMovements
+WHERE SessionId=@S AND ProcessingStatus IN ('Pending','Failed');",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        pending = Convert.ToInt32(command.ExecuteScalar());
+                    }
+
+                    if (unfinished == 0 && pending == 0)
+                    {
+                        using (var command = new SQLiteCommand(@"
+UPDATE InventoryCountSessions
+SET Status='Closed',ClosedBy=@U,ClosedAt=@N
+WHERE Id=@S;", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@U",
+                                originalClosedBy.HasValue ? (object)originalClosedBy.Value : managerId);
+                            command.Parameters.AddWithValue("@N",
+                                string.IsNullOrWhiteSpace(originalClosedAt) ? Now() : originalClosedAt);
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            command.ExecuteNonQuery();
+                        }
+                    }
+                    else
+                    {
+                        using (var command = new SQLiteCommand(
+                            "UPDATE InventoryCountSessions SET Status='PartiallyApproved' WHERE Id=@S;",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            command.ExecuteNonQuery();
+                        }
+                    }
+
+                    Event(connection, transaction, sessionId, null,
+                        "SessionReopenCancelled", managerId,
+                        "إلغاء المراجعة وإرجاع البنود للاعتماد السابق؛ العدد: " +
+                        ids.Count + "؛ السبب: " + reason.Trim());
 
                     transaction.Commit();
                 }
@@ -1541,10 +1834,28 @@ INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
 WHERE i.ProductId=@P
   AND i.ItemStatus NOT IN ('Approved','Cancelled')
   AND s.Status IN ('Open','Submitted','PartiallyApproved')
+  AND
+  (
+      (
+          i.TargetType='ExpiryGroup'
+          AND i.TargetKey='E:' || @P || ':' ||
+              CASE
+                  WHEN TRIM(COALESCE(@E,''))=''
+                      THEN '~NONE~'
+                  ELSE TRIM(@E)
+              END
+      )
+      OR
+      (
+          i.TargetType='Product'
+          AND i.TargetKey='P:' || @P
+      )
+  )
 ORDER BY s.CreatedAt,s.Id
 LIMIT 1;", c, t))
             {
                 command.Parameters.AddWithValue("@P", productId);
+                command.Parameters.AddWithValue("@E", expiryDate ?? "");
                 object value = command.ExecuteScalar();
                 return value == null || value == DBNull.Value
                     ? (int?)null
