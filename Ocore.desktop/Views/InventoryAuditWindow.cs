@@ -53,7 +53,7 @@ namespace Ocore.desktop.Views
             var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
             heading.Children.Add(new TextBlock
             {
-                Text = "إدارة الجرد: اختيار التشغيلات، العد بوحدتي P وU، ومراجعة الفروق",
+                Text = "الجرد السريع: ابحث عن الصنف، أدخل الكمية، وانتقل للصنف التالي",
                 FontSize = 21,
                 FontWeight = FontWeights.Bold,
                 Foreground = new SolidColorBrush(Color.FromRgb(18, 61, 53))
@@ -78,6 +78,7 @@ namespace Ocore.desktop.Views
                 ToolTip = "ابحث بكود الصنف أو الباركود"
             };
             barcodeSearchBox.TextChanged += BarcodeSearchBox_TextChanged;
+            barcodeSearchBox.KeyDown += (sender, args) => { if (args.Key == System.Windows.Input.Key.Enter && itemsGrid.Items.Count > 0) { itemsGrid.SelectedIndex = 0; pQuantityBox.Focus(); args.Handled = true; } };
             actions.Children.Add(barcodeSearchBox);
 
             reasonBox = new TextBox
@@ -107,6 +108,7 @@ namespace Ocore.desktop.Views
                 Padding = new Thickness(7),
                 ToolTip = "العدد الفعلي للوحدة الأساسية P"
             };
+            pQuantityBox.KeyDown += (sender, args) => { if (args.Key == System.Windows.Input.Key.Enter) { uQuantityBox.Focus(); uQuantityBox.SelectAll(); args.Handled = true; } };
             uUnitLabel = new TextBlock
             {
                 Text = "U",
@@ -122,6 +124,7 @@ namespace Ocore.desktop.Views
                 Padding = new Thickness(7),
                 ToolTip = "العدد الفعلي للوحدات الصغيرة U"
             };
+            uQuantityBox.KeyDown += (sender, args) => { if (args.Key == System.Windows.Input.Key.Enter) { SaveSelectedCount(); args.Handled = true; } };
             actions.Children.Add(pUnitLabel);
             actions.Children.Add(pQuantityBox);
             actions.Children.Add(uUnitLabel);
@@ -305,7 +308,7 @@ namespace Ocore.desktop.Views
                 return;
             }
             string escaped = value.Replace("'", "''");
-            itemsView.RowFilter = "ProductCode = '" + escaped + "' OR Barcode = '" + escaped + "'";
+            itemsView.RowFilter = "ProductCode LIKE '%" + escaped + "%' OR Barcode LIKE '%" + escaped + "%' OR ProductName LIKE '%" + escaped + "%'";
         }
 
         private void LoadSessions(int preferredId = 0)
@@ -491,13 +494,36 @@ namespace Ocore.desktop.Views
             }
             RunAction(() =>
             {
+                int savedItemId = Convert.ToInt32(item["Id"]);
                 auditService.SaveCount(currentUserId, selectedSessionId,
-                    Convert.ToInt32(item["Id"]), actualP, actualU);
+                    savedItemId, actualP, actualU);
                 pQuantityBox.Clear();
                 uQuantityBox.Clear();
                 LoadSessions(selectedSessionId);
-                Info("تم حفظ العد الفعلي بوحدتي P وU.");
+                SelectNextUncountedItem(savedItemId);
+                barcodeSearchBox.Clear();
             });
+        }
+
+        private void SelectNextUncountedItem(int previousItemId)
+        {
+            foreach (var value in itemsGrid.Items)
+            {
+                var row = value as DataRowView;
+                if (row == null) continue;
+                string status = Convert.ToString(row["ItemStatus"]);
+                int id = Convert.ToInt32(row["Id"]);
+                if (id != previousItemId && (status == "Pending" || status == "RecountRequired"))
+                {
+                    itemsGrid.SelectedItem = row;
+                    itemsGrid.ScrollIntoView(row);
+                    pQuantityBox.Focus();
+                    pQuantityBox.SelectAll();
+                    return;
+                }
+            }
+            pQuantityBox.Focus();
+            Info("تم حفظ العد. لا توجد بنود أخرى غير معدودة.");
         }
 
         private void SubmitSelectedSession()
