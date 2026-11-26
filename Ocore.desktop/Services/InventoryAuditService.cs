@@ -1014,6 +1014,83 @@ WHERE Id=@I AND SessionId=@S
             }
         }
 
+        public void DeleteItems(int managerId, int sessionId, IEnumerable<int> itemIds)
+        {
+            var ids = (itemIds ?? Enumerable.Empty<int>()).ToList();
+            if (sessionId <= 0) throw new ArgumentException("جلسة الجرد المحددة غير صحيحة.");
+            if (ids.Count == 0) throw new ArgumentException("حدد بندًا واحدًا على الأقل للحذف.");
+            if (ids.Any(id => id <= 0) || ids.Distinct().Count() != ids.Count)
+                throw new ArgumentException("توجد أرقام بنود غير صالحة أو مكررة.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    EnsureManager(connection, transaction, managerId);
+                    string sessionStatus;
+                    using (var command = new SQLiteCommand("SELECT Status FROM InventoryCountSessions WHERE Id=@S;", connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        sessionStatus = Convert.ToString(command.ExecuteScalar());
+                    }
+                    if (sessionStatus != "Open")
+                        throw new InvalidOperationException("يمكن حذف البنود من جلسة جرد مفتوحة فقط.");
+
+                    var affectedProducts = new SortedSet<int>();
+                    foreach (int itemId in ids)
+                    {
+                        int productId;
+                        double? actualQuantity;
+                        string oldStatus;
+                        using (var command = new SQLiteCommand(@"
+SELECT ProductId,ActualQuantity,ItemStatus
+FROM InventoryCountItems WHERE Id=@I AND SessionId=@S;", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@I", itemId);
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            using (var reader = command.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new InvalidOperationException("أحد البنود المحددة غير موجود أو لا يتبع الجلسة.");
+                                productId = Convert.ToInt32(reader["ProductId"]);
+                                oldStatus = Convert.ToString(reader["ItemStatus"]);
+                                actualQuantity = reader["ActualQuantity"] == DBNull.Value
+                                    ? (double?)null : Convert.ToDouble(reader["ActualQuantity"]);
+                            }
+                        }
+                        if (oldStatus == "Approved" || oldStatus == "Cancelled")
+                            throw new InvalidOperationException("لا يمكن حذف بند معتمد أو محذوف مسبقًا.");
+                        if (oldStatus != "Pending" && oldStatus != "Counting" && oldStatus != "Counted" &&
+                            oldStatus != "Review" && oldStatus != "RecountRequired")
+                            throw new InvalidOperationException("حالة أحد البنود لا تسمح بالحذف.");
+
+                        using (var command = new SQLiteCommand(@"
+UPDATE InventoryCountItems
+SET ItemStatus='Cancelled', ManagerNote='',
+    LockUserId=NULL, LockToken=NULL, LockUntil=NULL
+WHERE Id=@I AND SessionId=@S
+  AND ItemStatus IN ('Pending','Counting','Counted','Review','RecountRequired');", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@I", itemId);
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException("تغيرت حالة أحد البنود أثناء الحذف؛ لم يتم حذف أي بند.");
+                        }
+                        // الاحتفاظ بتاريخ المراجعة والأحداث دون طلب سبب من المستخدم.
+                        Revision(connection, transaction, itemId, actualQuantity, actualQuantity,
+                            oldStatus, "Cancelled", managerId, string.Empty);
+                        Event(connection, transaction, sessionId, itemId, "ItemDeleted", managerId,
+                            "حذف بند من جدول الجرد دون سبب.");
+                        affectedProducts.Add(productId);
+                    }
+                    foreach (int productId in affectedProducts)
+                        ProcessPendingMovementsForProduct(connection, transaction, productId, managerId);
+                    transaction.Commit();
+                }
+            }
+        }
+
         public void ApproveItem(int managerId, int sessionId, int itemId, string note = "")
         {
             ApproveItems(managerId, sessionId, new[] { itemId }, note);

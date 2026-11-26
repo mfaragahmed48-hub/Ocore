@@ -9,6 +9,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Input;
 using Ocore.desktop.Services;
 
 namespace Ocore.desktop.Views
@@ -178,6 +179,7 @@ namespace Ocore.desktop.Views
             itemsGrid.SelectionMode = DataGridSelectionMode.Extended;
             itemsGrid.SelectionChanged += ItemsGrid_SelectionChanged;
             itemsGrid.CellEditEnding += ItemsGrid_CellEditEnding;
+            itemsGrid.PreviewKeyDown += ItemsGrid_PreviewKeyDown;
             itemsGrid.MinHeight = 220;
             itemsGrid.RowHeight = 31;
             itemsGrid.FontSize = 11;
@@ -769,6 +771,8 @@ namespace Ocore.desktop.Views
             bool isOpen = string.Equals(Convert.ToString(row["Status"]), "Open", StringComparison.OrdinalIgnoreCase);
             if (isOpen) AppendEntryRow(itemTable);
             itemsView = itemTable.DefaultView;
+            // البنود الملغاة/المحذوفة تبقى محفوظة في السجل ولا تظهر ضمن جدول العمل.
+            itemsView.RowFilter = "ItemStatus IS NULL OR ItemStatus <> 'Cancelled'";
             itemsGrid.ItemsSource = itemsView;
 
             pendingGrid.ItemsSource = queryService.GetPendingMovements(selectedSessionId, currentUserId).DefaultView;
@@ -1020,6 +1024,42 @@ namespace Ocore.desktop.Views
                 noteBox.Clear();
                 LoadSessions(selectedSessionId);
                 Info("تم اعتماد البنود المحددة.");
+            });
+        }
+
+        private void ItemsGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Delete) return;
+            // لا نعترض Delete أثناء تحرير نص داخل خلية أو قائمة اختيار.
+            if (Keyboard.FocusedElement is TextBoxBase || Keyboard.FocusedElement is ComboBox) return;
+            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>()
+                .Where(row => !IsEntryRow(row)).ToList();
+            if (selected.Count == 0) return;
+            e.Handled = true;
+            DeleteSelectedItems();
+        }
+
+        private void DeleteSelectedItems()
+        {
+            var selected = itemsGrid.SelectedItems.Cast<object>().OfType<DataRowView>()
+                .Where(row => !IsEntryRow(row)).ToList();
+            if (selected.Count == 0 || selectedSessionId <= 0) return;
+            var session = sessionsGrid.SelectedItem as DataRowView;
+            if (session == null || !string.Equals(Convert.ToString(session["Status"]), "Open", StringComparison.OrdinalIgnoreCase))
+            {
+                Warn("يمكن حذف البنود من جلسة جرد مفتوحة فقط.");
+                return;
+            }
+            if (MessageBox.Show(
+                "سيتم حذف البنود المحددة من جدول الجرد. لن تتغير أرصدة المخزون أو بيانات التشغيل. هل تريد المتابعة؟",
+                "تأكيد حذف بنود الجرد", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+            var itemIds = selected.Select(row => Convert.ToInt32(row["Id"])).ToList();
+            RunAction(() =>
+            {
+                auditService.DeleteItems(currentUserId, selectedSessionId, itemIds);
+                LoadSessions(selectedSessionId);
+                Info("تم حذف " + itemIds.Count + " بند من جدول الجرد.");
             });
         }
 
