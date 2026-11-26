@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Globalization;
 using System.Data;
 using System.Data.SQLite;
 using Ocore.desktop.Data;
@@ -316,6 +317,7 @@ SELECT i.Id AS ItemId,
        i.BookQuantity,
        i.ActualQuantity,
        i.NetVarianceQuantity AS NetVariance,
+       COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),1) AS UnitsPerPackage,
        COALESCE(d.ShortageQuantity,0) AS ShortageQuantity,
        COALESCE(d.ExcessQuantity,0) AS ExcessQuantity,
        COALESCE(d.ShortageValue,0) AS ShortageValue,
@@ -342,8 +344,14 @@ WHERE i.SessionId=@S
   AND i.ItemStatus='Approved'
 ORDER BY i.ProductNameSnapshot,i.TargetKey;";
 
-            return ReadTable(sql, command =>
+            DataTable table = ReadTable(sql, command =>
                 command.Parameters.AddWithValue("@S", sessionId));
+            AddUnitBreakdown(table, "BookQuantity", "UnitsPerPackage", "Book");
+            AddUnitBreakdown(table, "ActualQuantity", "UnitsPerPackage", "Actual");
+            AddUnitBreakdown(table, "NetVariance", "UnitsPerPackage", "NetVariance");
+            AddUnitBreakdown(table, "ShortageQuantity", "UnitsPerPackage", "Shortage");
+            AddUnitBreakdown(table, "ExcessQuantity", "UnitsPerPackage", "Excess");
+            return table;
         }
 
         public DataTable GetVarianceSummary(int sessionId, int managerId)
@@ -352,12 +360,8 @@ ORDER BY i.ProductNameSnapshot,i.TargetKey;";
 
             const string sql = @"
 SELECT COUNT(*) AS ApprovedTargets,
-       SUM(CASE WHEN i.NetVarianceQuantity<0
-                THEN -i.NetVarianceQuantity ELSE 0 END) AS NetShortageQuantity,
-       SUM(CASE WHEN i.NetVarianceQuantity>0
-                THEN i.NetVarianceQuantity ELSE 0 END) AS NetExcessQuantity,
-       SUM(COALESCE(d.ShortageQuantity,0)) AS ShortageQuantity,
-       SUM(COALESCE(d.ExcessQuantity,0)) AS ExcessQuantity,
+       SUM(CASE WHEN COALESCE(d.ShortageQuantity,0)>0 THEN 1 ELSE 0 END) AS ShortageTargets,
+       SUM(CASE WHEN COALESCE(d.ExcessQuantity,0)>0 THEN 1 ELSE 0 END) AS ExcessTargets,
        SUM(COALESCE(d.ShortageValue,0)) AS ShortageValue,
        SUM(COALESCE(d.ExcessValue,0)) AS ExcessValue
 FROM InventoryCountItems i
@@ -396,6 +400,7 @@ SELECT i.ProductNameSnapshot AS ProductName,
        i.BatchNumberSnapshot AS BatchNumber,
        i.ExpiryDateSnapshot AS ExpiryDate,
        d.DifferenceQuantity,
+       COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),1) AS UnitsPerPackage,
        d.UnitCost,
        ABS(d.DifferenceQuantity)*d.UnitCost AS DifferenceValue,
        CASE
@@ -418,8 +423,10 @@ LEFT JOIN Users u ON u.Id=d.ManagerId
 WHERE d.SessionId=@S
 ORDER BY d.Id;";
 
-            return ReadTable(sql, command =>
+            DataTable table = ReadTable(sql, command =>
                 command.Parameters.AddWithValue("@S", sessionId));
+            AddUnitBreakdown(table, "DifferenceQuantity", "UnitsPerPackage", "Difference");
+            return table;
         }
 
         public DataTable GetPreviousCountComparison(int sessionId, int managerId)
@@ -436,6 +443,7 @@ SELECT i.ProductNameSnapshot AS ProductName,
        i.BatchNumberSnapshot AS BatchNumber,
        i.ExpiryDateSnapshot AS ExpiryDate,
        i.NetVarianceQuantity AS CurrentVariance,
+       COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),1) AS UnitsPerPackage,
        COALESCE
        (
            (
@@ -451,6 +459,17 @@ SELECT i.ProductNameSnapshot AS ProductName,
                LIMIT 1
            ),0
        ) AS PreviousVariance,
+       COALESCE(
+           (
+               SELECT COALESCE(NULLIF(p.UnitsPerPackageSnapshot,0),1)
+               FROM InventoryCountItems p
+               INNER JOIN InventoryCountSessions ps ON ps.Id=p.SessionId
+               WHERE p.TargetKey=i.TargetKey AND p.SessionId<>i.SessionId
+                 AND p.ItemStatus='Approved' AND ps.Status='Closed'
+                 AND ps.CreatedAt<cs.CreatedAt
+               ORDER BY ps.ClosedAt DESC,ps.Id DESC LIMIT 1
+           ),COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),1)
+       ) AS PreviousUnitsPerPackage,
        COALESCE
        (
            (
@@ -473,8 +492,11 @@ WHERE i.SessionId=@S
   AND i.ItemStatus='Approved'
 ORDER BY i.ProductNameSnapshot,i.TargetKey;";
 
-            return ReadTable(sql, command =>
+            DataTable table = ReadTable(sql, command =>
                 command.Parameters.AddWithValue("@S", sessionId));
+            AddUnitBreakdown(table, "CurrentVariance", "UnitsPerPackage", "CurrentVariance");
+            AddUnitBreakdown(table, "PreviousVariance", "PreviousUnitsPerPackage", "PreviousVariance");
+            return table;
         }
 
         public DataTable GetRepeatedShortages(int managerId)
@@ -492,6 +514,7 @@ SELECT i.ProductNameSnapshot AS ProductName,
        i.ExpiryDateSnapshot AS ExpiryDate,
        COUNT(DISTINCT i.SessionId) AS ShortageSessions,
        MAX(-i.NetVarianceQuantity) AS LargestShortageQuantity,
+       COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),1) AS UnitsPerPackage,
        MAX(s.ClosedAt) AS LatestShortageAt
 FROM InventoryCountItems i
 INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
@@ -500,11 +523,32 @@ WHERE i.ItemStatus='Approved'
   AND i.NetVarianceQuantity<0
   AND s.Status='Closed'
 GROUP BY i.TargetKey,i.ProductNameSnapshot,i.TargetType,
-         i.BatchNumberSnapshot,i.ExpiryDateSnapshot
+         i.BatchNumberSnapshot,i.ExpiryDateSnapshot,
+         COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),1)
 HAVING COUNT(DISTINCT i.SessionId)>=cfg.RepeatedShortageThreshold
 ORDER BY ShortageSessions DESC,LatestShortageAt DESC;";
 
-            return ReadTable(sql, null);
+            DataTable table = ReadTable(sql, null);
+            AddUnitBreakdown(table, "LargestShortageQuantity", "UnitsPerPackage", "LargestShortage");
+            return table;
+        }
+
+        private static void AddUnitBreakdown(DataTable table, string quantityColumn, string factorColumn, string prefix)
+        {
+            if (table == null || !table.Columns.Contains(quantityColumn) || !table.Columns.Contains(factorColumn)) return;
+            string pColumn = prefix + "PQuantity", uColumn = prefix + "UQuantity";
+            if (!table.Columns.Contains(pColumn)) table.Columns.Add(pColumn, typeof(long));
+            if (!table.Columns.Contains(uColumn)) table.Columns.Add(uColumn, typeof(long));
+            foreach (DataRow row in table.Rows)
+            {
+                double quantity = row[quantityColumn] == DBNull.Value ? 0d : Convert.ToDouble(row[quantityColumn], CultureInfo.InvariantCulture);
+                int factor = row[factorColumn] == DBNull.Value ? 1 : Convert.ToInt32(row[factorColumn], CultureInfo.InvariantCulture);
+                if (factor <= 0) throw new InvalidOperationException("معامل تحويل الوحدات غير صحيح في تقرير الجرد.");
+                long totalSmallUnits = checked((long)Math.Round(Math.Abs(quantity) * factor, 0, MidpointRounding.AwayFromZero));
+                long sign = quantity < 0 ? -1L : 1L;
+                row[pColumn] = (totalSmallUnits / factor) * sign;
+                row[uColumn] = (totalSmallUnits % factor) * sign;
+            }
         }
 
         private DataTable ReadTable(

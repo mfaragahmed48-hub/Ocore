@@ -428,7 +428,7 @@ namespace Ocore.desktop.Services
                             discountValue,
                             requestedGeneralDiscountCents);
 
-                        
+
                         bool hasAnyDiscount = false;
                         long totalItemDiscountCents = 0;
                         long totalGeneralDiscountCents = 0;
@@ -586,7 +586,7 @@ namespace Ocore.desktop.Services
                                     "الخصم النهائي للصنف " + line.Product.Name +
                                     " تجاوز الحد الأقصى المسموح به.");
 
-                            
+
                             long invoiceItemId;
 
                             using (var command = new SQLiteCommand(
@@ -627,7 +627,7 @@ VALUES
                                 command.Parameters.AddWithValue(
                                     "@discountAmount", finalDiscountAmount);
 
-                                
+
                                 command.ExecuteNonQuery();
                             }
 
@@ -637,7 +637,7 @@ VALUES
                                 invoiceItemId = Convert.ToInt64(command.ExecuteScalar());
                             }
 
-                            
+
                             // الخصم من التشغيلات التي حددها المستخدم فقط.
                             DeductFromSelectedBatches(
                                 connection,
@@ -645,7 +645,9 @@ VALUES
                                 invoiceItemId,
                                 line.Product.Id,
                                 line.PackageQuantity,
-                                line.BatchAllocations);
+                                line.BatchAllocations,
+                                userId,
+                                createdAt);
                         }
 
                         using (var command = new SQLiteCommand(
@@ -683,7 +685,7 @@ TaxStatus = 'Legacy'
                             command.Parameters.AddWithValue("@remainingAmount", remainingAmount);
                             command.Parameters.AddWithValue("@paymentStatus", paymentStatus);
 
-                            
+
 
                             command.Parameters.AddWithValue("@id", invoiceId);
                             command.ExecuteNonQuery();
@@ -879,7 +881,9 @@ TaxStatus = 'Legacy'
             long invoiceItemId,
             int productId,
             double requiredQuantity,
-            List<SaleInvoiceBatchAllocation> allocations)
+            List<SaleInvoiceBatchAllocation> allocations,
+            int userId,
+            string createdAt)
         {
             if (allocations == null || allocations.Count == 0)
                 throw new InvalidOperationException(
@@ -956,63 +960,72 @@ TaxStatus = 'Legacy'
                         (allocation.BatchNumber ?? batchId.ToString()));
                 }
 
-                if (currentQuantity + Epsilon < quantityToTake)
+                int? activeAuditSessionId =
+                    InventoryAuditService.FindActiveSessionForBatch(
+                        connection, transaction, batchId);
+                double pendingSalesQuantity = 0;
+                if (activeAuditSessionId.HasValue)
                 {
-                    throw new InvalidOperationException(
-                        "رصيد التشغيلة " +
-                        (string.IsNullOrWhiteSpace(allocation.BatchNumber)
-                            ? batchId.ToString()
-                            : allocation.BatchNumber) +
-                        " غير كافٍ.\n" +
-                        "المتاح حاليًا: " +
-                        currentQuantity.ToString(
-                            "0.########", CultureInfo.InvariantCulture) +
-                        "\nالمطلوب صرفه: " +
-                        quantityToTake.ToString(
-                            "0.########", CultureInfo.InvariantCulture));
-                }
-
-                using (var command = new SQLiteCommand(
-                    @"UPDATE Batches
-                      SET Quantity =
-                          CASE
-                              WHEN Quantity - @quantity <= @epsilon THEN 0
-                              ELSE Quantity - @quantity
-                          END
-                      WHERE Id = @batchId
-                        AND ProductId = @productId
-                        AND Quantity + @epsilon >= @quantity
-                        AND (
-                            ExpiryDate = ''
-                            OR ExpiryDate IS NULL
-                            OR ExpiryDate >= @today
-                        );",
-                    connection, transaction))
-                {
-                    command.Parameters.AddWithValue("@quantity", quantityToTake);
-                    command.Parameters.AddWithValue("@epsilon", Epsilon);
-                    command.Parameters.AddWithValue("@batchId", batchId);
-                    command.Parameters.AddWithValue("@productId", productId);
-                    command.Parameters.AddWithValue("@today", today);
-
-                    if (command.ExecuteNonQuery() != 1)
+                    using (var pendingCommand = new SQLiteCommand(@"
+SELECT COALESCE(SUM(Quantity),0)
+FROM InventoryCountPendingMovements
+WHERE SessionId=@S AND BatchId=@B
+  AND MovementType='Sale'
+  AND SourceTable='SalesInvoiceBatchAllocations'
+  AND ProcessingStatus IN ('Pending','Failed');", connection, transaction))
                     {
-                        throw new InvalidOperationException(
-                            "تعذر خصم الكمية من التشغيلة المحددة. " +
-                            "قد يكون رصيدها تغير أو انتهت صلاحيتها. أعد مراجعة التوزيع.");
+                        pendingCommand.Parameters.AddWithValue("@S", activeAuditSessionId.Value);
+                        pendingCommand.Parameters.AddWithValue("@B", batchId);
+                        pendingSalesQuantity = ReadDouble(pendingCommand.ExecuteScalar(), 0);
                     }
                 }
+                double availableQuantity = currentQuantity - pendingSalesQuantity;
+                if (availableQuantity + Epsilon < quantityToTake)
+                    throw new InvalidOperationException(
+                        "رصيد التشغيلة غير كافٍ بعد احتساب المبيعات المعلقة أثناء الجرد. المتاح: " +
+                        Math.Max(0, availableQuantity).ToString("0.########", CultureInfo.InvariantCulture));
 
-                using (var command = new SQLiteCommand(
-                    @"INSERT INTO SalesInvoiceBatchAllocations
-                      (InvoiceItemId, BatchId, Quantity)
-                      VALUES (@itemId, @batchId, @quantity);",
-                    connection, transaction))
+                int allocationId;
+                using (var command = new SQLiteCommand(@"
+INSERT INTO SalesInvoiceBatchAllocations (InvoiceItemId,BatchId,Quantity)
+VALUES (@itemId,@batchId,@quantity);", connection, transaction))
                 {
                     command.Parameters.AddWithValue("@itemId", invoiceItemId);
                     command.Parameters.AddWithValue("@batchId", batchId);
                     command.Parameters.AddWithValue("@quantity", quantityToTake);
                     command.ExecuteNonQuery();
+                }
+                using (var command = new SQLiteCommand(
+                    "SELECT last_insert_rowid();", connection, transaction))
+                    allocationId = Convert.ToInt32(command.ExecuteScalar());
+
+                if (activeAuditSessionId.HasValue)
+                {
+                    InventoryAuditService.QueuePendingMovement(
+                        connection, transaction, activeAuditSessionId.Value,
+                        productId, batchId, "Sale",
+                        "SalesInvoiceBatchAllocations", allocationId,
+                        quantityToTake, string.Empty, userId, createdAt);
+                }
+                else
+                {
+                    using (var command = new SQLiteCommand(@"
+UPDATE Batches
+SET Quantity=CASE WHEN Quantity-@quantity<=@epsilon THEN 0 ELSE Quantity-@quantity END
+WHERE Id=@batchId AND ProductId=@productId
+  AND Quantity+@epsilon>=@quantity
+  AND (ExpiryDate='' OR ExpiryDate IS NULL OR ExpiryDate>=@today);",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@quantity", quantityToTake);
+                        command.Parameters.AddWithValue("@epsilon", Epsilon);
+                        command.Parameters.AddWithValue("@batchId", batchId);
+                        command.Parameters.AddWithValue("@productId", productId);
+                        command.Parameters.AddWithValue("@today", today);
+                        if (command.ExecuteNonQuery() != 1)
+                            throw new InvalidOperationException(
+                                "تعذر خصم الكمية من التشغيلة المحددة. أعد مراجعة التوزيع.");
+                    }
                 }
 
                 allocatedTotal = Math.Round(
@@ -2050,8 +2063,8 @@ TaxStatus = 'Legacy'
 
         private class ProductSaleInfo
         {
-           
-            
+
+
             public int Id { get; set; }
             public string Name { get; set; }
             public string UnitName { get; set; }
@@ -2064,7 +2077,7 @@ TaxStatus = 'Legacy'
 
         private class PreparedSaleLine
         {
-            
+
             public ProductSaleInfo Product { get; set; }
             public SaleInvoiceItem OriginalItem { get; set; }
             public string UnitName { get; set; }

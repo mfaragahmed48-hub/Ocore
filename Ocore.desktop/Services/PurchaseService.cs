@@ -914,6 +914,10 @@ namespace Ocore.desktop.Services
                                     item,
                                     totalPackageQuantity);
 
+                            int? activeAuditSessionId =
+                                InventoryAuditService.FindActiveSessionForIncomingBatch(
+                                    connection, transaction, item.ProductId, expiryDate);
+
                             int batchId;
 
                             using (var command = new SQLiteCommand(@"
@@ -958,7 +962,8 @@ namespace Ocore.desktop.Services
                                     "@PurchasePrice", inventoryPackageCost);
 
                                 command.Parameters.AddWithValue(
-                                    "@Quantity", totalPackageQuantity);
+                                    "@Quantity",
+                                    activeAuditSessionId.HasValue ? 0d : totalPackageQuantity);
 
                                 batchId =
                                     Convert.ToInt32(command.ExecuteScalar());
@@ -1083,6 +1088,24 @@ namespace Ocore.desktop.Services
                                 command.Parameters.AddWithValue("@Notes", item.Notes ?? "");
 
                                 command.ExecuteNonQuery();
+                            }
+
+                            int purchaseItemId;
+                            using (var command = new SQLiteCommand(
+                                "SELECT last_insert_rowid();", connection, transaction))
+                            {
+                                purchaseItemId = Convert.ToInt32(command.ExecuteScalar());
+                            }
+
+                            if (activeAuditSessionId.HasValue)
+                            {
+                                InventoryAuditService.QueuePendingMovement(
+                                    connection, transaction, activeAuditSessionId.Value,
+                                    item.ProductId, batchId, "Purchase",
+                                    "PurchaseInvoiceItems", purchaseItemId,
+                                    totalPackageQuantity,
+                                    (item.PackageUnitName ?? "P") + " (P)",
+                                    userId, createdAt);
                             }
 
                             using (var command = new SQLiteCommand(@"

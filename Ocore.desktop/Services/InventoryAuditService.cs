@@ -1688,7 +1688,7 @@ LIMIT 1;", c, t))
             }
         }
 
-        private void QueuePendingMovement(
+        public static void QueuePendingMovement(
             SQLiteConnection c, SQLiteTransaction t, int sessionId, int productId,
             int batchId, string movementType, string sourceTable, int sourceRecordId,
             double quantity, string unitSnapshot, int employeeUserId, string originalCreatedAt)
@@ -1902,25 +1902,138 @@ WHERE i.TargetKey=@K
                     if (movement.MovementType == "Purchase" &&
                         movement.SourceTable == "PurchaseInvoiceItems")
                     {
+                        int sourceBatchId;
+                        double sourceQuantity;
+                        using (var sourceCommand = new SQLiteCommand(@"
+SELECT BatchId,
+       COALESCE(PackageQuantity,0)+COALESCE(FreePackageQuantity,0) AS TotalPackageQuantity
+FROM PurchaseInvoiceItems
+WHERE Id=@I;", c, t))
+                        {
+                            sourceCommand.Parameters.AddWithValue("@I", movement.SourceRecordId);
+                            using (var sourceReader = sourceCommand.ExecuteReader())
+                            {
+                                if (!sourceReader.Read())
+                                    throw new InvalidOperationException("سجل استلام الشراء غير موجود.");
+                                sourceBatchId = Convert.ToInt32(sourceReader["BatchId"]);
+                                sourceQuantity = Convert.ToDouble(sourceReader["TotalPackageQuantity"]);
+                            }
+                        }
+                        if (sourceBatchId != movement.BatchId ||
+                            Math.Abs(sourceQuantity - movement.Quantity) >= 0.00000001)
+                            throw new InvalidOperationException(
+                                "بيانات استلام الشراء لا تطابق الحركة المعلقة؛ تم إيقاف الإضافة.");
+
                         using (var command = new SQLiteCommand(
-                            "UPDATE Batches SET Quantity=Quantity+@Q WHERE Id=@B;", c, t))
+                            "UPDATE Batches SET Quantity=Quantity+@Q WHERE Id=@B AND ProductId=@P;", c, t))
                         {
                             command.Parameters.AddWithValue("@Q", movement.Quantity);
                             command.Parameters.AddWithValue("@B", movement.BatchId);
-
+                            command.Parameters.AddWithValue("@P", movement.ProductId);
                             if (command.ExecuteNonQuery() != 1)
-                                throw new InvalidOperationException("تشغيلة الشراء غير موجودة.");
+                                throw new InvalidOperationException("تشغيلة الشراء غير موجودة أو لا تتبع الصنف.");
+                        }
+                    }
+                    else if (movement.MovementType == "ManualAdd" &&
+                             movement.SourceTable == "Batches")
+                    {
+                        int sourceProductId;
+                        using (var sourceCommand = new SQLiteCommand(
+                            "SELECT ProductId FROM Batches WHERE Id=@B;", c, t))
+                        {
+                            sourceCommand.Parameters.AddWithValue("@B", movement.SourceRecordId);
+                            object sourceValue = sourceCommand.ExecuteScalar();
+                            if (sourceValue == null || sourceValue == DBNull.Value)
+                                throw new InvalidOperationException("التشغيلة المضافة يدويًا غير موجودة.");
+                            sourceProductId = Convert.ToInt32(sourceValue);
+                        }
+                        if (sourceProductId != movement.ProductId ||
+                            movement.SourceRecordId != movement.BatchId)
+                            throw new InvalidOperationException("بيانات إضافة التشغيلة لا تطابق الحركة المعلقة.");
+                        using (var command = new SQLiteCommand(
+                            "UPDATE Batches SET Quantity=Quantity+@Q WHERE Id=@B AND ProductId=@P;",
+                            c, t))
+                        {
+                            command.Parameters.AddWithValue("@Q", movement.Quantity);
+                            command.Parameters.AddWithValue("@B", movement.BatchId);
+                            command.Parameters.AddWithValue("@P", movement.ProductId);
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException("تعذر إضافة الكمية إلى التشغيلة اليدوية.");
+                        }
+                    }
+                    else if (movement.MovementType == "Sale" &&
+                             movement.SourceTable == "SalesInvoiceBatchAllocations")
+                    {
+                        double sourceQuantity;
+                        int sourceBatchId;
+                        int sourceProductId;
+                        using (var sourceCommand = new SQLiteCommand(@"
+SELECT a.BatchId,a.Quantity,si.ProductId
+FROM SalesInvoiceBatchAllocations a
+INNER JOIN SalesInvoiceItems si ON si.Id=a.InvoiceItemId
+WHERE a.Id=@I;", c, t))
+                        {
+                            sourceCommand.Parameters.AddWithValue("@I", movement.SourceRecordId);
+                            using (var sourceReader = sourceCommand.ExecuteReader())
+                            {
+                                if (!sourceReader.Read())
+                                    throw new InvalidOperationException("سجل تخصيص البيع غير موجود.");
+                                sourceBatchId = Convert.ToInt32(sourceReader["BatchId"]);
+                                sourceQuantity = Convert.ToDouble(sourceReader["Quantity"]);
+                                sourceProductId = Convert.ToInt32(sourceReader["ProductId"]);
+                            }
+                        }
+                        if (sourceBatchId != movement.BatchId ||
+                            sourceProductId != movement.ProductId ||
+                            Math.Abs(sourceQuantity - movement.Quantity) >= 0.00000001)
+                            throw new InvalidOperationException(
+                                "بيانات تخصيص البيع لا تطابق الحركة المعلقة؛ تم إيقاف الخصم لمنع ازدواج المخزون.");
+                        using (var command = new SQLiteCommand(@"
+UPDATE Batches SET Quantity=Quantity-@Q
+WHERE Id=@B AND Quantity>=@Q;", c, t))
+                        {
+                            command.Parameters.AddWithValue("@Q", movement.Quantity);
+                            command.Parameters.AddWithValue("@B", movement.BatchId);
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException(
+                                    "رصيد التشغيلة غير كافٍ لتنفيذ حركة البيع المعلقة.");
                         }
                     }
                     else if (movement.MovementType == "SalesReturn" &&
                              movement.SourceTable == "SalesReturnBatchAllocations")
                     {
+                        int sourceBatchId;
+                        int sourceProductId;
+                        double sourceQuantity;
+                        using (var sourceCommand = new SQLiteCommand(@"
+SELECT rba.BatchId,rba.Quantity,sri.ProductId
+FROM SalesReturnBatchAllocations rba
+INNER JOIN SalesReturnItems sri ON sri.Id=rba.ReturnItemId
+WHERE rba.Id=@I;", c, t))
+                        {
+                            sourceCommand.Parameters.AddWithValue("@I", movement.SourceRecordId);
+                            using (var sourceReader = sourceCommand.ExecuteReader())
+                            {
+                                if (!sourceReader.Read())
+                                    throw new InvalidOperationException("سجل تخصيص المرتجع غير موجود.");
+                                sourceBatchId = Convert.ToInt32(sourceReader["BatchId"]);
+                                sourceProductId = Convert.ToInt32(sourceReader["ProductId"]);
+                                sourceQuantity = Convert.ToDouble(sourceReader["Quantity"]);
+                            }
+                        }
+                        if (sourceBatchId != movement.BatchId ||
+                            sourceProductId != movement.ProductId ||
+                            Math.Abs(sourceQuantity - movement.Quantity) >= 0.00000001)
+                            throw new InvalidOperationException(
+                                "بيانات تخصيص المرتجع لا تطابق الحركة المعلقة؛ تم إيقاف الإضافة.");
+
                         string expiry;
 
                         using (var command = new SQLiteCommand(
-                            "SELECT COALESCE(ExpiryDate,'') FROM Batches WHERE Id=@B;", c, t))
+                            "SELECT COALESCE(ExpiryDate,'') FROM Batches WHERE Id=@B AND ProductId=@P;", c, t))
                         {
                             command.Parameters.AddWithValue("@B", movement.BatchId);
+                            command.Parameters.AddWithValue("@P", movement.ProductId);
 
                             object value = command.ExecuteScalar();
 
@@ -2037,12 +2150,14 @@ VALUES(@I,@B,0,@C,@BN,@E,@U,@RA,@RI,@D);", c, t))
                                 }
                             }
 
+                            double appliedDelta = movement.MovementType == "Sale"
+                                ? -movement.Quantity : movement.Quantity;
                             using (var appliedCommand = new SQLiteCommand(@"
 UPDATE InventoryCountItems
 SET AppliedQuantity=COALESCE(AppliedQuantity,BookQuantity)+@Q
 WHERE Id=@I AND ItemStatus='Approved';", c, t))
                             {
-                                appliedCommand.Parameters.AddWithValue("@Q", movement.Quantity);
+                                appliedCommand.Parameters.AddWithValue("@Q", appliedDelta);
                                 appliedCommand.Parameters.AddWithValue("@I", movement.CountItemId.Value);
                                 appliedCommand.ExecuteNonQuery();
                             }
@@ -2051,7 +2166,9 @@ WHERE Id=@I AND ItemStatus='Approved';", c, t))
 
                     string result = expiredReturn
                         ? "تمت معالجة المرتجع دون إضافته للمخزون لأن التشغيلة انتهت صلاحيتها."
-                        : "تمت إضافة الكمية إلى رصيد التشغيلة.";
+                        : movement.MovementType == "Sale"
+                            ? "تم خصم كمية البيع من رصيد التشغيلة."
+                            : "تمت إضافة الكمية إلى رصيد التشغيلة.";
 
                     using (var command = new SQLiteCommand(@"
 UPDATE InventoryCountPendingMovements

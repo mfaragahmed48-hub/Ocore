@@ -1519,7 +1519,9 @@ namespace Ocore.desktop.Services
                                 transaction,
                                 item.InvoiceItemId,
                                 returnItemId,
-                                item.PackageQuantity);
+                                item.PackageQuantity,
+                                userId,
+                                createdAt);
                         }
 
                         using (var command = new SQLiteCommand(@"
@@ -1802,7 +1804,9 @@ namespace Ocore.desktop.Services
             SQLiteTransaction transaction,
             int invoiceItemId,
             int returnItemId,
-            double packageQuantity)
+            double packageQuantity,
+            int userId,
+            string createdAt)
         {
             if (packageQuantity <= Epsilon)
                 return;
@@ -1810,6 +1814,7 @@ namespace Ocore.desktop.Services
             string sql = @"
                 SELECT
                     a.BatchId,
+                    b.ProductId,
                     SUM(a.Quantity) AS OriginalQuantity,
                     b.ExpiryDate,
                     SUM(a.Quantity) -
@@ -1853,6 +1858,7 @@ namespace Ocore.desktop.Services
                         allocations.Add(new ReturnAllocation
                         {
                             BatchId = Convert.ToInt32(reader["BatchId"]),
+                            ProductId = Convert.ToInt32(reader["ProductId"]),
                             ExpiryDate = Convert.ToString(reader["ExpiryDate"]),
                             RemainingQuantity = Math.Round(
                                 Convert.ToDouble(reader["RemainingAllocation"]),
@@ -1903,27 +1909,44 @@ namespace Ocore.desktop.Services
                         {
                             insertCommand.Parameters.AddWithValue("@ReturnItemId", returnItemId);
                             insertCommand.Parameters.AddWithValue("@BatchId", allocation.BatchId);
+                            int? activeAuditSessionId = isExpired
+                                ? (int?)null
+                                : InventoryAuditService.FindActiveSessionForBatch(
+                                    connection, transaction, allocation.BatchId);
+
                             insertCommand.Parameters.AddWithValue("@Quantity", allocatedQuantity);
-                            insertCommand.Parameters.AddWithValue("@Restocked", isExpired ? 0 : 1);
-
+                            insertCommand.Parameters.AddWithValue(
+                                "@Restocked",
+                                isExpired || activeAuditSessionId.HasValue ? 0 : 1);
                             insertCommand.ExecuteNonQuery();
-                        }
 
-                        if (!isExpired)
-                        {
-                            using (var updateCommand = new SQLiteCommand(@"
-                                UPDATE Batches
-                                SET Quantity = Quantity + @Quantity
-                                WHERE Id = @BatchId;",
-                                connection, transaction))
+                            int returnAllocationId;
+                            using (var idCommand = new SQLiteCommand(
+                                "SELECT last_insert_rowid();", connection, transaction))
+                                returnAllocationId = Convert.ToInt32(idCommand.ExecuteScalar());
+
+                            if (!isExpired)
                             {
-                                updateCommand.Parameters.AddWithValue("@Quantity", allocatedQuantity);
-                                updateCommand.Parameters.AddWithValue("@BatchId", allocation.BatchId);
-
-                                if (updateCommand.ExecuteNonQuery() != 1)
+                                if (activeAuditSessionId.HasValue)
                                 {
-                                    throw new Exception(
-                                        "تعذر تحديث كمية التشغيلة المرتجعة.");
+                                    InventoryAuditService.QueuePendingMovement(
+                                        connection, transaction, activeAuditSessionId.Value,
+                                        allocation.ProductId, allocation.BatchId, "SalesReturn",
+                                        "SalesReturnBatchAllocations", returnAllocationId,
+                                        allocatedQuantity, string.Empty, userId, createdAt);
+                                }
+                                else
+                                {
+                                    using (var updateCommand = new SQLiteCommand(@"
+UPDATE Batches
+SET Quantity=Quantity+@Quantity
+WHERE Id=@BatchId;", connection, transaction))
+                                    {
+                                        updateCommand.Parameters.AddWithValue("@Quantity", allocatedQuantity);
+                                        updateCommand.Parameters.AddWithValue("@BatchId", allocation.BatchId);
+                                        if (updateCommand.ExecuteNonQuery() != 1)
+                                            throw new Exception("تعذر تحديث كمية التشغيلة المرتجعة.");
+                                    }
                                 }
                             }
                         }
@@ -2029,6 +2052,7 @@ namespace Ocore.desktop.Services
         private class ReturnAllocation
         {
             public int BatchId { get; set; }
+            public int ProductId { get; set; }
             public string ExpiryDate { get; set; }
             public double RemainingQuantity { get; set; }
         }

@@ -218,11 +218,11 @@ namespace Ocore.desktop.Views
 
                 summaryText.Text = string.Format(
                     CultureInfo.CurrentCulture,
-                    "الأهداف المعتمدة: {0}   |   كمية العجز: {1:N2}   |   قيمة العجز: {2:N2}   |   كمية الزيادة: {3:N2}   |   قيمة الزيادة: {4:N2}",
+                    "الأهداف المعتمدة: {0}   |   أهداف بها عجز: {1}   |   قيمة العجز: {2:N2}   |   أهداف بها زيادة: {3}   |   قيمة الزيادة: {4:N2}",
                     Value(row, "ApprovedTargets"),
-                    Value(row, "ShortageQuantity"),
+                    Value(row, "ShortageTargets"),
                     Value(row, "ShortageValue"),
-                    Value(row, "ExcessQuantity"),
+                    Value(row, "ExcessTargets"),
                     Value(row, "ExcessValue"));
             }
 
