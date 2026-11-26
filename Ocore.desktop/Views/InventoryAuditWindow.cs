@@ -1203,7 +1203,6 @@ namespace Ocore.desktop.Views
                     return;
                 }
             }
-            Info("تم حفظ العد. لا توجد بنود أخرى غير معدودة.");
         }
 
         private void ApproveWholeSession()
