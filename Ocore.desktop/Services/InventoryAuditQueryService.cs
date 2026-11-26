@@ -142,10 +142,19 @@ SELECT i.Id,
        i.ExpiryDateSnapshot AS ExpiryDate,
        i.UnitSnapshot AS Unit,
        CASE WHEN @M=1
-            THEN i.BookQuantity
+            THEN COALESCE((
+                SELECT SUM(bs.BookQuantity)
+                FROM InventoryCountItemBatchSnapshots bs
+                WHERE bs.CountItemId=i.Id
+            ),i.BookQuantity)
             ELSE NULL
        END AS BookQuantity,
        i.ActualQuantity,
+       i.ActualPQuantity,
+       i.ActualUQuantity,
+       COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),p.UnitsPerPackage,1) AS UnitsPerPackageSnapshot,
+       COALESCE(p.UnitName,'') AS PUnitName,
+       COALESCE(p.SmallUnitName,'') AS UUnitName,
        CASE WHEN @M=1
             THEN i.NetVarianceQuantity
             ELSE NULL

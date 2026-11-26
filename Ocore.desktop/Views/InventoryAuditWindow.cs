@@ -320,17 +320,17 @@ namespace Ocore.desktop.Views
                 return;
             }
             if (name == "PUnitName" || name == "UUnitName" || name == "UnitsPerPackageSnapshot" ||
+                name == "ActualPQuantity" || name == "ActualUQuantity" ||
                 name == "Id" || name == "ProductId" || name == "BatchId" ||
                 name == "TargetType" || name == "TargetKey" || name == "AssignedUserId" ||
                 name == "CountedBy" || name == "PurchasePriceSnapshot" ||
                 name == "SourceRecordId" || name == "SessionId" || name == "EmployeeUserId")
             { args.Cancel = true; return; }
 
-            args.Column.IsReadOnly = name != "ActualPQuantity" && name != "ActualUQuantity";
-            if (name == "ActualPQuantity") { args.Column.Header = "الفعلي P"; args.Column.Width = 75; }
-            else if (name == "ActualUQuantity") { args.Column.Header = "الفعلي U"; args.Column.Width = 75; }
+            args.Column.SortMemberPath = name;
+            args.Column.IsReadOnly = name != "ActualQuantity";
             else if (name == "Unit" || name == "UnitSnapshot") args.Column.Header = "الوحدات (P/U)";
-            else if (name == "BookQuantity") args.Column.Header = "الرصيد الدفتري";
+            else if (name == "BookQuantity") args.Column.Header = "رصيد التشغيلة / الصلاحية";
             else if (name == "ActualQuantity") args.Column.Header = "الفعلي المكافئ P";
             else if (name == "VarianceQuantity") args.Column.Header = "الفرق";
             else if (name == "ItemStatus") args.Column.Header = "حالة البند";
@@ -792,7 +792,7 @@ namespace Ocore.desktop.Views
         {
             if (e.EditAction != DataGridEditAction.Commit) return;
             string property = e.Column.SortMemberPath;
-            if (property != "ActualPQuantity" && property != "ActualUQuantity") return;
+            if (property != "ActualQuantity") return;
             var row = e.Row.Item as DataRowView;
             if (row == null || IsEntryRow(row)) return;
             Dispatcher.BeginInvoke(new Action(() => SaveEditedCount(row)), DispatcherPriority.Background);
@@ -802,17 +802,32 @@ namespace Ocore.desktop.Views
         {
             try
             {
-                string pText = Convert.ToString(row["ActualPQuantity"]);
-                string uText = Convert.ToString(row["ActualUQuantity"]);
-                int actualP, actualU;
-                if (string.IsNullOrWhiteSpace(pText) || string.IsNullOrWhiteSpace(uText)) return;
-                if (!int.TryParse(pText, NumberStyles.None, CultureInfo.InvariantCulture, out actualP) ||
-                    !int.TryParse(uText, NumberStyles.None, CultureInfo.InvariantCulture, out actualU) ||
-                    actualP < 0 || actualU < 0)
-                { Warn("أدخل عددًا صحيحًا غير سالب في حقلي P وU."); return; }
+                string quantityText = Convert.ToString(row["ActualQuantity"]);
+                decimal actualEquivalent;
+                bool parsed = decimal.TryParse(quantityText, NumberStyles.Number,
+                    CultureInfo.CurrentCulture, out actualEquivalent);
+                if (!parsed)
+                    parsed = decimal.TryParse(quantityText, NumberStyles.Number,
+                        CultureInfo.InvariantCulture, out actualEquivalent);
+                if (!parsed || actualEquivalent < 0)
+                {
+                    Warn("أدخل كمية فعلية صحيحة غير سالبة.");
+                    return;
+                }
+
                 int factor = Convert.ToInt32(row["UnitsPerPackageSnapshot"]);
-                if (factor <= 1 && actualU != 0) { Warn("هذا الصنف لا يحتوي على وحدات U منفصلة؛ أدخل صفرًا."); return; }
-                if (factor > 1 && actualU >= factor) { Warn("عدد وحدات U يجب أن يكون أقل من معامل التحويل (" + factor + ")."); return; }
+                if (factor < 1)
+                    throw new InvalidOperationException("معامل تحويل الوحدات للصنف غير صحيح.");
+
+                decimal totalSmallUnits = actualEquivalent * factor;
+                if (decimal.Truncate(totalSmallUnits) != totalSmallUnits)
+                {
+                    Warn("الكمية المكافئة لا يمكن تحويلها إلى عدد صحيح من وحدات U لهذا الصنف.");
+                    return;
+                }
+
+                int actualP = decimal.ToInt32(decimal.Floor(totalSmallUnits / factor));
+                int actualU = decimal.ToInt32(totalSmallUnits % factor);
                 int itemId = Convert.ToInt32(row["Id"]);
                 auditService.SaveCount(currentUserId, selectedSessionId, itemId, actualP, actualU);
                 LoadSessions(selectedSessionId);
