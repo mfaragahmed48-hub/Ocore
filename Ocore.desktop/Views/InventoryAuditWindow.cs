@@ -590,7 +590,7 @@ namespace Ocore.desktop.Views
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 10, 0, 0)
             };
-            var addSelectedButton = MakeButton("إضافة المحدد للجرد", () =>
+            Action addSelectedAction = () =>
             {
                 choose.CommitEdit(DataGridEditingUnit.Cell, true);
                 choose.CommitEdit(DataGridEditingUnit.Row, true);
@@ -640,13 +640,13 @@ namespace Ocore.desktop.Views
                 }
                 catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
                 catch (Exception ex) { Error(ex.Message); }
-            });
-            buttons.Children.Add(addSelectedButton);
+            };
+            buttons.Children.Add(MakeButton("إضافة المحدد للجرد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
             {
                 if (args.Key != Key.Enter) return;
                 args.Handled = true;
-                addSelectedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                addSelectedAction();
             };
             choose.Focus();
             choose.SelectedIndex = 0;
@@ -1046,13 +1046,13 @@ namespace Ocore.desktop.Views
                     LoadSessions(id);
                 }
                 catch (Exception ex) { Error(ex.Message); }
-            });
-            buttons.Children.Add(addSelectedButton);
+            };
+            buttons.Children.Add(MakeButton("إضافة المحدد للجرد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
             {
                 if (args.Key != Key.Enter) return;
                 args.Handled = true;
-                addSelectedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                addSelectedAction();
             };
             choose.Focus();
             choose.SelectedIndex = 0;
@@ -1154,13 +1154,13 @@ namespace Ocore.desktop.Views
                 }
                 catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
                 catch (Exception ex) { Error(ex.Message); }
-            });
-            buttons.Children.Add(addSelectedButton);
+            };
+            buttons.Children.Add(MakeButton("إضافة المحدد للجرد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
             {
                 if (args.Key != Key.Enter) return;
                 args.Handled = true;
-                addSelectedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                addSelectedAction();
             };
             choose.Focus();
             choose.SelectedIndex = 0;
