@@ -2302,13 +2302,14 @@ WHERE a.Id=@I;", c, t))
                                 "بيانات تخصيص البيع لا تطابق الحركة المعلقة؛ تم إيقاف الخصم لمنع ازدواج المخزون.");
                         using (var command = new SQLiteCommand(@"
 UPDATE Batches SET Quantity=Quantity-@Q
-WHERE Id=@B AND Quantity>=@Q;", c, t))
+WHERE Id=@B AND ProductId=@P AND Quantity>=@Q;", c, t))
                         {
                             command.Parameters.AddWithValue("@Q", movement.Quantity);
                             command.Parameters.AddWithValue("@B", movement.BatchId);
+                            command.Parameters.AddWithValue("@P", movement.ProductId);
                             if (command.ExecuteNonQuery() != 1)
                                 throw new InvalidOperationException(
-                                    "رصيد التشغيلة غير كافٍ لتنفيذ حركة البيع المعلقة.");
+                                    "رصيد التشغيلة غير كافٍ أو التشغيلة لا تتبع الصنف لتنفيذ حركة البيع المعلقة.");
                         }
                     }
                     else if (movement.MovementType == "SalesReturn" &&
@@ -2367,13 +2368,14 @@ WHERE rba.Id=@I;", c, t))
                         if (!expiredReturn)
                         {
                             using (var command = new SQLiteCommand(
-                                "UPDATE Batches SET Quantity=Quantity+@Q WHERE Id=@B;", c, t))
+                                "UPDATE Batches SET Quantity=Quantity+@Q WHERE Id=@B AND ProductId=@P;", c, t))
                             {
                                 command.Parameters.AddWithValue("@Q", movement.Quantity);
                                 command.Parameters.AddWithValue("@B", movement.BatchId);
+                                command.Parameters.AddWithValue("@P", movement.ProductId);
 
                                 if (command.ExecuteNonQuery() != 1)
-                                    throw new InvalidOperationException("تعذر تحديث رصيد تشغيلة المرتجع.");
+                                    throw new InvalidOperationException("تعذر تحديث رصيد تشغيلة المرتجع أو لا تتبع الصنف.");
                             }
                         }
 
