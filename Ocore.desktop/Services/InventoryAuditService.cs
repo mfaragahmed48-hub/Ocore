@@ -2136,7 +2136,7 @@ VALUES(@S,@P,@B,@CI,@K,@T,@ST,@SR,@Q,@U,@E,@D,'Pending');", c, t))
             var movements = new List<PendingMovement>();
 
             using (var command = new SQLiteCommand(@"
-SELECT Id,SessionId,BatchId,CountItemId,MovementType,
+SELECT Id,SessionId,ProductId,BatchId,CountItemId,MovementType,
        SourceTable,SourceRecordId,Quantity,
        COALESCE(TargetKey,'') AS TargetKey,
        COALESCE(UnitSnapshot,'') AS UnitSnapshot
@@ -2155,6 +2155,7 @@ ORDER BY OriginalCreatedAt,Id;", c, t))
                         {
                             Id = Convert.ToInt32(reader["Id"]),
                             SessionId = Convert.ToInt32(reader["SessionId"]),
+                            ProductId = Convert.ToInt32(reader["ProductId"]),
                             BatchId = Convert.ToInt32(reader["BatchId"]),
                             CountItemId = reader["CountItemId"] == DBNull.Value
                                 ? (int?)null
@@ -2602,6 +2603,7 @@ WHERE SessionId=@S
         {
             public int Id { get; set; }
             public int SessionId { get; set; }
+            public int ProductId { get; set; }
             public int BatchId { get; set; }
             public int? CountItemId { get; set; }
             public string MovementType { get; set; }
