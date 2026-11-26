@@ -312,7 +312,7 @@ WHERE p.IsArchived=0
   )
 ORDER BY p.Name,b.ExpiryDate,b.BatchNumber,b.Id;";
 
-            return ReadTable(sql, null);
+            return ReadTableWithoutConstraints(sql, null);
         }
 
         public DataTable GetPendingMovements(int sessionId, int managerId)
@@ -606,6 +606,50 @@ ORDER BY ShortageSessions DESC,LatestShortageAt DESC;";
                 row[pColumn] = (totalSmallUnits / factor) * sign;
                 row[uColumn] = (totalSmallUnits % factor) * sign;
             }
+        }
+
+        private DataTable ReadTableWithoutConstraints(
+            string sql,
+            Action<SQLiteCommand> configure)
+        {
+            var table = new DataTable();
+
+            using (var connection = new SQLiteConnection(connectionString))
+            using (var command = new SQLiteCommand(sql, connection))
+            {
+                if (configure != null)
+                    configure(command);
+
+                connection.Open();
+
+                using (var reader = command.ExecuteReader())
+                {
+                    // Build a plain schema ourselves. DataTable.Load(reader) may import
+                    // SQLite key metadata as a unique constraint, but this query
+                    // intentionally returns multiple batch rows for the same ProductId.
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        Type fieldType = reader.GetFieldType(i) ?? typeof(object);
+                        var column = new DataColumn(reader.GetName(i), fieldType)
+                        {
+                            AllowDBNull = true
+                        };
+                        table.Columns.Add(column);
+                    }
+
+                    var values = new object[reader.FieldCount];
+                    while (reader.Read())
+                    {
+                        reader.GetValues(values);
+                        var row = table.NewRow();
+                        for (int i = 0; i < values.Length; i++)
+                            row[i] = values[i] ?? DBNull.Value;
+                        table.Rows.Add(row);
+                    }
+                }
+            }
+
+            return table;
         }
 
         private DataTable ReadTable(
