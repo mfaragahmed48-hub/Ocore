@@ -111,6 +111,12 @@
                                 Padding="10"
                                 Click="ProductsManagementButton_Click"/>
 
+                        <Button x:Name="InventoryAuditButton"
+                                Content="📋   الجرد"
+                                Margin="10,3"
+                                Padding="10"
+                                Click="InventoryAuditButton_Click"/>
+
                         <Button x:Name="BarcodePrintingButton"
                                 Content="🏷   طباعة الباركود"
                                 Margin="10,3"
@@ -187,7 +193,6 @@
                                 Click="AuditLogsButton_Click"
                                 Visibility="Collapsed"/>
 
-                        <!-- سجل الشيفتات والإغلاقات -->
                         <Button x:Name="ShiftHistoryButton"
                                 Content="🕘   سجل الشيفتات والإغلاقات"
                                 Margin="10,3"
@@ -248,7 +253,6 @@
                                     Columns="5"
                                     Margin="0,12,0,12">
 
-                <!-- إجمالي مبيعات الشيفت للمدير فقط -->
                 <Border x:Name="SalesTotalCard"
                         Background="White"
                         CornerRadius="10"
@@ -435,7 +439,6 @@
                                 Margin="15,0,0,0"
                                 VerticalAlignment="Center">
 
-                        <!-- مراجعة الشيفت للمدير فقط -->
                         <Button x:Name="ReviewCurrentShiftButton"
                                 Content="👁   مراجعة الشيفت"
                                 Width="155"

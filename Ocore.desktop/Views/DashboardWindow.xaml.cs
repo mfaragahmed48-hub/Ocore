@@ -1217,6 +1217,32 @@ namespace Ocore.desktop.Views
         // إدارة الأصناف والمخزون
         // ==========================================
 
+        private void InventoryAuditButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            try
+            {
+                var window = new InventoryAuditWindow(
+                    currentUserId,
+                    currentRole);
+
+                OpenIndependentWindow(window);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "حدث خطأ أثناء فتح شاشة الجرد:\n\n" + ex.Message,
+                    "O CORE",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        // ==========================================
+        // إدارة الأصناف والمخزون
+        // ==========================================
+
         private void ProductsManagementButton_Click(
             object sender,
             RoutedEventArgs e)
