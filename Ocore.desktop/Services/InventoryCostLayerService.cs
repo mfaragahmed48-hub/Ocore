@@ -47,6 +47,19 @@ WHERE ProductId = @ProductId;",
         {
             int batchId;
             bool existingBatch = false;
+            double salePrice;
+
+            using (var productCommand = new SQLiteCommand(
+                "SELECT SalePrice FROM Products WHERE Id = @ProductId;", connection, transaction))
+            {
+                productCommand.Parameters.AddWithValue("@ProductId", productId);
+                object value = productCommand.ExecuteScalar();
+                if (value == null || value == DBNull.Value)
+                    throw new InvalidOperationException("تعذر قراءة سعر بيع الصنف قبل إنشاء التشغيلة.");
+                salePrice = Convert.ToDouble(value);
+                if (double.IsNaN(salePrice) || double.IsInfinity(salePrice) || salePrice < 0)
+                    throw new InvalidOperationException("سعر بيع الصنف غير صالح لإنشاء التشغيلة.");
+            }
 
             using (var command = new SQLiteCommand(@"
 SELECT Id
@@ -54,12 +67,15 @@ FROM Batches
 WHERE ProductId = @ProductId
   AND TRIM(COALESCE(BatchNumber, '')) = ''
   AND TRIM(COALESCE(ExpiryDate, '')) = ''
+  AND SalePrice IS NOT NULL
+  AND ABS(SalePrice - @SalePrice) < 0.000001
 ORDER BY Id
 LIMIT 1;",
                 connection,
                 transaction))
             {
                 command.Parameters.AddWithValue("@ProductId", productId);
+                command.Parameters.AddWithValue("@SalePrice", salePrice);
                 object existing = command.ExecuteScalar();
 
                 if (existing != null && existing != DBNull.Value)
@@ -77,6 +93,7 @@ INSERT INTO Batches
     BatchNumber,
     ExpiryDate,
     PurchasePrice,
+    SalePrice,
     Quantity
 )
 VALUES
@@ -86,6 +103,7 @@ VALUES
     NULL,
     '',
     @UnitCost,
+    @SalePrice,
     0
 );
 SELECT last_insert_rowid();",
@@ -95,6 +113,7 @@ SELECT last_insert_rowid();",
                         insert.Parameters.AddWithValue("@ProductId", productId);
                         insert.Parameters.AddWithValue("@SupplierId", supplierId);
                         insert.Parameters.AddWithValue("@UnitCost", unitCost);
+                        insert.Parameters.AddWithValue("@SalePrice", salePrice);
                         batchId = Convert.ToInt32(insert.ExecuteScalar());
                     }
                 }

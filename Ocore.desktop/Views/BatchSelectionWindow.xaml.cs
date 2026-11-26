@@ -184,6 +184,7 @@ namespace Ocore.desktop.Views
                         BatchId = batch.Id,
                         BatchNumber = batch.BatchNumber,
                         ExpiryDate = batch.ExpiryDate,
+                        SalePrice = batch.SalePrice,
                         AvailableQuantity = batch.Quantity,
                         AllocatedQuantity = 0
                     });
@@ -423,6 +424,7 @@ namespace Ocore.desktop.Views
                         BatchId = selected.BatchId,
                         BatchNumber = selected.BatchNumber,
                         ExpiryDate = selected.ExpiryDate,
+                        SalePrice = selected.SalePrice,
                         AvailableQuantity =
                             selected.AvailableQuantity,
                         AllocatedQuantity = requiredQuantity

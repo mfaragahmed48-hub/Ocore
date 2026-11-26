@@ -475,6 +475,8 @@ namespace Ocore.desktop.Models
 
         public string ExpiryDate { get; set; }
 
+        public double? SalePrice { get; set; }
+
         // الرصيد المتاح من التشغيلة وقت تحميلها.
         public double AvailableQuantity { get; set; }
 

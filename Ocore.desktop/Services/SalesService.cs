@@ -280,6 +280,20 @@ namespace Ocore.desktop.Services
                                     "وحدة البيع للصنف " + product.Name + " غير صحيحة.");
                             }
 
+                            if (item.BatchAllocations != null && item.BatchAllocations.Count == 1 &&
+                                item.BatchAllocations[0] != null)
+                            {
+                                double? selectedBatchSalePrice = GetBatchSalePrice(
+                                    connection, transaction, product.Id,
+                                    item.BatchAllocations[0].BatchId);
+                                if (selectedBatchSalePrice.HasValue)
+                                {
+                                    unitPrice = selectedBatchSalePrice.Value;
+                                    if (string.Equals(item.UnitName, product.SmallUnitName, StringComparison.Ordinal))
+                                        unitPrice /= product.UnitsPerPackage;
+                                }
+                            }
+
                             if (double.IsNaN(item.UnitPrice) ||
                                 double.IsInfinity(item.UnitPrice) ||
                                 item.UnitPrice < 0)
@@ -864,6 +878,7 @@ TaxStatus = 'Legacy'
                     BatchId = allocation.BatchId,
                     BatchNumber = allocation.BatchNumber,
                     ExpiryDate = allocation.ExpiryDate,
+                    SalePrice = allocation.SalePrice,
                     AvailableQuantity = allocation.AvailableQuantity,
                     AllocatedQuantity = allocation.AllocatedQuantity
                 });
@@ -1981,6 +1996,26 @@ WHERE Id=@batchId AND ProductId=@productId
                 if (Convert.ToInt32(command.ExecuteScalar()) == 0)
                     throw new UnauthorizedAccessException(
                         "ليس لديك صلاحية إنشاء فاتورة بيع.");
+            }
+        }
+
+        private double? GetBatchSalePrice(
+            SQLiteConnection connection, SQLiteTransaction transaction,
+            int productId, int batchId)
+        {
+            using (var command = new SQLiteCommand(
+                @"SELECT SalePrice FROM Batches
+                  WHERE Id = @BatchId AND ProductId = @ProductId LIMIT 1;",
+                connection, transaction))
+            {
+                command.Parameters.AddWithValue("@BatchId", batchId);
+                command.Parameters.AddWithValue("@ProductId", productId);
+                object value = command.ExecuteScalar();
+                if (value == null || value == DBNull.Value) return null;
+                double price = Convert.ToDouble(value);
+                if (double.IsNaN(price) || double.IsInfinity(price) || price < 0)
+                    throw new InvalidOperationException("سعر بيع التشغيلة المحددة غير صحيح.");
+                return price;
             }
         }
 

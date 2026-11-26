@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS Batches (
     BatchNumber TEXT,
     ExpiryDate TEXT NOT NULL,
     PurchasePrice REAL NOT NULL DEFAULT 0,
+    SalePrice REAL NULL,
     Quantity REAL NOT NULL DEFAULT 0,
     FOREIGN KEY (ProductId) REFERENCES Products(Id),
     FOREIGN KEY (SupplierId) REFERENCES Suppliers(Id)
@@ -446,6 +447,7 @@ VALUES (1);
 
             EnsureProductPackageColumns(connection);
             EnsureProductMaxDiscountPercentageColumn(connection);
+            EnsureBatchSalePriceColumn(connection);
 
             // إضافة الحد الأدنى للمخزون لكل صنف.
             EnsureProductMinimumStockLevelColumn(connection);
@@ -912,6 +914,25 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
                 {
                     command.ExecuteNonQuery();
                 }
+            }
+        }
+
+        // إضافة سعر البيع الخاص بالتشغيلة دون تخمين أسعار تاريخية.
+        // تظل بيانات التشغيلات القديمة NULL وتستخدم سعر الصنف الحالي كقيمة احتياطية.
+        private static void EnsureBatchSalePriceColumn(
+            SQLiteConnection connection)
+        {
+            var existingColumns = new List<string>();
+            using (var command = new SQLiteCommand("PRAGMA table_info(Batches);", connection))
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read()) existingColumns.Add(reader["name"].ToString());
+            }
+            if (!ContainsColumn(existingColumns, "SalePrice"))
+            {
+                using (var command = new SQLiteCommand(
+                    "ALTER TABLE Batches ADD COLUMN SalePrice REAL NULL;", connection))
+                    command.ExecuteNonQuery();
             }
         }
 

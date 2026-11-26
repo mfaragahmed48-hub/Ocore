@@ -276,7 +276,7 @@ namespace Ocore.desktop.Services
 
         #endregion
 
-        
+
         #region Get Products
 
         public List<Product> GetProductsForManagement(int currentUserId)
@@ -385,7 +385,7 @@ ORDER BY p.Name;";
 
                                 SalePrice = Convert.ToDouble(reader["SalePrice"]),
                                 PurchasePrice = Convert.ToDouble(reader["PurchasePrice"]),
-                                
+
                                 MaxDiscountPercentage = Convert.ToDouble(
                                     reader["MaxDiscountPercentage"]),
 
@@ -758,7 +758,8 @@ SELECT
     b.Id,
     b.BatchNumber,
     b.ExpiryDate,
-    b.Quantity
+    b.Quantity,
+    b.SalePrice
 FROM Batches b
 INNER JOIN Products p ON p.Id = b.ProductId
 WHERE b.ProductId = @ProductId
@@ -804,7 +805,10 @@ ORDER BY
                                         : reader["ExpiryDate"].ToString(),
 
                                 Quantity =
-                                    Convert.ToDouble(reader["Quantity"])
+                                    Convert.ToDouble(reader["Quantity"]),
+                                SalePrice = reader["SalePrice"] == DBNull.Value
+                                    ? (double?)null
+                                    : Convert.ToDouble(reader["SalePrice"])
                             });
                         }
                     }
@@ -1077,7 +1081,7 @@ ORDER BY Name;";
                         }
 
 
-                        
+
                         string generatedCode;
                         string generatedBarcode;
 
@@ -1086,7 +1090,7 @@ ORDER BY Name;";
                             transaction,
                             out generatedCode,
                             out generatedBarcode);
-    
+
                         using (var command = new SQLiteCommand(
 
 @"INSERT INTO Products
@@ -1138,7 +1142,7 @@ ORDER BY Name;";
 
                             command.Parameters.AddWithValue(
                                 "@PurchasePrice", product.PurchasePrice);
-                            
+
                             command.Parameters.AddWithValue(
                                 "@CreatedAt",
                                 DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -1281,7 +1285,7 @@ ORDER BY Name;";
             if (product.SalePrice < 0 || product.PurchasePrice < 0)
                 throw new ArgumentException("الأسعار لا يمكن أن تكون سالبة.");
 
-            
+
             using (var connection = new SQLiteConnection(connectionString))
             {
                 connection.Open();
@@ -1353,7 +1357,7 @@ ORDER BY Name;";
                         if (oldProduct == null)
                             throw new InvalidOperationException("الصنف غير موجود.");
 
-                        
+
 
                         bool unitConversionChanged =
                             oldProduct.UnitsPerPackage != product.UnitsPerPackage ||
@@ -1429,7 +1433,7 @@ ORDER BY Name;";
                             command.Parameters.AddWithValue(
                                 "@PurchasePrice", product.PurchasePrice);
 
-                            
+
                             command.Parameters.AddWithValue("@Id", product.Id);
 
                             command.ExecuteNonQuery();
@@ -2080,7 +2084,7 @@ ORDER BY Name;";
         #endregion
 
         #region Audit
-        
+
         private void WriteProductAudit(
             SQLiteConnection connection,
             SQLiteTransaction transaction,

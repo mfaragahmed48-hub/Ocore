@@ -159,6 +159,11 @@
                                             IsReadOnly="True"
                                             Width="1.2*"/>
 
+                        <DataGridTextColumn Header="سعر البيع"
+                                            Binding="{Binding SalePrice, StringFormat={}{0:N2}}"
+                                            IsReadOnly="True"
+                                            Width="*"/>
+
                         <DataGridTextColumn Header="الرصيد المتاح"
                                             Binding="{Binding AvailableQuantity, StringFormat={}{0:N3}}"
                                             IsReadOnly="True"

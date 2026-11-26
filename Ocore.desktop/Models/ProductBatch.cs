@@ -11,6 +11,8 @@ namespace Ocore.desktop.Models
 
         public double Quantity { get; set; }
 
+        public double? SalePrice { get; set; }
+
         public string DisplayName
         {
             get

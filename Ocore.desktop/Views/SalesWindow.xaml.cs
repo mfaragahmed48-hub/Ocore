@@ -2764,9 +2764,39 @@ namespace Ocore.desktop.Views
                         BatchId = confirmed.BatchId,
                         BatchNumber = confirmed.BatchNumber,
                         ExpiryDate = confirmed.ExpiryDate,
+                        SalePrice = confirmed.SalePrice,
                         AvailableQuantity = confirmed.AvailableQuantity,
                         AllocatedQuantity = item.PackageQuantity
                     });
+
+                {
+                    double fallbackPackageSalePrice =
+                        item.UnitPrice *
+                        (item.IsSmallUnit
+                            ? Math.Max(1, item.UnitsPerPackage)
+                            : 1);
+
+                    SalesProductSearchResult currentProductResult =
+                        allSearchResults == null
+                            ? null
+                            : allSearchResults.FirstOrDefault(
+                                result => result != null &&
+                                          result.Product != null &&
+                                          result.Product.Id == item.ProductId);
+
+                    if (currentProductResult != null)
+                        fallbackPackageSalePrice =
+                            currentProductResult.Product.SalePrice;
+
+                    double selectedBatchUnitPrice =
+                        confirmed.SalePrice ?? fallbackPackageSalePrice;
+
+                    if (item.IsSmallUnit)
+                        selectedBatchUnitPrice /= Math.Max(1, item.UnitsPerPackage);
+
+                    item.UnitPrice = selectedBatchUnitPrice;
+                    item.Total = RoundMoney(item.Quantity * item.UnitPrice);
+                }
 
                 UpdateBatchAllocationSummary(item);
                 UpdateGrandTotal();
@@ -3448,21 +3478,22 @@ namespace Ocore.desktop.Views
 
                     double newUnitPrice;
 
-                    if (string.Equals(
-                        item.UnitName,
-                        product.UnitName,
-                        StringComparison.Ordinal))
+                    double packageSalePrice = product.SalePrice;
+                    SaleInvoiceBatchAllocation selectedAllocation =
+                        item.BatchAllocations == null ? null :
+                        item.BatchAllocations.FirstOrDefault(allocation =>
+                            allocation != null && allocation.AllocatedQuantity > BatchQuantityEpsilon);
+                    if (selectedAllocation != null && selectedAllocation.SalePrice.HasValue)
+                        packageSalePrice = selectedAllocation.SalePrice.Value;
+
+                    if (string.Equals(item.UnitName, product.UnitName, StringComparison.Ordinal))
                     {
-                        newUnitPrice = product.SalePrice;
+                        newUnitPrice = packageSalePrice;
                     }
                     else if (!string.IsNullOrWhiteSpace(product.SmallUnitName) &&
-                             string.Equals(
-                                 item.UnitName,
-                                 product.SmallUnitName,
-                                 StringComparison.Ordinal))
+                             string.Equals(item.UnitName, product.SmallUnitName, StringComparison.Ordinal))
                     {
-                        newUnitPrice =
-                            product.SalePrice / product.UnitsPerPackage;
+                        newUnitPrice = packageSalePrice / product.UnitsPerPackage;
                     }
                     else
                     {
