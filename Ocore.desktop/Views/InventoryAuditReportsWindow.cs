@@ -46,10 +46,10 @@ namespace Ocore.desktop.Views
 
             var root = new DockPanel { Margin = new Thickness(14) };
 
-            var header = new DockPanel
+            var header = new StackPanel
             {
-                Margin = new Thickness(0, 0, 0, 10),
-                LastChildFill = false
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 0, 0, 10)
             };
 
             summaryText = new TextBlock
@@ -62,7 +62,6 @@ namespace Ocore.desktop.Views
                 Foreground = new SolidColorBrush(Color.FromRgb(18, 61, 53))
             };
 
-            header.Children.Add(summaryText);
 
             var reportActions = new StackPanel
             {
@@ -73,8 +72,8 @@ namespace Ocore.desktop.Views
             reportActions.Children.Add(MakeButton("تصدير Excel", ExportExcel));
             reportActions.Children.Add(MakeButton("طباعة", PrintReport));
 
-            DockPanel.SetDock(reportActions, Dock.Right);
             header.Children.Add(reportActions);
+            header.Children.Add(summaryText);
 
             DockPanel.SetDock(header, Dock.Top);
             root.Children.Add(header);
