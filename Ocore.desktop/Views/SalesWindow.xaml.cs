@@ -1603,7 +1603,7 @@ namespace Ocore.desktop.Views
                             NormalizeSearchField(result.Name),
                             NormalizeSearchField(result.TradeNameArabic),
                             NormalizeSearchField(result.GenericName),
-                            NormalizeSearchField(result.ProductCode),
+                            NormalizeSearchField(searchResult.ProductCode),
                             NormalizeSearchField(result.Barcode)
                         }
                     });
@@ -2781,8 +2781,8 @@ namespace Ocore.desktop.Views
                             ? null
                             : allSearchResults.FirstOrDefault(
                                 searchResult => searchResult != null &&
-                                          result.Product != null &&
-                                          result.Product.Id == item.ProductId);
+                                          searchResult.Product != null &&
+                                          searchResult.Product.Id == item.ProductId);
 
                     if (currentProductResult != null)
                         fallbackPackageSalePrice =
