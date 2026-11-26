@@ -1235,7 +1235,6 @@ WHERE Id=@I AND SessionId=@S
                         }
                     }
                     if (ids.Count == 0) throw new InvalidOperationException("لا توجد بنود في جلسة الجرد لاعتمادها.");
-                    if (variance && string.IsNullOrWhiteSpace(note)) throw new InvalidOperationException("يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل اعتماد الجرد.");
                     using (var c = new SQLiteCommand(@"SELECT COUNT(*) FROM InventoryCountPendingMovements WHERE SessionId=@S AND ProcessingStatus IN ('Pending','Failed');", connection, transaction))
                     { c.Parameters.AddWithValue("@S", sessionId); if (Convert.ToInt32(c.ExecuteScalar()) > 0) throw new InvalidOperationException("توجد حركات معلقة أو فاشلة. استخدم معالجة الحركات أولًا."); }
                     using (var c = new SQLiteCommand("UPDATE InventoryCountSessions SET Status='Submitted' WHERE Id=@S AND Status='Open';", connection, transaction))
@@ -1363,12 +1362,6 @@ WHERE Id=@I AND SessionId=@S;", connection, transaction))
                     8,
                     MidpointRounding.AwayFromZero);
 
-                if (Math.Abs(difference) > epsilon &&
-                    string.IsNullOrWhiteSpace(note))
-                {
-                    throw new InvalidOperationException(
-                        "يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل الاعتماد.");
-                }
             }
         }
 
@@ -1485,12 +1478,6 @@ ORDER BY s.ReceiptAtSnapshot DESC,
 
             if (Math.Abs(difference) > epsilon)
             {
-                if (string.IsNullOrWhiteSpace(note))
-                {
-                    throw new InvalidOperationException(
-                        "يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل الاعتماد.");
-                }
-
                 CostLayer latestLayer;
                 if (string.Equals(targetType, "Batch", StringComparison.OrdinalIgnoreCase))
                 {
