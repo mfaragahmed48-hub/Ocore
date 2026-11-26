@@ -356,17 +356,6 @@ namespace Ocore.desktop.Views
             name.SetValue(TextBlock.MarginProperty, new Thickness(5, 3, 5, 3));
             panel.AppendChild(name);
 
-            var choose = new FrameworkElementFactory(typeof(Button));
-            choose.SetValue(ContentControl.ContentProperty, "اختيار التشغيلات");
-            choose.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 0, 0, 0));
-            choose.SetValue(Control.PaddingProperty, new Thickness(8, 2, 8, 2));
-            choose.SetBinding(FrameworkElement.TagProperty, new Binding("ProductId"));
-            choose.SetBinding(UIElement.VisibilityProperty, new Binding("IsEntryRow")
-            {
-                Converter = new BooleanToVisibilityConverter()
-            });
-            choose.AddHandler(Button.ClickEvent, new RoutedEventHandler(AuditProductBatchPicker_Click));
-            panel.AppendChild(choose);
 
             return new DataTemplate { VisualTree = panel };
         }
@@ -497,7 +486,8 @@ namespace Ocore.desktop.Views
                 entryRow["Barcode"] = Convert.ToString(product["Barcode"]);
 
             combo.Text = productName;
-            combo.Tag = "ready";
+            combo.Tag = "opening";
+            AddProductToInvoiceRow(productId, combo);
         }
 
         private void AuditProductBatchPicker_Click(object sender, RoutedEventArgs e)
