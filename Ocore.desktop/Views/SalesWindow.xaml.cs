@@ -2780,7 +2780,7 @@ namespace Ocore.desktop.Views
                         allSearchResults == null
                             ? null
                             : allSearchResults.FirstOrDefault(
-                                result => result != null &&
+                                searchResult => searchResult != null &&
                                           result.Product != null &&
                                           result.Product.Id == item.ProductId);
 
