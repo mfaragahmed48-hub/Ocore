@@ -1,4 +1,5 @@
 ﻿
+using DocumentFormat.OpenXml.ExtendedProperties;
 using Ocore.desktop.Data;
 using System;
 using System.Collections.Generic;
@@ -185,17 +186,6 @@ ORDER BY p.Id,
 
                     if (selected != null)
                     {
-                        foreach (var target in targets)
-                        {
-                            target.Batches = target.Batches
-                                .Where(b => selected.Contains(b.BatchId))
-                                .ToList();
-
-                            target.Quantity = target.Batches.Sum(b => b.Quantity);
-                        }
-
-                        targets = targets.Where(x => x.Batches.Count > 0).ToList();
-
                         var includedBatchIds = new HashSet<int>(
                             targets.SelectMany(x => x.Batches).Select(x => x.BatchId));
 
@@ -209,7 +199,6 @@ ORDER BY p.Id,
                                 "بعض التشغيلات المحددة غير موجودة أو لا تنتمي إلى أصناف قابلة للجرد؛ لم يتم إنشاء الجلسة.");
                         }
                     }
-
                     if (targets.Count == 0)
                         throw new InvalidOperationException("لا توجد أهداف مخزنية ضمن نطاق الجرد المحدد.");
 
@@ -678,26 +667,81 @@ WHERE Id=@I AND SessionId=@S;", connection, transaction))
                     if (string.IsNullOrWhiteSpace(note))
                     {
                         throw new InvalidOperationException(
-                            "يوجد عجز أو زيادة بين البنود المحددة. اكتب سبب الفرق قبل الاعتماد الجماعي.");
+                            "يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل الاعتماد.");
+                    }
+
+                    CostLayer latestLayer = layers
+                        .OrderByDescending(x => x.ReceiptAt ?? "")
+                        .ThenByDescending(x => x.ReceiptItemId)
+                        .ThenByDescending(x => x.BatchId)
+                        .FirstOrDefault();
+
+                    if (latestLayer == null)
+                    {
+                        throw new InvalidOperationException(
+                            "لا يوجد استلام مسجل داخل هدف الجرد لتقييم الفرق. لا يمكن اعتماد الفرق دون مصدر تكلفة موثق.");
+                    }
+
+                    double currentLayerQuantity;
+
+                    using (var command = new SQLiteCommand(
+                        "SELECT Quantity FROM Batches WHERE Id=@B;",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
+
+                        object value = command.ExecuteScalar();
+
+                        if (value == null || value == DBNull.Value)
+                            throw new InvalidOperationException("آخر استلام داخل هدف الجرد غير موجود.");
+
+                        currentLayerQuantity = Convert.ToDouble(value);
+                    }
+
+                    double adjustedQuantity = Math.Round(
+                        currentLayerQuantity + difference,
+                        8,
+                        MidpointRounding.AwayFromZero);
+
+                    if (adjustedQuantity < -epsilon)
+                    {
+                        throw new InvalidOperationException(
+                            "كمية العجز أكبر من رصيد آخر استلام داخل هدف الجرد. لم يتم تغيير المخزون؛ يلزم مراجعة توزيع الفرق قبل الاعتماد.");
                     }
 
                     using (var command = new SQLiteCommand(
-                        "SELECT COUNT(*) FROM InventoryCountItemBatchSnapshots WHERE CountItemId=@I;",
+                        "UPDATE Batches SET Quantity=@Q WHERE Id=@B;",
                         connection, transaction))
                     {
+                        command.Parameters.AddWithValue("@Q", Math.Max(0, adjustedQuantity));
+                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
+
+                        if (command.ExecuteNonQuery() != 1)
+                            throw new InvalidOperationException("تعذر تحديث رصيد آخر استلام داخل هدف الجرد.");
+                    }
+
+                    using (var command = new SQLiteCommand(@"
+INSERT INTO InventoryCountItemCostDecisions
+(SessionId,CountItemId,DifferenceQuantity,EvaluationMethod,UnitCost,
+ SourceBatchId,Notes,Reason,ManagerId,CreatedAt)
+VALUES(@S,@I,@D,'LastReceiptInTarget',@C,@B,@N,@R,@U,@T);",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@S", sessionId);
                         command.Parameters.AddWithValue("@I", itemId);
-
-                        int snapshotCount = Convert.ToInt32(command.ExecuteScalar());
-
-                        if (snapshotCount == 0 && !batchId.HasValue)
-                        {
-                            throw new InvalidOperationException(
-                                "أحد البنود لا يحتوي على لقطة استلام أو تشغيلة مرجعية لتقييم الفرق.");
-                        }
+                        command.Parameters.AddWithValue("@D", difference);
+                        command.Parameters.AddWithValue("@C", latestLayer.UnitCost);
+                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
+                        command.Parameters.AddWithValue("@N", note.Trim());
+                        command.Parameters.AddWithValue("@R", note.Trim());
+                        command.Parameters.AddWithValue("@U", managerId);
+                        command.Parameters.AddWithValue("@T", Now());
+                        command.ExecuteNonQuery();
                     }
                 }
             }
         }
+
 
         private int ApproveItemWithinTransaction(
             SQLiteConnection connection,
@@ -829,58 +873,43 @@ ORDER BY s.ReceiptAtSnapshot DESC,
                         "لا يوجد استلام مسجل داخل هدف الجرد لتقييم الفرق. لا يمكن اعتماد الفرق دون مصدر تكلفة موثق.");
                 }
 
-                if (string.Equals(targetType, "Batch", StringComparison.OrdinalIgnoreCase))
+                double currentLayerQuantity;
+
+                using (var command = new SQLiteCommand(
+                    "SELECT Quantity FROM Batches WHERE Id=@B;",
+                    connection, transaction))
                 {
-                    int targetBatchId = batchId ?? latestLayer.BatchId;
+                    command.Parameters.AddWithValue("@B", latestLayer.BatchId);
 
-                    using (var command = new SQLiteCommand(
-                        "UPDATE Batches SET Quantity=@Q WHERE Id=@B;",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@Q", actualQuantity);
-                        command.Parameters.AddWithValue("@B", targetBatchId);
+                    object value = command.ExecuteScalar();
 
-                        if (command.ExecuteNonQuery() != 1)
-                            throw new InvalidOperationException("التشغيلة غير موجودة؛ لم يتغير المخزون.");
-                    }
+                    if (value == null || value == DBNull.Value)
+                        throw new InvalidOperationException("آخر استلام داخل هدف الجرد غير موجود.");
+
+                    currentLayerQuantity = Convert.ToDouble(value);
                 }
-                else
+
+                double adjustedQuantity = Math.Round(
+                    currentLayerQuantity + difference,
+                    8,
+                    MidpointRounding.AwayFromZero);
+
+                if (adjustedQuantity < -epsilon)
                 {
-                    double currentLayerQuantity;
+                    throw new InvalidOperationException(
+                        "كمية العجز أكبر من رصيد آخر استلام داخل هدف الجرد. لم يتم تغيير المخزون؛ يلزم مراجعة توزيع الفرق قبل الاعتماد.");
+                }
 
-                    using (var command = new SQLiteCommand(
-                        "SELECT Quantity FROM Batches WHERE Id=@B;",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
+                using (var command = new SQLiteCommand(
+                    "UPDATE Batches SET Quantity=@Q WHERE Id=@B;",
+                    connection, transaction))
+                {
+                    command.Parameters.AddWithValue("@Q", Math.Max(0, adjustedQuantity));
+                    command.Parameters.AddWithValue("@B", latestLayer.BatchId);
 
-                        object value = command.ExecuteScalar();
-
-                        if (value == null || value == DBNull.Value)
-                            throw new InvalidOperationException("آخر استلام داخل هدف الجرد غير موجود.");
-
-                        currentLayerQuantity = Convert.ToDouble(value);
-                    }
-
-                    double adjustedQuantity = Math.Round(
-                        currentLayerQuantity + difference, 8, MidpointRounding.AwayFromZero);
-
-                    if (adjustedQuantity < -epsilon)
-                    {
+                    if (command.ExecuteNonQuery() != 1)
                         throw new InvalidOperationException(
-                            "كمية العجز أكبر من رصيد آخر استلام داخل هدف الجرد. لم يتم تغيير المخزون؛ يلزم مراجعة توزيع الفرق قبل الاعتماد.");
-                    }
-
-                    using (var command = new SQLiteCommand(
-                        "UPDATE Batches SET Quantity=@Q WHERE Id=@B;",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@Q", Math.Max(0, adjustedQuantity));
-                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
-
-                        if (command.ExecuteNonQuery() != 1)
-                            throw new InvalidOperationException("تعذر تحديث رصيد آخر استلام داخل هدف الجرد.");
-                    }
+                            "تعذر تحديث رصيد آخر استلام داخل هدف الجرد.");
                 }
 
                 using (var command = new SQLiteCommand(@"
@@ -900,24 +929,6 @@ VALUES(@S,@I,@D,'LastReceiptInTarget',@C,@B,@N,@R,@U,@T);",
                     command.Parameters.AddWithValue("@U", managerId);
                     command.Parameters.AddWithValue("@T", Now());
                     command.ExecuteNonQuery();
-                }
-            }
-            else if (string.Equals(targetType, "Batch", StringComparison.OrdinalIgnoreCase))
-            {
-                int targetBatchId = batchId ?? (layers.Count == 0 ? 0 : layers[0].BatchId);
-
-                if (targetBatchId > 0)
-                {
-                    using (var command = new SQLiteCommand(
-                        "UPDATE Batches SET Quantity=@Q WHERE Id=@B;",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@Q", actualQuantity);
-                        command.Parameters.AddWithValue("@B", targetBatchId);
-
-                        if (command.ExecuteNonQuery() != 1)
-                            throw new InvalidOperationException("التشغيلة غير موجودة؛ لم يتغير المخزون.");
-                    }
                 }
             }
 
