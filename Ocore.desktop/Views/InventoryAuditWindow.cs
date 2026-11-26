@@ -43,168 +43,216 @@ namespace Ocore.desktop.Views
 
         private UIElement BuildLayout()
         {
-            var root = new Grid { Margin = new Thickness(14) };
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star) });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1.15, GridUnitType.Star) });
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var root = new Grid { Margin = new Thickness(9), Background = new SolidColorBrush(Color.FromRgb(241, 244, 246)) };
+            for (int i = 0; i < 7; i++)
+                root.RowDefinitions.Add(new RowDefinition { Height = i == 4 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
 
-            var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-            heading.Children.Add(new TextBlock
-            {
-                Text = "الجرد السريع: ابحث عن الصنف، أدخل الكمية، وانتقل للصنف التالي",
-                FontSize = 21,
-                FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(18, 61, 53))
-            });
-            selectedSessionText = new TextBlock
-            {
-                Text = "اختر جلسة جرد لعرض تفاصيلها",
-                Margin = new Thickness(0, 5, 0, 0),
-                Foreground = Brushes.DimGray
-            };
-            heading.Children.Add(selectedSessionText);
-            Grid.SetRow(heading, 0);
-            root.Children.Add(heading);
+            var primary = new SolidColorBrush(Color.FromRgb(23, 76, 67));
+            var accent = new SolidColorBrush(Color.FromRgb(22, 134, 93));
+            var border = new SolidColorBrush(Color.FromRgb(220, 229, 225));
+            var muted = new SolidColorBrush(Color.FromRgb(113, 129, 124));
 
-            var actions = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
-            barcodeSearchBox = new TextBox
+            var header = new Border
             {
-                Width = 180,
-                Height = 34,
-                Margin = new Thickness(3),
-                Padding = new Thickness(7),
-                ToolTip = "ابحث بكود الصنف أو الباركود"
+                Background = primary,
+                CornerRadius = new CornerRadius(7),
+                Padding = new Thickness(11, 8, 11, 8),
+                Margin = new Thickness(0, 0, 0, 6)
             };
-            barcodeSearchBox.TextChanged += BarcodeSearchBox_TextChanged;
-            barcodeSearchBox.KeyDown += (sender, args) => { if (args.Key == System.Windows.Input.Key.Enter && itemsGrid.Items.Count > 0) { itemsGrid.SelectedIndex = 0; pQuantityBox.Focus(); args.Handled = true; } };
-            actions.Children.Add(barcodeSearchBox);
+            var headerGrid = new Grid();
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var titleStack = new StackPanel();
+            titleStack.Children.Add(new TextBlock { Text = "فاتورة جرد المخزون", FontSize = 18, FontWeight = FontWeights.Bold, Foreground = Brushes.White });
+            titleStack.Children.Add(new TextBlock { Text = "إدخال الكميات الفعلية ومراجعة كل تشغيلة وتاريخ صلاحية", FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(213, 231, 225)), Margin = new Thickness(0, 2, 0, 0) });
+            Grid.SetColumn(titleStack, 0);
+            headerGrid.Children.Add(titleStack);
+            var brand = new TextBlock { Text = "O CORE", FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 4, 0) };
+            Grid.SetColumn(brand, 1);
+            headerGrid.Children.Add(brand);
+            header.Child = headerGrid;
+            Grid.SetRow(header, 0);
+            root.Children.Add(header);
 
-            reasonBox = new TextBox
-            {
-                Width = 190,
-                Height = 34,
-                Margin = new Thickness(3),
-                Padding = new Thickness(7),
-                ToolTip = "سبب بدء الجرد أو سبب إلغاء الجلسة"
-            };
-            actions.Children.Add(reasonBox);
-            actions.Children.Add(MakeButton("بدء جرد شامل", CreateFullSession));
-            actions.Children.Add(MakeButton("بدء جرد محدد", CreateSelectedSession));
-            actions.Children.Add(MakeButton("إضافة أصناف للجلسة", AddItemsToOpenSession));
+            var sessionCard = new Border { Background = Brushes.White, BorderBrush = border, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 5) };
+            var sessionLayout = new Grid();
+            sessionLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
+            sessionLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2.2, GridUnitType.Star) });
+            sessionLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var sessionInfo = new StackPanel { Margin = new Thickness(3, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+            sessionInfo.Children.Add(new TextBlock { Text = "بيانات جلسة الجرد", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = muted });
+            selectedSessionText = new TextBlock { Text = "اختر جلسة جرد أو ابدأ جلسة جديدة", FontSize = 12, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(38, 58, 54)), Margin = new Thickness(0, 3, 0, 0), TextWrapping = TextWrapping.Wrap };
+            sessionInfo.Children.Add(selectedSessionText);
+            Grid.SetColumn(sessionInfo, 0);
+            sessionLayout.Children.Add(sessionInfo);
+            progressText = new TextBlock { Text = "التقدم: —", FontSize = 12, FontWeight = FontWeights.Bold, Foreground = accent, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(5) };
+            Grid.SetColumn(progressText, 1);
+            sessionLayout.Children.Add(progressText);
+            reasonBox = new TextBox { Width = 175, Height = 29, Margin = new Thickness(3), Padding = new Thickness(7, 2, 7, 2), FontSize = 11, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "سبب بدء الجرد أو سبب إلغاء الجلسة" };
+            Grid.SetColumn(reasonBox, 2);
+            sessionLayout.Children.Add(reasonBox);
+            sessionCard.Child = sessionLayout;
+            Grid.SetRow(sessionCard, 1);
+            root.Children.Add(sessionCard);
 
-            pUnitLabel = new TextBlock
-            {
-                Text = "P",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(3, 0, 0, 0),
-                FontWeight = FontWeights.Bold
-            };
-            pQuantityBox = new TextBox
-            {
-                Width = 75,
-                Height = 34,
-                Margin = new Thickness(3),
-                Padding = new Thickness(7),
-                ToolTip = "العدد الفعلي للوحدة الأساسية P"
-            };
-            pQuantityBox.KeyDown += (sender, args) => { if (args.Key == System.Windows.Input.Key.Enter) { uQuantityBox.Focus(); uQuantityBox.SelectAll(); args.Handled = true; } };
-            uUnitLabel = new TextBlock
-            {
-                Text = "U",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(3, 0, 0, 0),
-                FontWeight = FontWeights.Bold
-            };
-            uQuantityBox = new TextBox
-            {
-                Width = 75,
-                Height = 34,
-                Margin = new Thickness(3),
-                Padding = new Thickness(7),
-                ToolTip = "العدد الفعلي للوحدات الصغيرة U"
-            };
-            uQuantityBox.KeyDown += (sender, args) => { if (args.Key == System.Windows.Input.Key.Enter) { SaveSelectedCount(); args.Handled = true; } };
-            actions.Children.Add(pUnitLabel);
-            actions.Children.Add(pQuantityBox);
-            actions.Children.Add(uUnitLabel);
-            actions.Children.Add(uQuantityBox);
-            actions.Children.Add(MakeButton("حفظ العد P/U", SaveSelectedCount));
-            actions.Children.Add(MakeButton("إرسال الجلسة للمراجعة", SubmitSelectedSession));
-            actions.Children.Add(MakeButton("اعتماد البند", ApproveSelectedItem));
-            actions.Children.Add(MakeButton("اعتماد المحدد جماعيًا", ApproveSelectedItems));
-            actions.Children.Add(MakeButton("إلغاء البنود المحددة", CancelSelectedItems));
-            actions.Children.Add(MakeButton("طلب إعادة عد", RequestSelectedRecount));
-            actions.Children.Add(MakeButton("إعادة مراجعة المحدد", ReopenSelectedItems));
-            actions.Children.Add(MakeButton("إلغاء المراجعة والعودة للاعتماد السابق", CancelReopenedSelectedItems));
-            actions.Children.Add(MakeButton("إغلاق الجلسة", CloseSelectedSession));
-            actions.Children.Add(MakeButton("إلغاء الجلسة", CancelSelectedSession));
-            actions.Children.Add(MakeButton("إعادة معالجة الحركات", RetryPending));
-            actions.Children.Add(MakeButton("تقارير الجرد", OpenInventoryReports));
-            actions.Children.Add(MakeButton("إعدادات تتبع الأصناف", OpenTrackingSettings));
-            actions.Children.Add(MakeButton("تحديث", RefreshAll));
-            Grid.SetRow(actions, 1);
-            root.Children.Add(actions);
+            var sessionActions = new WrapPanel { Margin = new Thickness(0, 0, 0, 5) };
+            sessionActions.Children.Add(MakeButton("بدء جرد شامل", CreateFullSession));
+            sessionActions.Children.Add(MakeButton("بدء جرد محدد", CreateSelectedSession));
+            sessionActions.Children.Add(MakeButton("تحديث", RefreshAll));
+            sessionActions.Children.Add(MakeButton("تقارير الجرد", OpenInventoryReports));
+            sessionActions.Children.Add(MakeButton("إعدادات التتبع", OpenTrackingSettings));
+            Grid.SetRow(sessionActions, 2);
+            root.Children.Add(sessionActions);
 
-            var main = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            main.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.9, GridUnitType.Star) });
-            main.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.8, GridUnitType.Star) });
             sessionsGrid = CreateGrid();
+            sessionsGrid.Height = 68;
+            sessionsGrid.MinHeight = 54;
+            sessionsGrid.MaxHeight = 78;
+            sessionsGrid.Margin = new Thickness(0);
             sessionsGrid.SelectionChanged += SessionsGrid_SelectionChanged;
-            var sessionsPanel = MakePanel("جلسات الجرد", sessionsGrid);
-            Grid.SetColumn(sessionsPanel, 0);
-            main.Children.Add(sessionsPanel);
+            sessionsGrid.Background = Brushes.White;
+            sessionsGrid.AlternatingRowBackground = new SolidColorBrush(Color.FromRgb(246, 249, 247));
+            sessionsGrid.BorderBrush = border;
+            sessionsGrid.BorderThickness = new Thickness(1);
+            var sessionsCard = new Border { Background = Brushes.White, BorderBrush = border, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5), Padding = new Thickness(4), Margin = new Thickness(0, 0, 0, 5), Child = sessionsGrid };
+            Grid.SetRow(sessionsCard, 3);
+            root.Children.Add(sessionsCard);
+
+            var invoiceBody = new Grid();
+            invoiceBody.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            invoiceBody.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            invoiceBody.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var entryCard = new Border { Background = Brushes.White, BorderBrush = border, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5), Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 5) };
+            var entryGrid = new Grid();
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.7, GridUnitType.Star) });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            entryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            barcodeSearchBox = new TextBox { Height = 32, Margin = new Thickness(2), Padding = new Thickness(8, 4, 8, 4), FontSize = 12, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "ابحث باسم الصنف أو الكود أو الباركود" };
+            barcodeSearchBox.TextChanged += BarcodeSearchBox_TextChanged;
+            barcodeSearchBox.KeyDown += (sender, args) =>
+            {
+                if (args.Key == System.Windows.Input.Key.Enter && itemsGrid != null && itemsGrid.Items.Count > 0)
+                {
+                    itemsGrid.SelectedIndex = 0;
+                    pQuantityBox.Focus();
+                    pQuantityBox.SelectAll();
+                    args.Handled = true;
+                }
+            };
+            Grid.SetColumn(barcodeSearchBox, 0);
+            entryGrid.Children.Add(barcodeSearchBox);
+
+            pUnitLabel = new TextBlock { Text = "P", FontSize = 11, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 0, 2, 0) };
+            Grid.SetColumn(pUnitLabel, 1);
+            entryGrid.Children.Add(pUnitLabel);
+            pQuantityBox = new TextBox { Height = 32, Margin = new Thickness(2), Padding = new Thickness(6, 3, 6, 3), FontSize = 13, TextAlignment = TextAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "العدد الفعلي للوحدة الأساسية P" };
+            pQuantityBox.KeyDown += (sender, args) =>
+            {
+                if (args.Key == System.Windows.Input.Key.Enter)
+                {
+                    uQuantityBox.Focus();
+                    uQuantityBox.SelectAll();
+                    args.Handled = true;
+                }
+            };
+            Grid.SetColumn(pQuantityBox, 2);
+            entryGrid.Children.Add(pQuantityBox);
+
+            uUnitLabel = new TextBlock { Text = "U", FontSize = 11, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 0, 2, 0) };
+            Grid.SetColumn(uUnitLabel, 3);
+            entryGrid.Children.Add(uUnitLabel);
+            uQuantityBox = new TextBox { Height = 32, Margin = new Thickness(2), Padding = new Thickness(6, 3, 6, 3), FontSize = 13, TextAlignment = TextAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "العدد الفعلي للوحدات الصغيرة U" };
+            uQuantityBox.KeyDown += (sender, args) =>
+            {
+                if (args.Key == System.Windows.Input.Key.Enter)
+                {
+                    SaveSelectedCount();
+                    args.Handled = true;
+                }
+            };
+            Grid.SetColumn(uQuantityBox, 4);
+            entryGrid.Children.Add(uQuantityBox);
+
+            var saveButton = MakeButton("حفظ العد", SaveSelectedCount);
+            Grid.SetColumn(saveButton, 5);
+            entryGrid.Children.Add(saveButton);
+            var addButton = MakeButton("إضافة أصناف", AddItemsToOpenSession);
+            Grid.SetColumn(addButton, 6);
+            entryGrid.Children.Add(addButton);
+            var clearSearchButton = MakeButton("مسح البحث", () => { barcodeSearchBox.Clear(); barcodeSearchBox.Focus(); });
+            Grid.SetColumn(clearSearchButton, 7);
+            entryGrid.Children.Add(clearSearchButton);
+            entryCard.Child = entryGrid;
+            Grid.SetRow(entryCard, 0);
+            invoiceBody.Children.Add(entryCard);
 
             itemsGrid = CreateGrid();
             itemsGrid.SelectionMode = DataGridSelectionMode.Extended;
             itemsGrid.SelectionChanged += ItemsGrid_SelectionChanged;
-            var itemsPanel = MakePanel("تفاصيل التشغيلات والعد الفعلي والمراجعة", itemsGrid);
-            itemsPanel.Margin = new Thickness(8, 0, 0, 0);
-            Grid.SetColumn(itemsPanel, 1);
-            main.Children.Add(itemsPanel);
-            Grid.SetRow(main, 2);
-            root.Children.Add(main);
+            itemsGrid.MinHeight = 180;
+            itemsGrid.RowHeight = 34;
+            itemsGrid.FontSize = 11;
+            itemsGrid.Background = Brushes.White;
+            itemsGrid.Foreground = new SolidColorBrush(Color.FromRgb(38, 58, 54));
+            itemsGrid.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 213, 207));
+            itemsGrid.BorderThickness = new Thickness(1);
+            itemsGrid.HorizontalGridLinesBrush = border;
+            itemsGrid.VerticalGridLinesBrush = border;
+            itemsGrid.AlternatingRowBackground = new SolidColorBrush(Color.FromRgb(246, 249, 247));
+            itemsGrid.GridLinesVisibility = DataGridGridLinesVisibility.All;
+            var itemsPanel = new DockPanel();
+            var itemsTitle = new TextBlock { Text = "أصناف فاتورة الجرد — كل تشغيلة / تاريخ صلاحية في صف مستقل", FontSize = 12, FontWeight = FontWeights.Bold, Foreground = primary, Margin = new Thickness(3, 2, 3, 5) };
+            DockPanel.SetDock(itemsTitle, Dock.Top);
+            itemsPanel.Children.Add(itemsTitle);
+            itemsPanel.Children.Add(itemsGrid);
+            Grid.SetRow(itemsPanel, 1);
+            invoiceBody.Children.Add(itemsPanel);
 
-            var lower = new Grid();
-            lower.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            lower.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var reviewCard = new Border { Background = Brushes.White, BorderBrush = border, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5), Padding = new Thickness(5), Margin = new Thickness(0, 5, 0, 0) };
+            var reviewActions = new WrapPanel();
+            reviewActions.Children.Add(MakeButton("إرسال للمراجعة", SubmitSelectedSession));
+            reviewActions.Children.Add(MakeButton("اعتماد البند", ApproveSelectedItem));
+            reviewActions.Children.Add(MakeButton("اعتماد المحدد", ApproveSelectedItems));
+            reviewActions.Children.Add(MakeButton("إلغاء البنود", CancelSelectedItems));
+            reviewActions.Children.Add(MakeButton("طلب إعادة عد", RequestSelectedRecount));
+            reviewActions.Children.Add(MakeButton("إعادة مراجعة", ReopenSelectedItems));
+            reviewActions.Children.Add(MakeButton("إلغاء المراجعة", CancelReopenedSelectedItems));
+            reviewActions.Children.Add(MakeButton("إغلاق الجلسة", CloseSelectedSession));
+            reviewActions.Children.Add(MakeButton("إلغاء الجلسة", CancelSelectedSession));
+            reviewActions.Children.Add(MakeButton("معالجة الحركات", RetryPending));
+            reviewCard.Child = reviewActions;
+            Grid.SetRow(reviewCard, 2);
+            invoiceBody.Children.Add(reviewCard);
+
+            Grid.SetRow(invoiceBody, 4);
+            root.Children.Add(invoiceBody);
+
+            var activityTabs = new TabControl { Height = 105, Margin = new Thickness(0, 5, 0, 0), FontSize = 10 };
+            var pendingTab = new TabItem { Header = "الحركات المعلقة" };
             pendingGrid = CreateGrid();
-            var pendingPanel = MakePanel("الحركات المعلقة أثناء الجرد", pendingGrid);
-            Grid.SetColumn(pendingPanel, 0);
-            lower.Children.Add(pendingPanel);
+            pendingTab.Content = pendingGrid;
+            activityTabs.Items.Add(pendingTab);
+            var eventsTab = new TabItem { Header = "سجل الأحداث" };
             eventsGrid = CreateGrid();
-            var eventsPanel = MakePanel("سجل أحداث الجلسة", eventsGrid);
-            eventsPanel.Margin = new Thickness(8, 0, 0, 0);
-            Grid.SetColumn(eventsPanel, 1);
-            lower.Children.Add(eventsPanel);
-            Grid.SetRow(lower, 3);
-            root.Children.Add(lower);
+            eventsTab.Content = eventsGrid;
+            activityTabs.Items.Add(eventsTab);
+            Grid.SetRow(activityTabs, 5);
+            root.Children.Add(activityTabs);
 
-            var footer = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-            progressText = new TextBlock
-            {
-                Text = "التقدم: —",
-                FontWeight = FontWeights.Bold,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.FromRgb(18, 61, 53))
-            };
-            footer.Children.Add(progressText);
-            noteBox = new TextBox
-            {
-                Width = 330,
-                Height = 34,
-                Margin = new Thickness(20, 0, 5, 0),
-                Padding = new Thickness(7),
-                ToolTip = "ملاحظة المدير أو سبب الفرق أو إعادة العد"
-            };
+            noteBox = new TextBox { Height = 30, MinWidth = 260, Margin = new Thickness(0, 5, 5, 0), Padding = new Thickness(7, 3, 7, 3), FontSize = 11, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "ملاحظة المدير أو سبب الفرق أو إعادة العد أو الإلغاء" };
+            var footer = new DockPanel { Margin = new Thickness(0, 1, 0, 0) };
             footer.Children.Add(noteBox);
-            footer.Children.Add(MakeButton("إغلاق الشاشة", () => Close()));
-            Grid.SetRow(footer, 4);
+            var closeButton = MakeButton("إغلاق الشاشة", () => Close());
+            DockPanel.SetDock(closeButton, Dock.Left);
+            footer.Children.Add(closeButton);
+            Grid.SetRow(footer, 6);
             root.Children.Add(footer);
             return root;
         }
@@ -228,6 +276,11 @@ namespace Ocore.desktop.Views
             grid.AutoGeneratingColumn += (sender, args) =>
             {
                 string name = args.PropertyName;
+                if (name == "PUnitName" || name == "UUnitName" || name == "UnitsPerPackageSnapshot")
+                {
+                    args.Cancel = true;
+                    return;
+                }
                 if (name == "Id" || name == "ProductId" || name == "BatchId" ||
                     name == "TargetType" || name == "TargetKey" || name == "AssignedUserId" ||
                     name == "CountedBy" || name == "PurchasePriceSnapshot" ||
