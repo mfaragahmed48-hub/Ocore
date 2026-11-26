@@ -88,7 +88,7 @@ VALUES(@N,@S,@R,'Open',@U,@D);", connection, transaction))
                     {
                         command.Parameters.AddWithValue("@N", number);
                         command.Parameters.AddWithValue("@S", selected == null ? "Full" : "Selected");
-                        command.Parameters.AddWithValue("@R", cancellationNote);
+                        command.Parameters.AddWithValue("@R", reason.Trim());
                         command.Parameters.AddWithValue("@U", managerId);
                         command.Parameters.AddWithValue("@D", now);
                         command.ExecuteNonQuery();
@@ -323,6 +323,270 @@ VALUES(@I,@B,@Q,@C,@BN,@E,@U,@RA,@RI,@D);", connection, transaction))
 
                     transaction.Commit();
                     return sessionId;
+                }
+            }
+        }
+
+
+        public int AddTargetsToOpenSession(
+            int managerId, int sessionId, IEnumerable<int> selectedBatchIds)
+        {
+            var selected = selectedBatchIds == null
+                ? new HashSet<int>()
+                : new HashSet<int>(selectedBatchIds.Where(x => x > 0));
+
+            if (sessionId <= 0)
+                throw new ArgumentException("جلسة الجرد المحددة غير صحيحة.");
+            if (selected.Count == 0)
+                throw new ArgumentException("حدد تشغيلة واحدة على الأقل لإضافتها للجرد.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    EnsureManager(connection, transaction, managerId);
+
+                    string sessionStatus;
+                    using (var statusCommand = new SQLiteCommand(
+                        "SELECT Status FROM InventoryCountSessions WHERE Id=@S;",
+                        connection, transaction))
+                    {
+                        statusCommand.Parameters.AddWithValue("@S", sessionId);
+                        sessionStatus = Convert.ToString(statusCommand.ExecuteScalar());
+                    }
+                    if (sessionStatus != "Open")
+                        throw new InvalidOperationException(
+                            "إضافة أصناف جديدة مسموحة فقط في جلسة مفتوحة لم تُرسل للمراجعة.");
+
+                    var selectedList = selected.OrderBy(x => x).ToList();
+                    var placeholders = selectedList.Select((x, i) => "@B" + i).ToList();
+                    string batchFilter = string.Join(",", placeholders);
+                    var targetsByKey = new Dictionary<string, Target>(StringComparer.Ordinal);
+
+                    using (var command = new SQLiteCommand(@"
+SELECT p.Id AS ProductId,p.Name AS ProductName,
+       COALESCE(p.UnitName,'') AS UnitName,
+       COALESCE(p.SmallUnitName,'') AS SmallUnitName,
+       CASE WHEN COALESCE(p.UnitsPerPackage,1)>0
+            THEN p.UnitsPerPackage ELSE 1 END AS UnitsPerPackage,
+       COALESCE(t.TrackBatchNumber,0) AS TrackBatchNumber,
+       COALESCE(t.TrackExpiryDate,0) AS TrackExpiryDate,
+       b.Id AS BatchId,
+       COALESCE(b.BatchNumber,'') AS BatchNumber,
+       COALESCE(b.ExpiryDate,'') AS ExpiryDate,
+       COALESCE(b.Quantity,0) AS Quantity,
+       COALESCE(b.PurchasePrice,0) AS PurchasePrice,
+       COALESCE(pi.CreatedAt,
+           (SELECT MAX(al.CreatedAt)
+            FROM AuditLogs al
+            WHERE al.EntityType='Batch'
+              AND al.EntityId=b.Id
+              AND al.ActionType='Create'),'') AS ReceiptAt,
+       COALESCE(pii.Id,b.Id,0) AS ReceiptItemId
+FROM Products p
+LEFT JOIN InventoryProductTracking t ON t.ProductId=p.Id
+LEFT JOIN Batches b ON b.ProductId=p.Id
+LEFT JOIN PurchaseInvoiceItems pii ON pii.BatchId=b.Id
+LEFT JOIN PurchaseInvoices pi ON pi.Id=pii.InvoiceId
+WHERE p.IsArchived=0
+  AND p.Id IN
+      (SELECT DISTINCT ProductId FROM Batches WHERE Id IN (" + batchFilter + @"))
+ORDER BY p.Id,
+         COALESCE(pi.CreatedAt,
+             (SELECT MAX(al.CreatedAt)
+              FROM AuditLogs al
+              WHERE al.EntityType='Batch'
+                AND al.EntityId=b.Id
+                AND al.ActionType='Create'),''),
+         COALESCE(pii.Id,b.Id),b.Id;", connection, transaction))
+                    {
+                        for (int i = 0; i < selectedList.Count; i++)
+                            command.Parameters.AddWithValue(placeholders[i], selectedList[i]);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader["BatchId"] == DBNull.Value)
+                                    continue;
+
+                                int productId = Convert.ToInt32(reader["ProductId"]);
+                                int batchId = Convert.ToInt32(reader["BatchId"]);
+                                string expiry = Convert.ToString(reader["ExpiryDate"]);
+                                bool trackBatchNumber = Convert.ToInt32(reader["TrackBatchNumber"]) == 1;
+                                bool trackExpiryDate = Convert.ToInt32(reader["TrackExpiryDate"]) == 1;
+
+                                string targetType;
+                                string targetKey;
+                                if (trackBatchNumber)
+                                {
+                                    targetType = "Batch";
+                                    targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
+                                }
+                                else if (trackExpiryDate)
+                                {
+                                    targetType = "ExpiryGroup";
+                                    string expiryKey = string.IsNullOrWhiteSpace(expiry)
+                                        ? "~NONE~"
+                                        : expiry.Trim();
+                                    targetKey = "E:" + productId.ToString(CultureInfo.InvariantCulture) + ":" + expiryKey;
+                                }
+                                else
+                                {
+                                    targetType = "Product";
+                                    targetKey = "P:" + productId.ToString(CultureInfo.InvariantCulture);
+                                }
+
+                                Target target;
+                                if (!targetsByKey.TryGetValue(targetKey, out target))
+                                {
+                                    target = new Target
+                                    {
+                                        ProductId = productId,
+                                        Name = Convert.ToString(reader["ProductName"]),
+                                        Unit = BuildUnitSnapshot(
+                                            Convert.ToString(reader["UnitName"]),
+                                            Convert.ToString(reader["SmallUnitName"]),
+                                            Convert.ToInt32(reader["UnitsPerPackage"])),
+                                        UnitsPerPackage = Convert.ToInt32(reader["UnitsPerPackage"]),
+                                        TargetType = targetType,
+                                        TargetKey = targetKey,
+                                        Expiry = targetType == "Batch" || targetType == "ExpiryGroup" ? expiry : "",
+                                        Batch = targetType == "Batch" ? Convert.ToString(reader["BatchNumber"]) : "",
+                                        Batches = new List<TargetBatch>()
+                                    };
+                                    targetsByKey.Add(targetKey, target);
+                                }
+
+                                var batch = new TargetBatch
+                                {
+                                    BatchId = batchId,
+                                    BatchNumber = Convert.ToString(reader["BatchNumber"]),
+                                    ExpiryDate = expiry,
+                                    Quantity = Convert.ToDouble(reader["Quantity"]),
+                                    PurchasePrice = Convert.ToDouble(reader["PurchasePrice"]),
+                                    ReceiptAt = Convert.ToString(reader["ReceiptAt"]),
+                                    ReceiptItemId = Convert.ToInt32(reader["ReceiptItemId"])
+                                };
+                                target.Batches.Add(batch);
+                                target.Quantity += batch.Quantity;
+                            }
+                        }
+                    }
+
+                    var targets = targetsByKey.Values
+                        .Where(x => x.Batches.Any(b => selected.Contains(b.BatchId)))
+                        .OrderBy(x => x.Name, StringComparer.CurrentCulture)
+                        .ThenBy(x => x.TargetKey, StringComparer.Ordinal)
+                        .ToList();
+
+                    var includedBatchIds = new HashSet<int>(
+                        targets.SelectMany(x => x.Batches).Select(x => x.BatchId));
+                    if (selected.Any(x => !includedBatchIds.Contains(x)))
+                        throw new InvalidOperationException(
+                            "بعض التشغيلات المحددة لم تعد موجودة أو لا تنتمي إلى صنف قابل للجرد؛ لم تتم الإضافة.");
+                    if (targets.Count == 0)
+                        throw new InvalidOperationException("لا توجد أهداف مخزنية صالحة للإضافة.");
+
+                    foreach (var target in targets)
+                    {
+                        using (var duplicate = new SQLiteCommand(@"
+SELECT COUNT(*) FROM InventoryCountItems
+WHERE SessionId=@S AND TargetKey=@K;", connection, transaction))
+                        {
+                            duplicate.Parameters.AddWithValue("@S", sessionId);
+                            duplicate.Parameters.AddWithValue("@K", target.TargetKey);
+                            if (Convert.ToInt32(duplicate.ExecuteScalar()) > 0)
+                                throw new InvalidOperationException(
+                                    "أحد الأهداف المحددة موجود بالفعل داخل جلسة الجرد؛ لم تتم إضافة أي هدف.");
+                        }
+
+                        using (var conflict = new SQLiteCommand(@"
+SELECT COUNT(*)
+FROM InventoryCountItems i
+INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
+WHERE i.TargetKey=@K
+  AND i.ItemStatus<>'Cancelled'
+  AND s.Id<>@S
+  AND s.Status IN ('Open','Submitted','PartiallyApproved');", connection, transaction))
+                        {
+                            conflict.Parameters.AddWithValue("@K", target.TargetKey);
+                            conflict.Parameters.AddWithValue("@S", sessionId);
+                            if (Convert.ToInt32(conflict.ExecuteScalar()) > 0)
+                                throw new InvalidOperationException(
+                                    "أحد الأهداف مرتبط بجلسة جرد أخرى مفتوحة أو قيد المراجعة؛ لم تتم الإضافة.");
+                        }
+                    }
+
+                    string now = Now();
+                    foreach (var target in targets)
+                    {
+                        TargetBatch latest = target.Batches
+                            .OrderByDescending(x => x.ReceiptAt ?? "")
+                            .ThenByDescending(x => x.ReceiptItemId)
+                            .ThenByDescending(x => x.BatchId)
+                            .FirstOrDefault();
+
+                        using (var command = new SQLiteCommand(@"
+INSERT INTO InventoryCountItems
+(SessionId,ProductId,BatchId,TargetType,TargetKey,ProductNameSnapshot,
+ BatchNumberSnapshot,ExpiryDateSnapshot,UnitSnapshot,BookQuantity,
+ PurchasePriceSnapshot,UnitsPerPackageSnapshot,ItemStatus,CreatedAt)
+VALUES(@S,@P,@B,@T,@K,@N,@BN,@E,@U,@Q,@C,@UP,'Pending',@D);", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            command.Parameters.AddWithValue("@P", target.ProductId);
+                            command.Parameters.AddWithValue("@B",
+                                target.TargetType == "Batch" && target.Batches.Count == 1
+                                    ? (object)target.Batches[0].BatchId
+                                    : DBNull.Value);
+                            command.Parameters.AddWithValue("@T", target.TargetType);
+                            command.Parameters.AddWithValue("@K", target.TargetKey);
+                            command.Parameters.AddWithValue("@N", target.Name ?? "");
+                            command.Parameters.AddWithValue("@BN", target.Batch ?? "");
+                            command.Parameters.AddWithValue("@E", target.Expiry ?? "");
+                            command.Parameters.AddWithValue("@U", target.Unit ?? "");
+                            command.Parameters.AddWithValue("@Q", target.Quantity);
+                            command.Parameters.AddWithValue("@C", latest == null ? 0 : latest.PurchasePrice);
+                            command.Parameters.AddWithValue("@UP", target.UnitsPerPackage > 0 ? target.UnitsPerPackage : 1);
+                            command.Parameters.AddWithValue("@D", now);
+                            command.ExecuteNonQuery();
+                        }
+
+                        int countItemId = Convert.ToInt32(
+                            new SQLiteCommand("SELECT last_insert_rowid();", connection, transaction).ExecuteScalar());
+
+                        foreach (var batch in target.Batches)
+                        {
+                            using (var snapshotCommand = new SQLiteCommand(@"
+INSERT INTO InventoryCountItemBatchSnapshots
+(CountItemId,BatchId,BookQuantity,PurchasePriceSnapshot,
+ BatchNumberSnapshot,ExpiryDateSnapshot,UnitSnapshot,
+ ReceiptAtSnapshot,ReceiptItemIdSnapshot,CreatedAt)
+VALUES(@I,@B,@Q,@C,@BN,@E,@U,@RA,@RI,@D);", connection, transaction))
+                            {
+                                snapshotCommand.Parameters.AddWithValue("@I", countItemId);
+                                snapshotCommand.Parameters.AddWithValue("@B", batch.BatchId);
+                                snapshotCommand.Parameters.AddWithValue("@Q", batch.Quantity);
+                                snapshotCommand.Parameters.AddWithValue("@C", batch.PurchasePrice);
+                                snapshotCommand.Parameters.AddWithValue("@BN", batch.BatchNumber ?? "");
+                                snapshotCommand.Parameters.AddWithValue("@E", batch.ExpiryDate ?? "");
+                                snapshotCommand.Parameters.AddWithValue("@U", target.Unit ?? "");
+                                snapshotCommand.Parameters.AddWithValue("@RA", batch.ReceiptAt ?? "");
+                                snapshotCommand.Parameters.AddWithValue("@RI", batch.ReceiptItemId);
+                                snapshotCommand.Parameters.AddWithValue("@D", now);
+                                snapshotCommand.ExecuteNonQuery();
+                            }
+                        }
+                    }
+
+                    Event(connection, transaction, sessionId, null,
+                        "TargetsAdded", managerId,
+                        "إضافة أهداف جرد جديدة أثناء الجلسة؛ عدد الأهداف: " + targets.Count);
+
+                    transaction.Commit();
+                    return targets.Count;
                 }
             }
         }
@@ -1272,7 +1536,7 @@ WHERE Id=@S AND Status IN('Open','Submitted','PartiallyApproved');",
 
         public void CancelSession(int managerId, int sessionId, string reason)
         {
-            string cancellationNote = string.IsNullOrWhiteSpace(reason)
+            reason = string.IsNullOrWhiteSpace(reason)
                 ? "تم الإلغاء بواسطة المدير دون إدخال سبب."
                 : reason.Trim();
 
@@ -1345,7 +1609,7 @@ WHERE SessionId=@S AND ItemStatus<>'Approved';",
                     }
 
                     Event(connection, transaction, sessionId, null,
-                        "SessionCancelled", managerId, cancellationNote);
+                        "SessionCancelled", managerId, reason.Trim());
 
                     transaction.Commit();
                 }
