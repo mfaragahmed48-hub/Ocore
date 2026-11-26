@@ -1217,7 +1217,9 @@ namespace Ocore.desktop.Views
             RunAction(() =>
             {
                 auditService.ApproveAndCloseSession(currentUserId, selectedSessionId, noteBox.Text.Trim());
-                noteBox.Clear(); LoadSessions(selectedSessionId);
+                noteBox.Clear();
+                LoadSessions(selectedSessionId);
+                StartNewInvoice();
                 Info("تم اعتماد جميع بنود الجرد وتحديث المخزون وإغلاق الجلسة بنجاح.");
             });
         }
