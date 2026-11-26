@@ -234,10 +234,10 @@ namespace Ocore.desktop.Views
             sheet.PageSetup.FitToPages(1, 0);
             sheet.PageSetup.PagesWide = 1;
             sheet.PageSetup.CenterHorizontally = true;
-            sheet.PageMargins.Top = 0.5;
-            sheet.PageMargins.Bottom = 0.5;
-            sheet.PageMargins.Left = 0.25;
-            sheet.PageMargins.Right = 0.25;
+            sheet.PageSetup.Margins.Top = 0.5;
+            sheet.PageSetup.Margins.Bottom = 0.5;
+            sheet.PageSetup.Margins.Left = 0.25;
+            sheet.PageSetup.Margins.Right = 0.25;
         }
 
         private void PrintReport()
