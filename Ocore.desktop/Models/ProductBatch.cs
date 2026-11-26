@@ -13,6 +13,8 @@ namespace Ocore.desktop.Models
 
         public double? SalePrice { get; set; }
 
+        public bool IsUntrackedProduct { get; set; }
+
         public string DisplayName
         {
             get

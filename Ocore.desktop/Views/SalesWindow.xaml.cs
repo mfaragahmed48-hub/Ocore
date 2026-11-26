@@ -2326,8 +2326,8 @@ namespace Ocore.desktop.Views
                 return;
             }
 
-            // كل صف يجب أن يرتبط بتشغيلة واحدة فقط.
-            if (item.BatchAllocations != null &&
+            // الأصناف المتتبعة فقط تظل مقيدة بتشغيلة واحدة في الصف.
+            if (!item.IsUntrackedProduct && item.BatchAllocations != null &&
                 item.BatchAllocations.Count > 1)
             {
                 MessageBox.Show(
@@ -2343,7 +2343,7 @@ namespace Ocore.desktop.Views
 
             SaleInvoiceBatchAllocation selectedAllocation = null;
 
-            if (item.BatchAllocations != null &&
+            if (!item.IsUntrackedProduct && item.BatchAllocations != null &&
                 item.BatchAllocations.Count == 1)
             {
                 selectedAllocation = item.BatchAllocations[0];
@@ -2468,8 +2468,68 @@ namespace Ocore.desktop.Views
 
                 // تحديث الرصيد المتاح المسجل لهذا الصف
                 // ليعكس الرصيد المتبقي بعد تخصيص الصفوف الأخرى.
-                selectedAllocation.AvailableQuantity =
-                    remainingBatchQuantity;
+                selectedAllocation.AvailableQuantity = remainingBatchQuantity;
+            }
+
+            List<SaleInvoiceBatchAllocation> updatedUntrackedAllocations = null;
+            if (item.IsUntrackedProduct && item.BatchAllocations != null && item.BatchAllocations.Count > 0)
+            {
+                double? price = item.BatchAllocations.Where(a => a != null &&
+                    a.AllocatedQuantity > BatchQuantityEpsilon).Select(a => a.SalePrice).FirstOrDefault();
+                if (!price.HasValue)
+                {
+                    MessageBox.Show("تعذر تحديد سعر مجموعة التشغيلات الحالية.",
+                        "تخصيص التشغيلات", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    e.Cancel = true;
+                    return;
+                }
+
+                List<ProductBatch> currentBatches = productService.GetAvailableBatches(currentUserId, item.ProductId);
+                if (currentBatches == null) currentBatches = new List<ProductBatch>();
+                var available = currentBatches.Where(b => b != null && b.IsUntrackedProduct &&
+                    string.IsNullOrWhiteSpace(b.BatchNumber) && string.IsNullOrWhiteSpace(b.ExpiryDate) &&
+                    b.SalePrice.HasValue && Math.Abs(b.SalePrice.Value - price.Value) <= 0.000001)
+                    .OrderBy(b => b.Id)
+                    .Select(b => new
+                    {
+                        Batch = b,
+                        Other = invoiceItems.Where(row => row != null && !ReferenceEquals(row, item) &&
+                            row.ProductId == item.ProductId && row.BatchAllocations != null)
+                            .SelectMany(row => row.BatchAllocations)
+                            .Where(a => a != null && a.BatchId == b.Id && IsFinite(a.AllocatedQuantity) &&
+                                a.AllocatedQuantity > 0).Sum(a => a.AllocatedQuantity)
+                    })
+                    .Select(x => new { x.Batch, Available = Math.Max(0, x.Batch.Quantity - x.Other) })
+                    .Where(x => x.Available > BatchQuantityEpsilon).ToList();
+
+                double totalAvailable = available.Sum(x => x.Available);
+                if (newPackageQuantity > totalAvailable + BatchQuantityEpsilon)
+                {
+                    MessageBox.Show("الكمية الجديدة تتجاوز رصيد مجموعة السعر نفسها. المتاح: " +
+                        totalAvailable.ToString("0.###"), "رصيد غير كافٍ",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    e.Cancel = true;
+                    return;
+                }
+
+                updatedUntrackedAllocations = new List<SaleInvoiceBatchAllocation>();
+                double remaining = newPackageQuantity;
+                foreach (var entry in available)
+                {
+                    double take = Math.Min(entry.Available, remaining);
+                    if (take > BatchQuantityEpsilon)
+                        updatedUntrackedAllocations.Add(new SaleInvoiceBatchAllocation
+                        {
+                            BatchId = entry.Batch.Id,
+                            BatchNumber = entry.Batch.BatchNumber,
+                            ExpiryDate = entry.Batch.ExpiryDate,
+                            SalePrice = entry.Batch.SalePrice,
+                            AvailableQuantity = entry.Available,
+                            AllocatedQuantity = take
+                        });
+                    remaining = Math.Max(0, remaining - take);
+                    if (remaining <= BatchQuantityEpsilon) break;
+                }
             }
 
             double newTotal =
@@ -2486,11 +2546,14 @@ namespace Ocore.desktop.Views
 
                     // الصف مرتبط بتشغيلة واحدة:
                     // كمية الصرف من هذه التشغيلة تساوي كمية الصف الجديدة.
-                    if (selectedAllocation != null)
+                    if (updatedUntrackedAllocations != null)
                     {
-                        selectedAllocation.AllocatedQuantity =
-                            newPackageQuantity;
+                        item.BatchAllocations.Clear();
+                        foreach (var allocation in updatedUntrackedAllocations)
+                            item.BatchAllocations.Add(allocation);
                     }
+                    else if (selectedAllocation != null)
+                        selectedAllocation.AllocatedQuantity = newPackageQuantity;
 
                     RefreshInvoice(item);
                 }));
@@ -2602,6 +2665,9 @@ namespace Ocore.desktop.Views
                 if (availableBatches == null)
                     availableBatches = new List<ProductBatch>();
 
+                item.IsUntrackedProduct = availableBatches.Count > 0 &&
+                    availableBatches.All(b => b != null && b.IsUntrackedProduct);
+
                 availableBatches = availableBatches
                     .Where(x => x != null && x.Id > 0)
                     .GroupBy(x => x.Id)
@@ -2712,91 +2778,52 @@ namespace Ocore.desktop.Views
                     return;
                 }
 
-                // كل صف يجب أن يحتوي على تشغيلة واحدة فقط.
-                if (window.ConfirmedAllocations.Count != 1)
-                {
-                    MessageBox.Show(
-                        "يجب اختيار تشغيلة واحدة فقط لكل صف.",
-                        "اختيار التشغيلات",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+                List<SaleInvoiceBatchAllocation> confirmedAllocations =
+                    window.ConfirmedAllocations.Where(a => a != null && a.BatchId > 0 &&
+                        IsFinite(a.AllocatedQuantity) && a.AllocatedQuantity > 0).ToList();
+                double confirmedTotal = confirmedAllocations.Sum(a => a.AllocatedQuantity);
+                bool samePrice = confirmedAllocations.Count > 0 &&
+                    confirmedAllocations.All(a => a.SalePrice.HasValue &&
+                        Math.Abs(a.SalePrice.Value - confirmedAllocations[0].SalePrice.Value) <= 0.000001);
 
+                if (confirmedAllocations.Count == 0 ||
+                    Math.Abs(confirmedTotal - item.PackageQuantity) > BatchQuantityEpsilon ||
+                    (!item.IsUntrackedProduct && confirmedAllocations.Count != 1) ||
+                    (item.IsUntrackedProduct && !samePrice))
+                {
+                    MessageBox.Show("بيانات التشغيلات لا تطابق كمية الصف أو سعر المجموعة.",
+                        "بيانات تخصيص غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
                     UpdateBatchAllocationSummary(item);
                     UpdateGrandTotal();
-
-                    return;
-                }
-
-                SaleInvoiceBatchAllocation confirmed =
-                    window.ConfirmedAllocations[0];
-
-                if (confirmed == null ||
-                    confirmed.BatchId <= 0 ||
-                    !IsFinite(confirmed.AllocatedQuantity) ||
-                    Math.Abs(
-                        confirmed.AllocatedQuantity -
-                        item.PackageQuantity) > BatchQuantityEpsilon)
-                {
-                    MessageBox.Show(
-                        "بيانات التشغيلة المختارة لا تطابق كمية الصف.\n\n" +
-                        "أعد اختيار التشغيلة.",
-                        "بيانات تخصيص غير صحيحة",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-
-                    UpdateBatchAllocationSummary(item);
-                    UpdateGrandTotal();
-
                     return;
                 }
 
                 if (item.BatchAllocations == null)
-                {
-                    item.BatchAllocations =
-                        new ObservableCollection<SaleInvoiceBatchAllocation>();
-                }
-
+                    item.BatchAllocations = new ObservableCollection<SaleInvoiceBatchAllocation>();
                 item.BatchAllocations.Clear();
-
-                item.BatchAllocations.Add(
-                    new SaleInvoiceBatchAllocation
+                foreach (var a in confirmedAllocations)
+                    item.BatchAllocations.Add(new SaleInvoiceBatchAllocation
                     {
-                        BatchId = confirmed.BatchId,
-                        BatchNumber = confirmed.BatchNumber,
-                        ExpiryDate = confirmed.ExpiryDate,
-                        SalePrice = confirmed.SalePrice,
-                        AvailableQuantity = confirmed.AvailableQuantity,
-                        AllocatedQuantity = item.PackageQuantity
+                        BatchId = a.BatchId,
+                        BatchNumber = a.BatchNumber,
+                        ExpiryDate = a.ExpiryDate,
+                        SalePrice = a.SalePrice,
+                        AvailableQuantity = a.AvailableQuantity,
+                        AllocatedQuantity = a.AllocatedQuantity
                     });
 
-                {
-                    double fallbackPackageSalePrice =
-                        item.UnitPrice *
-                        (item.IsSmallUnit
-                            ? Math.Max(1, item.UnitsPerPackage)
-                            : 1);
-
-                    SalesProductSearchResult currentProductResult =
-                        allSearchResults == null
-                            ? null
-                            : allSearchResults.FirstOrDefault(
-                                searchResult => searchResult != null &&
-                                          searchResult.Product != null &&
-                                          searchResult.Product.Id == item.ProductId);
-
-                    if (currentProductResult != null)
-                        fallbackPackageSalePrice =
-                            currentProductResult.Product.SalePrice;
-
-                    double selectedBatchUnitPrice =
-                        confirmed.SalePrice ?? fallbackPackageSalePrice;
-
-                    if (item.IsSmallUnit)
-                        selectedBatchUnitPrice /= Math.Max(1, item.UnitsPerPackage);
-
-                    item.UnitPrice = selectedBatchUnitPrice;
-                    item.Total = RoundMoney(item.Quantity * item.UnitPrice);
-                }
+                double fallbackPackageSalePrice = item.UnitPrice *
+                    (item.IsSmallUnit ? Math.Max(1, item.UnitsPerPackage) : 1);
+                SalesProductSearchResult currentProductResult = allSearchResults == null ? null :
+                    allSearchResults.FirstOrDefault(r => r != null && r.Product != null &&
+                        r.Product.Id == item.ProductId);
+                if (currentProductResult != null)
+                    fallbackPackageSalePrice = currentProductResult.Product.SalePrice;
+                double selectedBatchUnitPrice = confirmedAllocations[0].SalePrice ?? fallbackPackageSalePrice;
+                if (item.IsSmallUnit)
+                    selectedBatchUnitPrice /= Math.Max(1, item.UnitsPerPackage);
+                item.UnitPrice = selectedBatchUnitPrice;
+                item.Total = RoundMoney(item.Quantity * item.UnitPrice);
 
                 UpdateBatchAllocationSummary(item);
                 UpdateGrandTotal();
@@ -2871,269 +2898,123 @@ namespace Ocore.desktop.Views
         {
             allocatedTotal = 0;
             errorMessage = string.Empty;
-
-            if (item == null)
+            if (item == null || !IsFinite(item.PackageQuantity) || item.PackageQuantity <= 0)
             {
-                errorMessage = "بيانات الصنف غير صحيحة.";
+                errorMessage = "بيانات الصنف أو الكمية غير صحيحة.";
+                return false;
+            }
+            if (item.BatchAllocations == null || item.BatchAllocations.Count == 0)
+            {
+                errorMessage = "لم يتم اختيار مجموعة سعر أو تشغيلة للصنف: " + item.ItemName;
+                return false;
+            }
+            if (!item.IsUntrackedProduct && item.BatchAllocations.Count != 1)
+            {
+                errorMessage = "يجب تخصيص تشغيلة واحدة فقط للصف الخاص بالصنف: " + item.ItemName;
                 return false;
             }
 
-            if (!IsFinite(item.PackageQuantity) ||
-                item.PackageQuantity <= 0)
+            var ids = new HashSet<int>();
+            double? commonPrice = null;
+            foreach (SaleInvoiceBatchAllocation a in item.BatchAllocations)
             {
-                errorMessage =
-                    "الكمية المطلوبة غير صحيحة للصنف: " +
-                    item.ItemName;
-
+                if (a == null || a.BatchId <= 0 || !IsFinite(a.AllocatedQuantity) ||
+                    a.AllocatedQuantity <= 0 || !IsFinite(a.AvailableQuantity) ||
+                    a.AvailableQuantity < 0 || a.AllocatedQuantity > a.AvailableQuantity + BatchQuantityEpsilon ||
+                    !ids.Add(a.BatchId))
+                {
+                    errorMessage = "بيانات إحدى التشغيلات أو كمية الصرف غير صحيحة للصنف: " + item.ItemName;
+                    return false;
+                }
+                if (!item.IsUntrackedProduct && IsBatchExpiredOrInvalid(a.ExpiryDate))
+                {
+                    errorMessage = "لا يمكن البيع من تشغيلة منتهية الصلاحية أو تاريخها غير صحيح: " + a.BatchNumber;
+                    return false;
+                }
+                if (item.IsUntrackedProduct)
+                {
+                    if (!a.SalePrice.HasValue)
+                    {
+                        errorMessage = "سعر البيع غير محدد لإحدى تشغيلات الصنف: " + item.ItemName;
+                        return false;
+                    }
+                    if (!commonPrice.HasValue) commonPrice = a.SalePrice.Value;
+                    else if (Math.Abs(commonPrice.Value - a.SalePrice.Value) > 0.000001)
+                    {
+                        errorMessage = "لا يمكن جمع تشغيلات مختلفة السعر في صف بيع واحد.";
+                        return false;
+                    }
+                }
+                allocatedTotal = Math.Round(allocatedTotal + a.AllocatedQuantity, 8);
+            }
+            if (Math.Abs(allocatedTotal - item.PackageQuantity) > BatchQuantityEpsilon)
+            {
+                errorMessage = "إجمالي الكمية الموزعة لا يساوي كمية الصف للصنف: " + item.ItemName;
                 return false;
             }
-
-            if (item.BatchAllocations == null ||
-                item.BatchAllocations.Count == 0)
-            {
-                errorMessage =
-                    "لم يتم اختيار تشغيلة للصنف: " +
-                    item.ItemName;
-
-                return false;
-            }
-
-            // كل صف في الفاتورة يجب أن يحتوي على تشغيلة واحدة فقط.
-            if (item.BatchAllocations.Count != 1)
-            {
-                errorMessage =
-                    "يجب تخصيص تشغيلة واحدة فقط للصف الخاص بالصنف: " +
-                    item.ItemName;
-
-                return false;
-            }
-
-            SaleInvoiceBatchAllocation allocation =
-                item.BatchAllocations[0];
-
-            if (allocation == null)
-            {
-                errorMessage =
-                    "بيانات التشغيلة غير صحيحة للصنف: " +
-                    item.ItemName;
-
-                return false;
-            }
-
-            if (allocation.BatchId <= 0)
-            {
-                errorMessage =
-                    "رقم التشغيلة غير صحيح للصنف: " +
-                    item.ItemName;
-
-                return false;
-            }
-
-            if (!IsFinite(allocation.AllocatedQuantity) ||
-                allocation.AllocatedQuantity <= 0)
-            {
-                errorMessage =
-                    "كمية الصرف غير صحيحة للصنف: " +
-                    item.ItemName;
-
-                return false;
-            }
-
-            if (!IsFinite(allocation.AvailableQuantity) ||
-                allocation.AvailableQuantity < 0)
-            {
-                errorMessage =
-                    "الرصيد المتاح غير صحيح للتشغيلة: " +
-                    allocation.BatchNumber +
-                    "\nالصنف: " + item.ItemName;
-
-                return false;
-            }
-
-            if (allocation.AllocatedQuantity >
-                allocation.AvailableQuantity + BatchQuantityEpsilon)
-            {
-                errorMessage =
-                    "كمية الصرف تتجاوز رصيد التشغيلة.\n\n" +
-                    "الصنف: " + item.ItemName +
-                    "\nالتشغيلة: " + allocation.BatchNumber +
-                    "\nالمتاح: " +
-                    allocation.AvailableQuantity.ToString("0.###") +
-                    "\nالمطلوب صرفه: " +
-                    allocation.AllocatedQuantity.ToString("0.###");
-
-                return false;
-            }
-
-            if (IsBatchExpiredOrInvalid(allocation.ExpiryDate))
-            {
-                errorMessage =
-                    "لا يمكن البيع من تشغيلة منتهية الصلاحية " +
-                    "أو تاريخ صلاحيتها غير صحيح.\n\n" +
-                    "الصنف: " + item.ItemName +
-                    "\nالتشغيلة: " + allocation.BatchNumber +
-                    "\nالصلاحية: " + allocation.ExpiryDate;
-
-                return false;
-            }
-
-            if (Math.Abs(
-                allocation.AllocatedQuantity -
-                item.PackageQuantity) > BatchQuantityEpsilon)
-            {
-                errorMessage =
-                    "كمية التشغيلة لا تطابق كمية الصف.\n\n" +
-                    "الصنف: " + item.ItemName +
-                    "\nكمية الصف: " +
-                    item.PackageQuantity.ToString("0.###") +
-                    "\nكمية التشغيلة: " +
-                    allocation.AllocatedQuantity.ToString("0.###");
-
-                return false;
-            }
-
-            allocatedTotal = allocation.AllocatedQuantity;
-
             return true;
         }
 
-        private void UpdateBatchAllocationSummary(
-            SaleInvoiceItem item)
+        private void UpdateBatchAllocationSummary(SaleInvoiceItem item)
         {
             if (item == null)
             {
-                BatchRequiredText.Text = "0";
-                BatchAllocatedText.Text = "0";
-                BatchRemainingText.Text = "0";
-
-                BatchAllocationStatusText.Text =
-                    "اختر صنفًا من الفاتورة";
-
-                BatchAllocationStatusText.Foreground =
-                    System.Windows.Media.Brushes.Gray;
-
+                BatchRequiredText.Text = "0"; BatchAllocatedText.Text = "0"; BatchRemainingText.Text = "0";
+                BatchAllocationStatusText.Text = "اختر صنفًا من الفاتورة";
+                BatchAllocationStatusText.Foreground = System.Windows.Media.Brushes.Gray;
                 return;
             }
-
-            double required = item.PackageQuantity;
-            double allocated = 0;
-
-            bool validData = true;
-            bool hasExpiredAllocation = false;
-            bool hasSingleAllocation =
-                item.BatchAllocations != null &&
-                item.BatchAllocations.Count == 1;
-
-            if (!IsFinite(required) || required <= 0)
-                validData = false;
-
-            if (!hasSingleAllocation)
+            double required = item.PackageQuantity, allocated = 0;
+            bool valid = IsFinite(required) && required > 0, expired = false;
+            bool has = item.BatchAllocations != null && item.BatchAllocations.Count > 0;
+            var positive = has ? item.BatchAllocations.Where(a => a != null &&
+                IsFinite(a.AllocatedQuantity) && a.AllocatedQuantity > 0).ToList()
+                : new List<SaleInvoiceBatchAllocation>();
+            var ids = new HashSet<int>();
+            double? commonPrice = null;
+            foreach (var a in positive)
             {
-                validData = false;
-
-                if (item.BatchAllocations != null)
+                allocated += a.AllocatedQuantity;
+                if (a.BatchId <= 0 || !ids.Add(a.BatchId) || !IsFinite(a.AvailableQuantity) ||
+                    a.AvailableQuantity < a.AllocatedQuantity - BatchQuantityEpsilon) valid = false;
+                if (!item.IsUntrackedProduct && IsBatchExpiredOrInvalid(a.ExpiryDate))
                 {
-                    foreach (SaleInvoiceBatchAllocation allocation
-                        in item.BatchAllocations)
-                    {
-                        if (allocation != null &&
-                            IsFinite(allocation.AllocatedQuantity))
-                        {
-                            allocated += allocation.AllocatedQuantity;
-                        }
-                    }
+                    expired = true; valid = false;
                 }
+                if (item.IsUntrackedProduct)
+                {
+                    if (!a.SalePrice.HasValue) valid = false;
+                    else if (!commonPrice.HasValue) commonPrice = a.SalePrice.Value;
+                    else if (Math.Abs(commonPrice.Value - a.SalePrice.Value) > 0.000001) valid = false;
+                }
+            }
+            if (positive.Count == 0 || Math.Abs(allocated - required) > BatchQuantityEpsilon) valid = false;
+            if (!item.IsUntrackedProduct && positive.Count > 1) valid = false;
+
+            BatchRequiredText.Text = IsFinite(required) ? required.ToString("0.###") : "—";
+            BatchAllocatedText.Text = IsFinite(allocated) ? allocated.ToString("0.###") : "—";
+            BatchRemainingText.Text = IsFinite(required) && IsFinite(allocated) ? (required - allocated).ToString("0.###") : "—";
+            if (expired)
+            {
+                BatchAllocationStatusText.Text = "التشغيلة منتهية الصلاحية أو تاريخها غير صحيح";
+                BatchAllocationStatusText.Foreground = System.Windows.Media.Brushes.DarkRed;
+            }
+            else if (!has)
+            {
+                BatchAllocationStatusText.Text = "لم يتم اختيار مجموعة سعر أو تشغيلة";
+                BatchAllocationStatusText.Foreground = System.Windows.Media.Brushes.DarkOrange;
+            }
+            else if (!valid)
+            {
+                BatchAllocationStatusText.Text = "بيانات التخصيص أو الكمية غير متطابقة";
+                BatchAllocationStatusText.Foreground = System.Windows.Media.Brushes.DarkRed;
             }
             else
             {
-                SaleInvoiceBatchAllocation allocation =
-                    item.BatchAllocations[0];
-
-                if (allocation == null ||
-                    allocation.BatchId <= 0 ||
-                    !IsFinite(allocation.AllocatedQuantity) ||
-                    allocation.AllocatedQuantity < 0 ||
-                    !IsFinite(allocation.AvailableQuantity) ||
-                    allocation.AvailableQuantity < 0 ||
-                    allocation.AllocatedQuantity >
-                    allocation.AvailableQuantity + BatchQuantityEpsilon)
-                {
-                    validData = false;
-                }
-                else
-                {
-                    allocated = allocation.AllocatedQuantity;
-
-                    if (IsBatchExpiredOrInvalid(allocation.ExpiryDate))
-                    {
-                        hasExpiredAllocation = true;
-                        validData = false;
-                    }
-
-                    if (Math.Abs(
-                        allocation.AllocatedQuantity - required) >
-                        BatchQuantityEpsilon)
-                    {
-                        validData = false;
-                    }
-                }
-            }
-
-            BatchRequiredText.Text =
-                IsFinite(required)
-                    ? required.ToString("0.###")
-                    : "—";
-
-            BatchAllocatedText.Text =
-                IsFinite(allocated)
-                    ? allocated.ToString("0.###")
-                    : "—";
-
-            BatchRemainingText.Text =
-                IsFinite(required) && IsFinite(allocated)
-                    ? (required - allocated).ToString("0.###")
-                    : "—";
-
-            if (hasExpiredAllocation)
-            {
-                BatchAllocationStatusText.Text =
-                    "التشغيلة منتهية الصلاحية أو تاريخها غير صحيح";
-
-                BatchAllocationStatusText.Foreground =
-                    System.Windows.Media.Brushes.DarkRed;
-            }
-            else if (item.BatchAllocations == null ||
-                     item.BatchAllocations.Count == 0)
-            {
-                BatchAllocationStatusText.Text =
-                    "لم يتم اختيار تشغيلة";
-
-                BatchAllocationStatusText.Foreground =
-                    System.Windows.Media.Brushes.DarkOrange;
-            }
-            else if (item.BatchAllocations.Count > 1)
-            {
-                BatchAllocationStatusText.Text =
-                    "يجب اختيار تشغيلة واحدة فقط";
-
-                BatchAllocationStatusText.Foreground =
-                    System.Windows.Media.Brushes.DarkRed;
-            }
-            else if (!validData)
-            {
-                BatchAllocationStatusText.Text =
-                    "بيانات التشغيلة أو الكمية غير متطابقة";
-
-                BatchAllocationStatusText.Foreground =
-                    System.Windows.Media.Brushes.DarkRed;
-            }
-            else
-            {
-                BatchAllocationStatusText.Text =
-                    "التشغيلة محددة والكمية مطابقة";
-
-                BatchAllocationStatusText.Foreground =
-                    System.Windows.Media.Brushes.ForestGreen;
+                BatchAllocationStatusText.Text = item.IsUntrackedProduct
+                    ? "مجموعة السعر موزعة على " + positive.Count + " تشغيلة"
+                    : "التشغيلة محددة والكمية مطابقة";
+                BatchAllocationStatusText.Foreground = System.Windows.Media.Brushes.ForestGreen;
             }
         }
 

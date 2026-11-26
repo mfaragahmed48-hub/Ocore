@@ -755,27 +755,24 @@ ORDER BY p.Name;";
 
                 string sql = @"
 SELECT
-    b.Id,
-    b.BatchNumber,
-    b.ExpiryDate,
-    b.Quantity,
-    b.SalePrice
+    b.Id, b.BatchNumber, b.ExpiryDate, b.Quantity,
+    CASE
+        WHEN COALESCE(t.TrackBatchNumber, 1) = 0
+         AND COALESCE(t.TrackExpiryDate, 1) = 0
+         AND TRIM(COALESCE(b.BatchNumber, '')) = ''
+         AND TRIM(COALESCE(b.ExpiryDate, '')) = ''
+        THEN COALESCE(b.SalePrice, p.SalePrice)
+        ELSE b.SalePrice
+    END AS SalePrice,
+    CASE WHEN COALESCE(t.TrackBatchNumber, 1) = 0
+           AND COALESCE(t.TrackExpiryDate, 1) = 0
+         THEN 1 ELSE 0 END AS IsUntrackedProduct
 FROM Batches b
 INNER JOIN Products p ON p.Id = b.ProductId
-WHERE b.ProductId = @ProductId
-  AND p.IsArchived = 0
-  AND b.Quantity > 0
-  AND (
-        b.ExpiryDate = ''
-        OR b.ExpiryDate >= @Today
-      )
-ORDER BY
-    CASE
-        WHEN b.ExpiryDate = '' THEN 1
-        ELSE 0
-    END,
-    b.ExpiryDate,
-    b.Id;";
+LEFT JOIN InventoryProductTracking t ON t.ProductId = p.Id
+WHERE b.ProductId = @ProductId AND p.IsArchived = 0 AND b.Quantity > 0
+  AND (b.ExpiryDate = '' OR b.ExpiryDate >= @Today)
+ORDER BY CASE WHEN b.ExpiryDate = '' THEN 1 ELSE 0 END, b.ExpiryDate, b.Id;";
 
                 using (var command = new SQLiteCommand(sql, connection))
                 {
@@ -808,7 +805,9 @@ ORDER BY
                                     Convert.ToDouble(reader["Quantity"]),
                                 SalePrice = reader["SalePrice"] == DBNull.Value
                                     ? (double?)null
-                                    : Convert.ToDouble(reader["SalePrice"])
+                                    : Convert.ToDouble(reader["SalePrice"]),
+                                IsUntrackedProduct =
+                                    Convert.ToInt32(reader["IsUntrackedProduct"]) == 1
                             });
                         }
                     }

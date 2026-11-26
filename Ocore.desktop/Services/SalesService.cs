@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
 using System.Globalization;
+using System.Linq;
 
 namespace Ocore.desktop.Services
 {
@@ -280,15 +281,25 @@ namespace Ocore.desktop.Services
                                     "وحدة البيع للصنف " + product.Name + " غير صحيحة.");
                             }
 
-                            if (item.BatchAllocations != null && item.BatchAllocations.Count == 1 &&
-                                item.BatchAllocations[0] != null)
+                            if (item.BatchAllocations != null && item.BatchAllocations.Count > 0)
                             {
-                                double? selectedBatchSalePrice = GetBatchSalePrice(
-                                    connection, transaction, product.Id,
-                                    item.BatchAllocations[0].BatchId);
-                                if (selectedBatchSalePrice.HasValue)
+                                var positiveAllocations = item.BatchAllocations
+                                    .Where(a => a != null && a.AllocatedQuantity > Epsilon).ToList();
+                                if (positiveAllocations.Count > 0)
                                 {
-                                    unitPrice = selectedBatchSalePrice.Value;
+                                    double? storedPrice = GetBatchSalePrice(connection, transaction,
+                                        product.Id, positiveAllocations[0].BatchId);
+                                    double expectedPrice = storedPrice ?? product.SalePrice;
+                                    foreach (SaleInvoiceBatchAllocation a in positiveAllocations.Skip(1))
+                                    {
+                                        double? storedAllocationPrice = GetBatchSalePrice(connection,
+                                            transaction, product.Id, a.BatchId);
+                                        double allocationPrice = storedAllocationPrice ?? product.SalePrice;
+                                        if (Math.Abs(allocationPrice - expectedPrice) > PriceTolerance)
+                                            throw new InvalidOperationException(
+                                                "لا يمكن بيع تشغيلات ذات أسعار بيع مختلفة في صف واحد للصنف " + product.Name + ".");
+                                    }
+                                    unitPrice = expectedPrice;
                                     if (string.Equals(item.UnitName, product.SmallUnitName, StringComparison.Ordinal))
                                         unitPrice /= product.UnitsPerPackage;
                                 }
@@ -911,6 +922,11 @@ TaxStatus = 'Legacy'
             bool isUntrackedProduct =
                 InventoryCostLayerService.IsUntrackedProduct(
                     connection, transaction, productId);
+            if (!isUntrackedProduct &&
+                allocations.Count(a => a != null && a.AllocatedQuantity > Epsilon) > 1)
+                throw new InvalidOperationException(
+                    "لا يمكن تخصيص أكثر من تشغيلة للصنف الذي يتتبع التشغيلة أو الصلاحية.");
+
             var usedBatchIds = new HashSet<int>();
 
             foreach (var allocation in allocations)

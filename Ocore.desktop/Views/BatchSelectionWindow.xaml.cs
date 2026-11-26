@@ -22,6 +22,7 @@ namespace Ocore.desktop.Views
             availableBatchAllocations;
 
         private int previouslySelectedBatchId;
+        private bool isUntrackedProduct;
 
         public List<SaleInvoiceBatchAllocation> ConfirmedAllocations
         {
@@ -39,6 +40,8 @@ namespace Ocore.desktop.Views
                 throw new ArgumentNullException(nameof(invoiceItem));
 
             requiredQuantity = invoiceItem.PackageQuantity;
+            isUntrackedProduct = availableBatches != null && availableBatches.Count > 0 &&
+                availableBatches.All(batch => batch != null && batch.IsUntrackedProduct);
 
             availableBatchAllocations =
                 new ObservableCollection<SaleInvoiceBatchAllocation>();
@@ -53,12 +56,9 @@ namespace Ocore.desktop.Views
 
             previouslySelectedBatchId = 0;
 
-            if (invoiceItem.BatchAllocations != null &&
-                invoiceItem.BatchAllocations.Count == 1)
-            {
-                previouslySelectedBatchId =
-                    invoiceItem.BatchAllocations[0].BatchId;
-            }
+            if (invoiceItem.BatchAllocations != null && invoiceItem.BatchAllocations.Count > 0)
+                previouslySelectedBatchId = invoiceItem.BatchAllocations
+                    .Where(a => a != null && a.BatchId > 0).Select(a => a.BatchId).FirstOrDefault();
 
             BuildAvailableBatches(availableBatches);
 
@@ -83,7 +83,9 @@ namespace Ocore.desktop.Views
             {
                 targetBatch =
                     availableBatchAllocations.FirstOrDefault(
-                        x => x.BatchId == previouslySelectedBatchId);
+                        x => x.BatchId == previouslySelectedBatchId ||
+                            (x.GroupAllocations != null &&
+                             x.GroupAllocations.Any(b => b.BatchId == previouslySelectedBatchId)));
             }
 
             if (targetBatch == null &&
@@ -163,32 +165,58 @@ namespace Ocore.desktop.Views
 
 
 
-        private void BuildAvailableBatches(
-            List<ProductBatch> availableBatches)
+        private void BuildAvailableBatches(List<ProductBatch> availableBatches)
         {
-            HashSet<int> addedIds = new HashSet<int>();
+            var ids = new HashSet<int>();
+            if (availableBatches == null) return;
+            var batches = availableBatches.Where(b => b != null && b.Id > 0 &&
+                ids.Add(b.Id) && IsFinite(b.Quantity) && b.Quantity > QuantityEpsilon)
+                .OrderBy(b => b.Id).ToList();
 
-            if (availableBatches == null)
-                return;
-
-            foreach (ProductBatch batch in availableBatches)
+            if (isUntrackedProduct)
             {
-                if (batch == null ||
-                    batch.Id <= 0 ||
-                    !addedIds.Add(batch.Id))
-                    continue;
+                if (batches.Any(b => !b.IsUntrackedProduct ||
+                    !string.IsNullOrWhiteSpace(b.BatchNumber) ||
+                    !string.IsNullOrWhiteSpace(b.ExpiryDate) || !b.SalePrice.HasValue))
+                    return;
 
-                availableBatchAllocations.Add(
-                    new SaleInvoiceBatchAllocation
+                foreach (var group in batches.GroupBy(b => Math.Round(b.SalePrice.Value, 6))
+                    .OrderBy(g => g.Min(b => b.Id)))
+                {
+                    var members = group.OrderBy(b => b.Id).Select(b =>
+                        new SaleInvoiceBatchAllocation
+                        {
+                            BatchId = b.Id,
+                            BatchNumber = b.BatchNumber,
+                            ExpiryDate = b.ExpiryDate,
+                            SalePrice = b.SalePrice,
+                            AvailableQuantity = b.Quantity,
+                            AllocatedQuantity = 0
+                        }).ToList();
+                    availableBatchAllocations.Add(new SaleInvoiceBatchAllocation
                     {
-                        BatchId = batch.Id,
-                        BatchNumber = batch.BatchNumber,
-                        ExpiryDate = batch.ExpiryDate,
-                        SalePrice = batch.SalePrice,
-                        AvailableQuantity = batch.Quantity,
-                        AllocatedQuantity = 0
+                        BatchId = 0,
+                        BatchNumber = "مجموعة سعر (" + members.Count + " تشغيلة)",
+                        ExpiryDate = "غير متتبع",
+                        SalePrice = group.First().SalePrice,
+                        AvailableQuantity = members.Sum(m => m.AvailableQuantity),
+                        IsUntrackedGroup = true,
+                        GroupAllocations = members
                     });
+                }
+                return;
             }
+
+            foreach (ProductBatch b in batches)
+                availableBatchAllocations.Add(new SaleInvoiceBatchAllocation
+                {
+                    BatchId = b.Id,
+                    BatchNumber = b.BatchNumber,
+                    ExpiryDate = b.ExpiryDate,
+                    SalePrice = b.SalePrice,
+                    AvailableQuantity = b.Quantity,
+                    AllocatedQuantity = 0
+                });
         }
 
         private static bool IsFinite(double value)
@@ -289,14 +317,10 @@ namespace Ocore.desktop.Views
                 return;
             }
 
-            if (IsExpiredOrInvalid(selected.ExpiryDate))
+            if (!selected.IsUntrackedGroup && IsExpiredOrInvalid(selected.ExpiryDate))
             {
-                AllocationStatusText.Text =
-                    "التشغيلة منتهية أو تاريخها غير صحيح";
-
-                AllocationStatusText.Foreground =
-                    Brushes.DarkRed;
-
+                AllocationStatusText.Text = "التشغيلة منتهية أو تاريخها غير صحيح";
+                AllocationStatusText.Foreground = Brushes.DarkRed;
                 return;
             }
 
@@ -312,8 +336,9 @@ namespace Ocore.desktop.Views
                 return;
             }
 
-            AllocationStatusText.Text =
-                "التشغيلة جاهزة للاختيار";
+            AllocationStatusText.Text = selected.IsUntrackedGroup
+                ? "مجموعة السعر جاهزة؛ سيتم الصرف من الأقدم أولًا"
+                : "التشغيلة جاهزة للاختيار";
 
             AllocationStatusText.Foreground =
                 Brushes.ForestGreen;
@@ -342,11 +367,24 @@ namespace Ocore.desktop.Views
                 return false;
             }
 
-            if (selected.BatchId <= 0)
+            if (selected.IsUntrackedGroup)
             {
-                errorMessage =
-                    "بيانات التشغيلة المختارة غير صحيحة.";
-
+                if (!isUntrackedProduct || selected.GroupAllocations == null ||
+                    selected.GroupAllocations.Count == 0 || !selected.SalePrice.HasValue ||
+                    selected.GroupAllocations.Any(b => b == null || b.BatchId <= 0 ||
+                        !b.SalePrice.HasValue ||
+                        Math.Abs(b.SalePrice.Value - selected.SalePrice.Value) > QuantityEpsilon ||
+                        !IsFinite(b.AvailableQuantity) || b.AvailableQuantity < 0 ||
+                        !string.IsNullOrWhiteSpace(b.BatchNumber) ||
+                        !string.IsNullOrWhiteSpace(b.ExpiryDate)))
+                {
+                    errorMessage = "بيانات مجموعة السعر غير صحيحة أو تحتوي على أسعار مختلفة.";
+                    return false;
+                }
+            }
+            else if (selected.BatchId <= 0)
+            {
+                errorMessage = "بيانات التشغيلة المختارة غير صحيحة.";
                 return false;
             }
 
@@ -359,14 +397,13 @@ namespace Ocore.desktop.Views
                 return false;
             }
 
-            if (IsExpiredOrInvalid(selected.ExpiryDate))
+            if (!selected.IsUntrackedGroup && IsExpiredOrInvalid(selected.ExpiryDate))
             {
                 errorMessage =
                     "لا يمكن البيع من تشغيلة منتهية الصلاحية " +
                     "أو تاريخ صلاحيتها غير صحيح.\n\n" +
                     "التشغيلة: " + selected.BatchNumber +
                     "\nالصلاحية: " + selected.ExpiryDate;
-
                 return false;
             }
 
@@ -416,20 +453,44 @@ namespace Ocore.desktop.Views
                 return;
             }
 
-            ConfirmedAllocations =
-                new List<SaleInvoiceBatchAllocation>
+            ConfirmedAllocations = new List<SaleInvoiceBatchAllocation>();
+            if (selected.IsUntrackedGroup)
+            {
+                double remaining = requiredQuantity;
+                foreach (var b in selected.GroupAllocations.OrderBy(x => x.BatchId))
                 {
-                    new SaleInvoiceBatchAllocation
-                    {
-                        BatchId = selected.BatchId,
-                        BatchNumber = selected.BatchNumber,
-                        ExpiryDate = selected.ExpiryDate,
-                        SalePrice = selected.SalePrice,
-                        AvailableQuantity =
-                            selected.AvailableQuantity,
-                        AllocatedQuantity = requiredQuantity
-                    }
-                };
+                    double take = Math.Min(b.AvailableQuantity, remaining);
+                    if (take > QuantityEpsilon)
+                        ConfirmedAllocations.Add(new SaleInvoiceBatchAllocation
+                        {
+                            BatchId = b.BatchId,
+                            BatchNumber = b.BatchNumber,
+                            ExpiryDate = b.ExpiryDate,
+                            SalePrice = b.SalePrice,
+                            AvailableQuantity = b.AvailableQuantity,
+                            AllocatedQuantity = take
+                        });
+                    remaining = Math.Max(0, remaining - take);
+                    if (remaining <= QuantityEpsilon) break;
+                }
+                if (remaining > QuantityEpsilon)
+                {
+                    ConfirmedAllocations = null;
+                    MessageBox.Show("تعذر توزيع الكمية كاملة على تشغيلات مجموعة السعر.",
+                        "توزيع التشغيلات", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+            else
+                ConfirmedAllocations.Add(new SaleInvoiceBatchAllocation
+                {
+                    BatchId = selected.BatchId,
+                    BatchNumber = selected.BatchNumber,
+                    ExpiryDate = selected.ExpiryDate,
+                    SalePrice = selected.SalePrice,
+                    AvailableQuantity = selected.AvailableQuantity,
+                    AllocatedQuantity = requiredQuantity
+                });
 
             DialogResult = true;
             Close();

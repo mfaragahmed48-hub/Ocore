@@ -127,7 +127,7 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
-                           Text="اختر تشغيلة واحدة من التشغيلات المتاحة"
+                           Text="اختر مجموعة سعر بيع أو تشغيلة للصنف المتتبع"
                            FontSize="14"
                            FontWeight="Bold"
                            Foreground="#173B63"
@@ -149,7 +149,7 @@
 
                     <DataGrid.Columns>
 
-                        <DataGridTextColumn Header="رقم التشغيلة"
+                        <DataGridTextColumn Header="التشغيلة / المجموعة"
                                             Binding="{Binding BatchNumber}"
                                             IsReadOnly="True"
                                             Width="1.3*"/>
@@ -203,7 +203,7 @@
                 <StackPanel Grid.Column="1"
                             HorizontalAlignment="Center">
 
-                    <TextBlock Text="كمية التشغيلة المختارة"
+                    <TextBlock Text="كمية المجموعة المختارة"
                                Foreground="#52677F"
                                FontWeight="Bold"/>
 
