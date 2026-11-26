@@ -234,7 +234,7 @@ SELECT b.Id AS BatchId,b.ProductId,p.Name AS ProductName,
 FROM Batches b
 INNER JOIN Products p ON p.Id=b.ProductId
 LEFT JOIN InventoryProductTracking t ON t.ProductId=p.Id
-WHERE p.IsArchived=0
+WHERE COALESCE(p.IsArchived,0)=0
   AND NOT EXISTS
   (
       SELECT 1
@@ -281,7 +281,7 @@ SELECT p.Id AS ProductId,p.Name AS ProductName,
        CASE WHEN b.Id IS NULL THEN 'P:' || p.Id ELSE 'B:' || b.Id END AS TargetKey
 FROM Products p
 LEFT JOIN Batches b ON b.ProductId=p.Id
-WHERE p.IsArchived=0
+WHERE COALESCE(p.IsArchived,0)=0
   AND
   (
       (b.Id IS NOT NULL AND NOT EXISTS

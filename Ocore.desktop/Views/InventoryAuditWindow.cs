@@ -522,25 +522,41 @@ namespace Ocore.desktop.Views
             DockPanel.SetDock(heading, Dock.Top);
             layout.Children.Add(heading);
 
+            var pickerTable = productTargets.CopyToDataTable();
+            pickerTable.Columns.Add(new DataColumn("IsSelected", typeof(bool)) { DefaultValue = false });
+
             var choose = new DataGrid
             {
                 AutoGenerateColumns = false,
-                IsReadOnly = true,
+                IsReadOnly = false,
+                IsEnabled = true,
+                Focusable = true,
                 CanUserAddRows = false,
+                CanUserDeleteRows = false,
                 SelectionMode = DataGridSelectionMode.Extended,
                 SelectionUnit = DataGridSelectionUnit.FullRow,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.All,
-                RowHeight = 34,
+                RowHeight = 36,
                 FontSize = 12,
-                ItemsSource = productTargets.CopyToDataTable().DefaultView
+                ItemsSource = pickerTable.DefaultView
             };
-            choose.Columns.Add(new DataGridTextColumn { Header = "الكود", Binding = new Binding("ProductCode"), Width = 95 });
-            choose.Columns.Add(new DataGridTextColumn { Header = "رقم التشغيلة", Binding = new Binding("BatchNumber"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-            choose.Columns.Add(new DataGridTextColumn { Header = "تاريخ الصلاحية", Binding = new Binding("ExpiryDate"), Width = 145 });
-            choose.Columns.Add(new DataGridTextColumn { Header = "الرصيد", Binding = new Binding("Quantity"), Width = 95 });
-            choose.Columns.Add(new DataGridTextColumn { Header = "الوحدة", Binding = new Binding("Unit"), Width = 100 });
-            choose.Columns.Add(new DataGridTextColumn { Header = "النوع", Binding = new Binding("TargetKind"), Width = 120 });
+            choose.Columns.Add(new DataGridCheckBoxColumn
+            {
+                Header = "اختيار",
+                Binding = new Binding("IsSelected")
+                {
+                    Mode = BindingMode.TwoWay,
+                    UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+                },
+                Width = 65
+            });
+            choose.Columns.Add(new DataGridTextColumn { Header = "الكود", Binding = new Binding("ProductCode"), IsReadOnly = true, Width = 95 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "رقم التشغيلة", Binding = new Binding("BatchNumber"), IsReadOnly = true, Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            choose.Columns.Add(new DataGridTextColumn { Header = "تاريخ الصلاحية", Binding = new Binding("ExpiryDate"), IsReadOnly = true, Width = 145 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "الرصيد", Binding = new Binding("Quantity"), IsReadOnly = true, Width = 95 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "الوحدة", Binding = new Binding("Unit"), IsReadOnly = true, Width = 100 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "النوع", Binding = new Binding("TargetKind"), IsReadOnly = true, Width = 120 });
             layout.Children.Add(choose);
 
             var buttons = new StackPanel
@@ -551,7 +567,15 @@ namespace Ocore.desktop.Views
             };
             buttons.Children.Add(MakeButton("إضافة المحدد للجرد", () =>
             {
-                var selectedRows = choose.SelectedItems.Cast<object>().OfType<DataRowView>().ToList();
+                choose.CommitEdit(DataGridEditingUnit.Cell, true);
+                choose.CommitEdit(DataGridEditingUnit.Row, true);
+
+                var selectedRows = choose.Items.Cast<object>()
+                    .OfType<DataRowView>()
+                    .Where(row =>
+                        (row["IsSelected"] != DBNull.Value && Convert.ToBoolean(row["IsSelected"])) ||
+                        choose.SelectedItems.Contains(row))
+                    .ToList();
                 if (selectedRows.Count == 0)
                 {
                     Warn("اختر تشغيلة واحدة أو أكثر، أو اختر كارتة الصنف إذا لم توجد تشغيلات.");
