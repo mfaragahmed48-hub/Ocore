@@ -98,42 +98,15 @@ ORDER BY p.Id,
                         while (reader.Read())
                         {
                             int productId = Convert.ToInt32(reader["ProductId"]);
-                            bool trackBatch = Convert.ToInt32(reader["TrackBatchNumber"]) == 1;
-                            bool trackExpiry = Convert.ToInt32(reader["TrackExpiryDate"]) == 1;
                             bool hasBatch = reader["BatchId"] != DBNull.Value;
 
-                            string targetType;
-                            string targetKey;
+                            if (!hasBatch)
+                                continue;
+
                             string expiry = Convert.ToString(reader["ExpiryDate"]);
-
-                            if (trackBatch)
-                            {
-                                if (!hasBatch)
-                                    continue;
-
-                                int batchId = Convert.ToInt32(reader["BatchId"]);
-                                targetType = "Batch";
-                                targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
-                            }
-                            else if (trackExpiry)
-                            {
-                                if (!hasBatch)
-                                    continue;
-
-                                targetType = "ExpiryGroup";
-                                string expiryKey = string.IsNullOrWhiteSpace(expiry)
-                                    ? "~NONE~"
-                                    : expiry.Trim();
-
-                                targetKey = "E:" +
-                                    productId.ToString(CultureInfo.InvariantCulture) +
-                                    ":" + expiryKey;
-                            }
-                            else
-                            {
-                                targetType = "Product";
-                                targetKey = "P:" + productId.ToString(CultureInfo.InvariantCulture);
-                            }
+                            int batchId = Convert.ToInt32(reader["BatchId"]);
+                            string targetType = "Batch";
+                            string targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
 
                             Target target;
 
@@ -147,15 +120,13 @@ ORDER BY p.Id,
                                         Convert.ToString(reader["UnitName"]),
                                         Convert.ToString(reader["SmallUnitName"]),
                                         Convert.ToInt32(reader["UnitsPerPackage"])),
+                                    UnitsPerPackage = Convert.ToInt32(reader["UnitsPerPackage"]),
                                     TargetType = targetType,
                                     TargetKey = targetKey,
-                                    Expiry = trackExpiry ? expiry : "",
-                                    Batch = trackBatch && hasBatch
-                                        ? Convert.ToString(reader["BatchNumber"])
-                                        : "",
+                                    Expiry = expiry,
+                                    Batch = Convert.ToString(reader["BatchNumber"]),
                                     Batches = new List<TargetBatch>()
                                 };
-
                                 targetsByKey.Add(targetKey, target);
                             }
 
@@ -234,8 +205,8 @@ WHERE i.TargetKey=@K
 INSERT INTO InventoryCountItems
 (SessionId,ProductId,BatchId,TargetType,TargetKey,ProductNameSnapshot,
  BatchNumberSnapshot,ExpiryDateSnapshot,UnitSnapshot,BookQuantity,
- PurchasePriceSnapshot,ItemStatus,CreatedAt)
-VALUES(@S,@P,@B,@T,@K,@N,@BN,@E,@U,@Q,@C,'Pending',@D);", connection, transaction))
+ PurchasePriceSnapshot,UnitsPerPackageSnapshot,ItemStatus,CreatedAt)
+VALUES(@S,@P,@B,@T,@K,@N,@BN,@E,@U,@Q,@C,@UP,'Pending',@D);", connection, transaction))
                         {
                             command.Parameters.AddWithValue("@S", sessionId);
                             command.Parameters.AddWithValue("@P", target.ProductId);
@@ -251,6 +222,7 @@ VALUES(@S,@P,@B,@T,@K,@N,@BN,@E,@U,@Q,@C,'Pending',@D);", connection, transactio
                             command.Parameters.AddWithValue("@U", target.Unit ?? "");
                             command.Parameters.AddWithValue("@Q", target.Quantity);
                             command.Parameters.AddWithValue("@C", latest == null ? 0 : latest.PurchasePrice);
+                            command.Parameters.AddWithValue("@UP", target.UnitsPerPackage > 0 ? target.UnitsPerPackage : 1);
                             command.Parameters.AddWithValue("@D", now);
                             command.ExecuteNonQuery();
                         }
@@ -295,52 +267,8 @@ VALUES(@I,@B,@Q,@C,@BN,@E,@U,@RA,@RI,@D);", connection, transaction))
 
         public void AssignItem(int managerId, int sessionId, int itemId, int employeeId)
         {
-            using (var c = new SQLiteConnection(connectionString))
-            {
-                c.Open();
-
-                using (var t = c.BeginTransaction(IsolationLevel.Serializable))
-                {
-                    EnsureManager(c, t, managerId);
-                    EnsureCounter(c, t, employeeId);
-
-                    string old;
-
-                    using (var cmd = new SQLiteCommand(
-                        "SELECT COALESCE(AssignedUserId,0) FROM InventoryCountItems WHERE Id=@I AND SessionId=@S;",
-                        c, t))
-                    {
-                        cmd.Parameters.AddWithValue("@I", itemId);
-                        cmd.Parameters.AddWithValue("@S", sessionId);
-
-                        object v = cmd.ExecuteScalar();
-
-                        if (v == null)
-                            throw new InvalidOperationException("بند الجرد غير موجود.");
-
-                        old = Convert.ToString(v);
-                    }
-
-                    using (var cmd = new SQLiteCommand(@"
-UPDATE InventoryCountItems
-SET AssignedUserId=@U
-WHERE Id=@I AND SessionId=@S
-  AND ItemStatus NOT IN('Approved','Cancelled');", c, t))
-                    {
-                        cmd.Parameters.AddWithValue("@U", employeeId);
-                        cmd.Parameters.AddWithValue("@I", itemId);
-                        cmd.Parameters.AddWithValue("@S", sessionId);
-
-                        if (cmd.ExecuteNonQuery() != 1)
-                            throw new InvalidOperationException("لا يمكن تغيير مسؤول البند.");
-                    }
-
-                    Event(c, t, sessionId, itemId, "AssignmentChanged",
-                        managerId, "المسؤول السابق: " + old + "؛ الجديد: " + employeeId);
-
-                    t.Commit();
-                }
-            }
+            throw new InvalidOperationException(
+                "نظام الجرد الجديد ينفذه المدير مباشرة ولا يدعم إسناد البنود للموظفين.");
         }
 
         public string StartCounting(int userId, int sessionId, int itemId, int lockMinutes = 10)
@@ -501,6 +429,95 @@ WHERE Id=@I AND SessionId=@S
                         "الكمية الفعلية: " +
                         quantity.ToString("0.########", CultureInfo.InvariantCulture));
 
+                    transaction.Commit();
+                }
+            }
+        }
+
+        public void SaveCount(
+            int managerId, int sessionId, int itemId, int actualPQuantity, int actualUQuantity)
+        {
+            if (actualPQuantity < 0 || actualUQuantity < 0)
+                throw new ArgumentException("الكميات الفعلية لا يمكن أن تكون سالبة.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    EnsureManager(connection, transaction, managerId);
+                    EnsureOpen(connection, transaction, sessionId);
+                    int unitsPerPackage;
+                    double? oldQuantity = null;
+                    int? oldP = null;
+                    int? oldU = null;
+                    string oldStatus;
+
+                    using (var command = new SQLiteCommand(@"
+SELECT i.ActualQuantity,i.ActualPQuantity,i.ActualUQuantity,i.ItemStatus,
+       COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),p.UnitsPerPackage,1) AS UnitsPerPackage
+FROM InventoryCountItems i
+INNER JOIN Products p ON p.Id=i.ProductId
+WHERE i.Id=@I AND i.SessionId=@S;", connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@I", itemId);
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (!reader.Read())
+                                throw new InvalidOperationException("بند الجرد غير موجود في الجلسة المحددة.");
+                            oldStatus = Convert.ToString(reader["ItemStatus"]);
+                            if (oldStatus != "Pending" && oldStatus != "Counting" &&
+                                oldStatus != "RecountRequired" && oldStatus != "Counted")
+                                throw new InvalidOperationException("حالة البند لا تسمح بتسجيل العد.");
+                            unitsPerPackage = Convert.ToInt32(reader["UnitsPerPackage"]);
+                            if (unitsPerPackage < 1)
+                                throw new InvalidOperationException("معامل تحويل الوحدات للصنف غير صحيح.");
+                            if (reader["ActualQuantity"] != DBNull.Value)
+                                oldQuantity = Convert.ToDouble(reader["ActualQuantity"]);
+                            if (reader["ActualPQuantity"] != DBNull.Value)
+                                oldP = Convert.ToInt32(reader["ActualPQuantity"]);
+                            if (reader["ActualUQuantity"] != DBNull.Value)
+                                oldU = Convert.ToInt32(reader["ActualUQuantity"]);
+                        }
+                    }
+
+                    if (actualUQuantity >= unitsPerPackage)
+                        throw new ArgumentException(
+                            "عدد وحدات U يجب أن يكون أقل من معامل التحويل (" +
+                            unitsPerPackage.ToString(CultureInfo.InvariantCulture) + ").");
+                    double actualQuantity = actualPQuantity + (actualUQuantity / (double)unitsPerPackage);
+                    string now = Now();
+
+                    using (var command = new SQLiteCommand(@"
+UPDATE InventoryCountItems
+SET ActualQuantity=@Q,ActualPQuantity=@P,ActualUQuantity=@U,
+    UnitsPerPackageSnapshot=@UP,CountedBy=@A,CountedAt=@N,
+    ItemStatus='Counted',LockUserId=NULL,LockToken=NULL,LockUntil=NULL
+WHERE Id=@I AND SessionId=@S
+  AND ItemStatus IN ('Pending','Counting','RecountRequired','Counted');",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@Q", actualQuantity);
+                        command.Parameters.AddWithValue("@P", actualPQuantity);
+                        command.Parameters.AddWithValue("@U", actualUQuantity);
+                        command.Parameters.AddWithValue("@UP", unitsPerPackage);
+                        command.Parameters.AddWithValue("@A", managerId);
+                        command.Parameters.AddWithValue("@N", now);
+                        command.Parameters.AddWithValue("@I", itemId);
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        if (command.ExecuteNonQuery() != 1)
+                            throw new InvalidOperationException("تعذر حفظ نتيجة العد.");
+                    }
+
+                    RevisionPAndU(connection, transaction, itemId,
+                        oldQuantity, actualQuantity, oldP, oldU,
+                        actualPQuantity, actualUQuantity,
+                        oldStatus, "Counted", managerId, "حفظ العد الفعلي بوحدتي P وU");
+                    Event(connection, transaction, sessionId, itemId, "CountSaved", managerId,
+                        "الفعلي: " + actualPQuantity.ToString(CultureInfo.InvariantCulture) +
+                        " P + " + actualUQuantity.ToString(CultureInfo.InvariantCulture) +
+                        " U؛ معامل التحويل: " + unitsPerPackage.ToString(CultureInfo.InvariantCulture));
                     transaction.Commit();
                 }
             }
@@ -911,11 +928,32 @@ ORDER BY s.ReceiptAtSnapshot DESC,
                         "يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل الاعتماد.");
                 }
 
-                CostLayer latestLayer = layers
-                    .OrderByDescending(x => x.ReceiptAt ?? "")
-                    .ThenByDescending(x => x.ReceiptItemId)
-                    .ThenByDescending(x => x.BatchId)
-                    .FirstOrDefault();
+                CostLayer latestLayer;
+                if (string.Equals(targetType, "Batch", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!batchId.HasValue)
+                        throw new InvalidOperationException("بند التشغيلة لا يحتوي على رقم تشغيلة صالح.");
+                    latestLayer = layers.FirstOrDefault(x => x.BatchId == batchId.Value);
+                    if (latestLayer == null)
+                    {
+                        latestLayer = new CostLayer
+                        {
+                            BatchId = batchId.Value,
+                            UnitCost = itemCostSnapshot,
+                            ReceiptAt = "",
+                            ReceiptItemId = 0
+                        };
+                    }
+                }
+                else
+                {
+                    // Keep the historical behavior for legacy grouped sessions.
+                    latestLayer = layers
+                        .OrderByDescending(x => x.ReceiptAt ?? "")
+                        .ThenByDescending(x => x.ReceiptItemId)
+                        .ThenByDescending(x => x.BatchId)
+                        .FirstOrDefault();
+                }
 
                 if (latestLayer == null)
                 {
@@ -1496,48 +1534,18 @@ LIMIT 1;", c, t))
         public static int? FindActiveSessionForIncomingBatch(
             SQLiteConnection c, SQLiteTransaction t, int productId, string expiryDate)
         {
-            int trackBatch = 0;
-            int trackExpiry = 0;
-
-            using (var settings = new SQLiteCommand(@"
-SELECT COALESCE(TrackBatchNumber,0),COALESCE(TrackExpiryDate,0)
-FROM InventoryProductTracking
-WHERE ProductId=@P;", c, t))
-            {
-                settings.Parameters.AddWithValue("@P", productId);
-
-                using (var reader = settings.ExecuteReader())
-                {
-                    if (reader.Read())
-                    {
-                        trackBatch = Convert.ToInt32(reader[0]);
-                        trackExpiry = Convert.ToInt32(reader[1]);
-                    }
-                }
-            }
-
-            if (trackBatch == 1)
-                return null;
-
-            string targetKey = trackExpiry == 1
-                ? "E:" + productId.ToString(CultureInfo.InvariantCulture) + ":" +
-                  (string.IsNullOrWhiteSpace(expiryDate) ? "~NONE~" : expiryDate.Trim())
-                : "P:" + productId.ToString(CultureInfo.InvariantCulture);
-
             using (var command = new SQLiteCommand(@"
 SELECT s.Id
 FROM InventoryCountItems i
 INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
-WHERE i.TargetKey=@K
+WHERE i.ProductId=@P
   AND i.ItemStatus NOT IN ('Approved','Cancelled')
   AND s.Status IN ('Open','Submitted','PartiallyApproved')
 ORDER BY s.CreatedAt,s.Id
 LIMIT 1;", c, t))
             {
-                command.Parameters.AddWithValue("@K", targetKey);
-
+                command.Parameters.AddWithValue("@P", productId);
                 object value = command.ExecuteScalar();
-
                 return value == null || value == DBNull.Value
                     ? (int?)null
                     : Convert.ToInt32(value);
@@ -2194,19 +2202,7 @@ WHERE SessionId=@S
 
         private static void EnsureCounter(SQLiteConnection c, SQLiteTransaction t, int id)
         {
-            using (var q = new SQLiteCommand(
-                "SELECT Role FROM Users WHERE Id=@I AND IsActive=1;", c, t))
-            {
-                q.Parameters.AddWithValue("@I", id);
-                object role = q.ExecuteScalar();
-
-                if (role == null || role == DBNull.Value ||
-                    string.Equals(Convert.ToString(role), "Manager", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new UnauthorizedAccessException(
-                        "المدير لا ينفذ العد؛ يقتصر دوره على المراجعة والاعتماد.");
-                }
-            }
+            EnsureManager(c, t, id);
         }
 
         private static void EnsureActive(SQLiteConnection c, SQLiteTransaction t, int id)
@@ -2290,6 +2286,36 @@ VALUES(@I,@O,@N,@OS,@NS,@A,@R,@D);", c, t))
             }
         }
 
+        private static void RevisionPAndU(
+            SQLiteConnection c, SQLiteTransaction t,
+            int id, double? oldQuantity, double? newQuantity,
+            int? oldP, int? oldU, int? newP, int? newU,
+            string oldStatus, string newStatus, int actor, string reason)
+        {
+            using (var command = new SQLiteCommand(@"
+INSERT INTO InventoryCountRevisions
+(CountItemId,PreviousActualQuantity,NewActualQuantity,
+ PreviousActualPQuantity,PreviousActualUQuantity,
+ NewActualPQuantity,NewActualUQuantity,
+ PreviousStatus,NewStatus,ChangedBy,Reason,CreatedAt)
+VALUES(@I,@OQ,@NQ,@OP,@OU,@NP,@NU,@OS,@NS,@A,@R,@D);", c, t))
+            {
+                command.Parameters.AddWithValue("@I", id);
+                command.Parameters.AddWithValue("@OQ", oldQuantity.HasValue ? (object)oldQuantity.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@NQ", newQuantity.HasValue ? (object)newQuantity.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@OP", oldP.HasValue ? (object)oldP.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@OU", oldU.HasValue ? (object)oldU.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@NP", newP.HasValue ? (object)newP.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@NU", newU.HasValue ? (object)newU.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@OS", oldStatus);
+                command.Parameters.AddWithValue("@NS", newStatus);
+                command.Parameters.AddWithValue("@A", actor);
+                command.Parameters.AddWithValue("@R", reason ?? "");
+                command.Parameters.AddWithValue("@D", Now());
+                command.ExecuteNonQuery();
+            }
+        }
+
         private static string BuildUnitSnapshot(
             string packageUnitName, string smallUnitName, int unitsPerPackage)
         {
@@ -2320,6 +2346,7 @@ VALUES(@I,@O,@N,@OS,@NS,@A,@R,@D);", c, t))
             public string Batch { get; set; }
             public string Expiry { get; set; }
             public string Unit { get; set; }
+            public int UnitsPerPackage { get; set; }
             public string TargetType { get; set; }
             public string TargetKey { get; set; }
             public double Quantity { get; set; }
