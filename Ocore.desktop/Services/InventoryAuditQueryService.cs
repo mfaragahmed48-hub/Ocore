@@ -155,8 +155,16 @@ SELECT i.Id,
        COALESCE(NULLIF(i.UnitsPerPackageSnapshot,0),p.UnitsPerPackage,1) AS UnitsPerPackageSnapshot,
        COALESCE(p.UnitName,'') AS PUnitName,
        COALESCE(p.SmallUnitName,'') AS UUnitName,
-       CASE WHEN @M=1
-            THEN i.NetVarianceQuantity
+       CASE WHEN @M=1 AND i.ActualQuantity IS NOT NULL
+            THEN ROUND(
+                COALESCE(i.NetVarianceQuantity,0) + i.ActualQuantity -
+                COALESCE(i.AppliedQuantity,COALESCE((
+                    SELECT SUM(bs.BookQuantity)
+                    FROM InventoryCountItemBatchSnapshots bs
+                    WHERE bs.CountItemId=i.Id
+                ),i.BookQuantity)),
+                8
+            )
             ELSE NULL
        END AS VarianceQuantity,
        i.ItemStatus,
