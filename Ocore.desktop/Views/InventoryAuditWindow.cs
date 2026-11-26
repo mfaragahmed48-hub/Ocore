@@ -287,17 +287,36 @@ namespace Ocore.desktop.Views
             if (name == "ProductName")
             {
                 args.Cancel = true;
-                var column = new DataGridTemplateColumn
+
+                // احتفظ بعمود واحد فقط للصنف حتى لو أعاد WPF توليد الأعمدة عند تغيير مصدر البيانات.
+                var existingProductColumns = itemsGrid.Columns
+                    .Where(column => string.Equals(column.SortMemberPath, "ProductName", StringComparison.Ordinal))
+                    .ToList();
+
+                if (existingProductColumns.Count > 0)
                 {
-                    Header = "بحث واختيار الصنف",
+                    var firstColumn = existingProductColumns[0];
+                    firstColumn.Header = "الصنف";
+
+                    foreach (var duplicateColumn in existingProductColumns.Skip(1))
+                        itemsGrid.Columns.Remove(duplicateColumn);
+
+                    firstColumn.DisplayIndex = 0;
+                    return;
+                }
+
+                var productColumn = new DataGridTemplateColumn
+                {
+                    Header = "الصنف",
                     Width = new DataGridLength(2.2, DataGridLengthUnitType.Star),
                     MinWidth = 230,
                     CellTemplate = CreateAuditProductDisplayTemplate(),
                     CellEditingTemplate = CreateAuditProductTemplate(),
                     SortMemberPath = "ProductName"
                 };
-                itemsGrid.Columns.Add(column);
-                column.DisplayIndex = 0;
+
+                itemsGrid.Columns.Add(productColumn);
+                productColumn.DisplayIndex = 0;
                 return;
             }
             if (name == "PUnitName" || name == "UUnitName" || name == "UnitsPerPackageSnapshot" ||
@@ -556,7 +575,7 @@ namespace Ocore.desktop.Views
             {
                 itemsGrid.SelectedItem = entry;
                 itemsGrid.ScrollIntoView(entry);
-                var searchColumn = itemsGrid.Columns.FirstOrDefault(c => Convert.ToString(c.Header) == "بحث واختيار الصنف");
+                var searchColumn = itemsGrid.Columns.FirstOrDefault(c => Convert.ToString(c.Header) == "الصنف");
                 if (searchColumn != null)
                 {
                     Dispatcher.BeginInvoke(new Action(() =>
@@ -572,7 +591,7 @@ namespace Ocore.desktop.Views
         {
             var entry = itemsGrid.Items.Cast<object>().OfType<DataRowView>().LastOrDefault(IsEntryRow);
             if (entry == null) return;
-            var searchColumn = itemsGrid.Columns.FirstOrDefault(c => Convert.ToString(c.Header) == "بحث واختيار الصنف");
+            var searchColumn = itemsGrid.Columns.FirstOrDefault(c => Convert.ToString(c.Header) == "الصنف");
             if (searchColumn == null) return;
             itemsGrid.SelectedItem = entry;
             itemsGrid.ScrollIntoView(entry);
