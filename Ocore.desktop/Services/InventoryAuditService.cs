@@ -1218,7 +1218,7 @@ WHERE Id=@I AND SessionId=@S
                             throw new InvalidOperationException("اعتماد الجرد متاح للجلسات المفتوحة فقط.");
                     }
                     var ids = new List<int>(); bool variance = false;
-                    using (var c = new SQLiteCommand(@"SELECT Id,BookQuantity,ActualQuantity,AppliedQuantity,ItemStatus,LockUserId,LockToken,LockUntil FROM InventoryCountItems WHERE SessionId=@S ORDER BY Id;", connection, transaction))
+                    using (var c = new SQLiteCommand(@"SELECT Id,BookQuantity,ActualQuantity,AppliedQuantity,ItemStatus,LockUserId,LockToken,LockUntil FROM InventoryCountItems WHERE SessionId=@S AND ItemStatus<>'Cancelled' ORDER BY Id;", connection, transaction))
                     {
                         c.Parameters.AddWithValue("@S", sessionId);
                         using (var r = c.ExecuteReader()) while (r.Read())
