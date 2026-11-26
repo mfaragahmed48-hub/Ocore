@@ -914,59 +914,88 @@ namespace Ocore.desktop.Services
                                     item,
                                     totalPackageQuantity);
 
+                            bool isUntrackedProduct =
+                                InventoryCostLayerService.IsUntrackedProduct(
+                                    connection, transaction, item.ProductId);
+
+                            string effectiveBatchNumber = isUntrackedProduct
+                                ? null
+                                : (string.IsNullOrWhiteSpace(item.BatchNumber)
+                                    ? null
+                                    : item.BatchNumber.Trim());
+
+                            string effectiveExpiryDate = isUntrackedProduct
+                                ? ""
+                                : expiryDate;
+
                             int? activeAuditSessionId =
                                 InventoryAuditService.FindActiveSessionForIncomingBatch(
-                                    connection, transaction, item.ProductId, expiryDate);
+                                    connection, transaction, item.ProductId, effectiveExpiryDate);
 
                             int batchId;
 
-                            using (var command = new SQLiteCommand(@"
-                                INSERT INTO Batches
-                                (
-                                    ProductId,
-                                    SupplierId,
-                                    BatchNumber,
-                                    ExpiryDate,
-                                    PurchasePrice,
-                                    Quantity
-                                )
-                                VALUES
-                                (
-                                    @ProductId,
-                                    @SupplierId,
-                                    @BatchNumber,
-                                    @ExpiryDate,
-                                    @PurchasePrice,
-                                    @Quantity
-                                );
-
-                                SELECT last_insert_rowid();",
-                                connection, transaction))
+                            if (isUntrackedProduct)
                             {
-                                command.Parameters.AddWithValue(
-                                    "@ProductId", item.ProductId);
-
-                                command.Parameters.AddWithValue(
-                                    "@SupplierId", supplierId);
-
-                                command.Parameters.AddWithValue(
-                                    "@BatchNumber",
-                                    string.IsNullOrWhiteSpace(item.BatchNumber)
-                                        ? (object)DBNull.Value
-                                        : item.BatchNumber.Trim());
-
-                                command.Parameters.AddWithValue(
-                                    "@ExpiryDate", expiryDate);
-
-                                command.Parameters.AddWithValue(
-                                    "@PurchasePrice", inventoryPackageCost);
-
-                                command.Parameters.AddWithValue(
-                                    "@Quantity",
-                                    activeAuditSessionId.HasValue ? 0d : totalPackageQuantity);
-
                                 batchId =
-                                    Convert.ToInt32(command.ExecuteScalar());
+                                    InventoryCostLayerService.GetOrCreateUntrackedBatch(
+                                        connection,
+                                        transaction,
+                                        item.ProductId,
+                                        supplierId,
+                                        inventoryPackageCost,
+                                        totalPackageQuantity,
+                                        activeAuditSessionId.HasValue);
+                            }
+                            else
+                            {
+                                using (var command = new SQLiteCommand(@"
+                                    INSERT INTO Batches
+                                    (
+                                        ProductId,
+                                        SupplierId,
+                                        BatchNumber,
+                                        ExpiryDate,
+                                        PurchasePrice,
+                                        Quantity
+                                    )
+                                    VALUES
+                                    (
+                                        @ProductId,
+                                        @SupplierId,
+                                        @BatchNumber,
+                                        @ExpiryDate,
+                                        @PurchasePrice,
+                                        @Quantity
+                                    );
+
+                                    SELECT last_insert_rowid();",
+                                    connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue(
+                                        "@ProductId", item.ProductId);
+
+                                    command.Parameters.AddWithValue(
+                                        "@SupplierId", supplierId);
+
+                                    command.Parameters.AddWithValue(
+                                        "@BatchNumber",
+                                        string.IsNullOrWhiteSpace(item.BatchNumber)
+                                            ? (object)DBNull.Value
+                                            : item.BatchNumber.Trim());
+
+                                    command.Parameters.AddWithValue(
+                                        "@ExpiryDate", expiryDate);
+
+                                    command.Parameters.AddWithValue(
+                                        "@PurchasePrice", inventoryPackageCost);
+
+                                    command.Parameters.AddWithValue(
+                                        "@Quantity",
+                                        activeAuditSessionId.HasValue ? 0d : totalPackageQuantity);
+
+                                    batchId =
+                                        Convert.ToInt32(command.ExecuteScalar());
+                                }
                             }
 
                             using (var command = new SQLiteCommand(@"
@@ -1052,11 +1081,11 @@ namespace Ocore.desktop.Services
 
                                 command.Parameters.AddWithValue(
                                     "@BatchNumber",
-                                    string.IsNullOrWhiteSpace(item.BatchNumber)
+                                    effectiveBatchNumber == null
                                         ? (object)DBNull.Value
-                                        : item.BatchNumber.Trim());
+                                        : effectiveBatchNumber);
 
-                                command.Parameters.AddWithValue("@ExpiryDate", expiryDate);
+                                command.Parameters.AddWithValue("@ExpiryDate", effectiveExpiryDate);
                                 command.Parameters.AddWithValue("@Quantity", item.Quantity);
                                 command.Parameters.AddWithValue("@UnitPrice", item.UnitPrice);
                                 command.Parameters.AddWithValue("@Total", lineTotal);
@@ -1095,6 +1124,20 @@ namespace Ocore.desktop.Services
                                 "SELECT last_insert_rowid();", connection, transaction))
                             {
                                 purchaseItemId = Convert.ToInt32(command.ExecuteScalar());
+                            }
+
+                            if (isUntrackedProduct)
+                            {
+                                InventoryCostLayerService.RecordPurchaseReceipt(
+                                    connection,
+                                    transaction,
+                                    item.ProductId,
+                                    batchId,
+                                    invoiceId,
+                                    purchaseItemId,
+                                    createdAt,
+                                    inventoryPackageCost,
+                                    totalPackageQuantity);
                             }
 
                             if (activeAuditSessionId.HasValue)

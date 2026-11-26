@@ -168,6 +168,7 @@
     <Compile Include="Services\InventoryAuditQueryService.cs" />
     <Compile Include="Services\InventoryAuditService.cs" />
     <Compile Include="Services\InventoryProductTrackingService.cs" />
+    <Compile Include="Services\InventoryCostLayerService.cs" />
     <Compile Include="Services\ProductExcelImportService.cs" />
     <Compile Include="Services\ExpiryAlertService.cs" />
     <Compile Include="Services\GS1BarcodeService.cs" />
