@@ -598,6 +598,7 @@ WHERE Id=@S
             }
         }
 
+
         private static void ValidateItemsForApproval(
             SQLiteConnection connection,
             SQLiteTransaction transaction,
@@ -612,11 +613,10 @@ WHERE Id=@S
                 double bookQuantity;
                 double actualQuantity;
                 double? appliedQuantity;
-                int? batchId;
                 string itemStatus;
 
                 using (var command = new SQLiteCommand(@"
-SELECT BookQuantity,ActualQuantity,AppliedQuantity,BatchId,ItemStatus,
+SELECT BookQuantity,ActualQuantity,AppliedQuantity,ItemStatus,
        LockUserId,LockToken,LockUntil
 FROM InventoryCountItems
 WHERE Id=@I AND SessionId=@S;", connection, transaction))
@@ -627,15 +627,18 @@ WHERE Id=@I AND SessionId=@S;", connection, transaction))
                     using (var reader = command.ExecuteReader())
                     {
                         if (!reader.Read())
-                            throw new InvalidOperationException("بند الجرد غير موجود أو لا يتبع الجلسة المحددة.");
+                            throw new InvalidOperationException(
+                                "بند الجرد غير موجود أو لا يتبع الجلسة المحددة.");
 
                         if (reader["ActualQuantity"] == DBNull.Value)
-                            throw new InvalidOperationException("لا توجد كمية فعلية في أحد البنود المحددة.");
+                            throw new InvalidOperationException(
+                                "لا توجد كمية فعلية في أحد البنود المحددة.");
 
                         itemStatus = Convert.ToString(reader["ItemStatus"]);
 
                         if (itemStatus != "Counted" && itemStatus != "Review")
-                            throw new InvalidOperationException("أحد البنود المحددة لا يقبل الاعتماد؛ لم يتم اعتماد أي بند.");
+                            throw new InvalidOperationException(
+                                "أحد البنود المحددة لا يقبل الاعتماد؛ لم يتم اعتماد أي بند.");
 
                         if (reader["LockUserId"] != DBNull.Value ||
                             reader["LockToken"] != DBNull.Value ||
@@ -651,93 +654,19 @@ WHERE Id=@I AND SessionId=@S;", connection, transaction))
                         appliedQuantity = reader["AppliedQuantity"] == DBNull.Value
                             ? (double?)null
                             : Convert.ToDouble(reader["AppliedQuantity"]);
-
-                        batchId = reader["BatchId"] == DBNull.Value
-                            ? (int?)null
-                            : Convert.ToInt32(reader["BatchId"]);
                     }
                 }
 
                 double difference = Math.Round(
                     actualQuantity - (appliedQuantity ?? bookQuantity),
-                    8, MidpointRounding.AwayFromZero);
+                    8,
+                    MidpointRounding.AwayFromZero);
 
-                if (Math.Abs(difference) > epsilon)
+                if (Math.Abs(difference) > epsilon &&
+                    string.IsNullOrWhiteSpace(note))
                 {
-                    if (string.IsNullOrWhiteSpace(note))
-                    {
-                        throw new InvalidOperationException(
-                            "يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل الاعتماد.");
-                    }
-
-                    CostLayer latestLayer = layers
-                        .OrderByDescending(x => x.ReceiptAt ?? "")
-                        .ThenByDescending(x => x.ReceiptItemId)
-                        .ThenByDescending(x => x.BatchId)
-                        .FirstOrDefault();
-
-                    if (latestLayer == null)
-                    {
-                        throw new InvalidOperationException(
-                            "لا يوجد استلام مسجل داخل هدف الجرد لتقييم الفرق. لا يمكن اعتماد الفرق دون مصدر تكلفة موثق.");
-                    }
-
-                    double currentLayerQuantity;
-
-                    using (var command = new SQLiteCommand(
-                        "SELECT Quantity FROM Batches WHERE Id=@B;",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
-
-                        object value = command.ExecuteScalar();
-
-                        if (value == null || value == DBNull.Value)
-                            throw new InvalidOperationException("آخر استلام داخل هدف الجرد غير موجود.");
-
-                        currentLayerQuantity = Convert.ToDouble(value);
-                    }
-
-                    double adjustedQuantity = Math.Round(
-                        currentLayerQuantity + difference,
-                        8,
-                        MidpointRounding.AwayFromZero);
-
-                    if (adjustedQuantity < -epsilon)
-                    {
-                        throw new InvalidOperationException(
-                            "كمية العجز أكبر من رصيد آخر استلام داخل هدف الجرد. لم يتم تغيير المخزون؛ يلزم مراجعة توزيع الفرق قبل الاعتماد.");
-                    }
-
-                    using (var command = new SQLiteCommand(
-                        "UPDATE Batches SET Quantity=@Q WHERE Id=@B;",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@Q", Math.Max(0, adjustedQuantity));
-                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
-
-                        if (command.ExecuteNonQuery() != 1)
-                            throw new InvalidOperationException("تعذر تحديث رصيد آخر استلام داخل هدف الجرد.");
-                    }
-
-                    using (var command = new SQLiteCommand(@"
-INSERT INTO InventoryCountItemCostDecisions
-(SessionId,CountItemId,DifferenceQuantity,EvaluationMethod,UnitCost,
- SourceBatchId,Notes,Reason,ManagerId,CreatedAt)
-VALUES(@S,@I,@D,'LastReceiptInTarget',@C,@B,@N,@R,@U,@T);",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@S", sessionId);
-                        command.Parameters.AddWithValue("@I", itemId);
-                        command.Parameters.AddWithValue("@D", difference);
-                        command.Parameters.AddWithValue("@C", latestLayer.UnitCost);
-                        command.Parameters.AddWithValue("@B", latestLayer.BatchId);
-                        command.Parameters.AddWithValue("@N", note.Trim());
-                        command.Parameters.AddWithValue("@R", note.Trim());
-                        command.Parameters.AddWithValue("@U", managerId);
-                        command.Parameters.AddWithValue("@T", Now());
-                        command.ExecuteNonQuery();
-                    }
+                    throw new InvalidOperationException(
+                        "يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل الاعتماد.");
                 }
             }
         }
