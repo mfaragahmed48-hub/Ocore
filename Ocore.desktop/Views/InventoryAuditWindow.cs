@@ -329,7 +329,7 @@ namespace Ocore.desktop.Views
 
             args.Column.SortMemberPath = name;
             args.Column.IsReadOnly = name != "ActualQuantity";
-            else if (name == "Unit" || name == "UnitSnapshot") args.Column.Header = "الوحدات (P/U)";
+            if (name == "Unit" || name == "UnitSnapshot") args.Column.Header = "الوحدات (P/U)";
             else if (name == "BookQuantity") args.Column.Header = "رصيد التشغيلة / الصلاحية";
             else if (name == "ActualQuantity") args.Column.Header = "الفعلي المكافئ P";
             else if (name == "VarianceQuantity") args.Column.Header = "الفرق";
