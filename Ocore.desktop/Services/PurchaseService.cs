@@ -1137,7 +1137,8 @@ namespace Ocore.desktop.Services
                                     purchaseItemId,
                                     createdAt,
                                     inventoryPackageCost,
-                                    totalPackageQuantity);
+                                    totalPackageQuantity,
+                                    activeAuditSessionId);
                             }
 
                             if (activeAuditSessionId.HasValue)

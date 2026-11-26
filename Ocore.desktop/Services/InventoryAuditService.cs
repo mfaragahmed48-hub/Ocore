@@ -2852,6 +2852,14 @@ WHERE Id=@I;", c, t))
                             if (command.ExecuteNonQuery() != 1)
                                 throw new InvalidOperationException("تشغيلة الشراء غير موجودة أو لا تتبع الصنف.");
                         }
+
+                        if (InventoryCostLayerService.IsUntrackedProduct(
+                            c, t, movement.ProductId))
+                        {
+                            InventoryCostLayerService.ActivateDeferredPurchaseReceipt(
+                                c, t, movement.SourceRecordId,
+                                movement.Quantity, Now());
+                        }
                     }
                     else if (movement.MovementType == "ManualAdd" &&
                              movement.SourceTable == "Batches")

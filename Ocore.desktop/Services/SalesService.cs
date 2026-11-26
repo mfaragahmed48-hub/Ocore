@@ -893,6 +893,9 @@ TaxStatus = 'Legacy'
                 "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
             double allocatedTotal = 0;
+            bool isUntrackedProduct =
+                InventoryCostLayerService.IsUntrackedProduct(
+                    connection, transaction, productId);
             var usedBatchIds = new HashSet<int>();
 
             foreach (var allocation in allocations)
@@ -1026,6 +1029,14 @@ WHERE Id=@batchId AND ProductId=@productId
                             throw new InvalidOperationException(
                                 "تعذر خصم الكمية من التشغيلة المحددة. أعد مراجعة التوزيع.");
                     }
+                }
+
+                if (isUntrackedProduct)
+                {
+                    InventoryCostLayerService.AllocateSaleCostLayers(
+                        connection, transaction, productId, batchId,
+                        allocationId, invoiceItemId, quantityToTake,
+                        availableQuantity, createdAt);
                 }
 
                 allocatedTotal = Math.Round(
