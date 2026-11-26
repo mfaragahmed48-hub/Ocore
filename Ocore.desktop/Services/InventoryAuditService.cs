@@ -521,12 +521,13 @@ WHERE Id=@I AND SessionId=@S
 SELECT COUNT(*)
 FROM InventoryCountItems
 WHERE SessionId=@S
-  AND ItemStatus NOT IN('Counted','Approved');", c, t))
+  AND ItemStatus NOT IN('Counted','Approved','Cancelled');", c, t))
                     {
                         cmd.Parameters.AddWithValue("@S", sessionId);
 
                         if (Convert.ToInt32(cmd.ExecuteScalar()) > 0)
-                            throw new InvalidOperationException("لا يمكن إرسال الجلسة قبل اكتمال العد.");
+                            throw new InvalidOperationException(
+                                "لا يمكن إرسال الجلسة قبل اكتمال العد أو إلغاء البنود المتبقية صراحةً.");
                     }
 
                     using (var cmd = new SQLiteCommand(@"
@@ -543,9 +544,129 @@ WHERE Id=@S
                     }
 
                     Event(c, t, sessionId, null,
-                        "SessionSubmitted", userId, "إرسال الجلسة لمراجعة المدير.");
+                        "SessionSubmitted", userId,
+                        "إرسال الجلسة لمراجعة المدير.");
 
                     t.Commit();
+                }
+            }
+        }
+
+        public void CancelItems(
+            int managerId,
+            int sessionId,
+            IEnumerable<int> itemIds,
+            string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ArgumentException("سبب إلغاء البنود مطلوب.", "reason");
+
+            var ids = (itemIds ?? Enumerable.Empty<int>()).ToList();
+
+            if (ids.Count == 0)
+                throw new ArgumentException("حدد بندًا واحدًا على الأقل للإلغاء.");
+
+            if (ids.Any(x => x <= 0) || ids.Distinct().Count() != ids.Count)
+                throw new ArgumentException("توجد أرقام بنود غير صالحة أو مكررة.");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+
+                using (var transaction =
+                    connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    EnsureManager(connection, transaction, managerId);
+                    EnsureOpen(connection, transaction, sessionId);
+
+                    var affectedProducts = new SortedSet<int>();
+
+                    foreach (int itemId in ids)
+                    {
+                        int productId;
+                        double? actualQuantity;
+                        string oldStatus;
+
+                        using (var command = new SQLiteCommand(@"
+SELECT ProductId,ActualQuantity,ItemStatus
+FROM InventoryCountItems
+WHERE Id=@I AND SessionId=@S;",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@I", itemId);
+                            command.Parameters.AddWithValue("@S", sessionId);
+
+                            using (var reader = command.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new InvalidOperationException(
+                                        "أحد البنود المحددة غير موجود أو لا يتبع الجلسة.");
+
+                                productId = Convert.ToInt32(reader["ProductId"]);
+                                oldStatus = Convert.ToString(reader["ItemStatus"]);
+
+                                actualQuantity = reader["ActualQuantity"] == DBNull.Value
+                                    ? (double?)null
+                                    : Convert.ToDouble(reader["ActualQuantity"]);
+                            }
+                        }
+
+                        if (oldStatus == "Approved" || oldStatus == "Cancelled")
+                            throw new InvalidOperationException(
+                                "لا يمكن إلغاء بند معتمد أو ملغى مسبقًا.");
+
+                        if (oldStatus != "Pending" &&
+                            oldStatus != "Counting" &&
+                            oldStatus != "Counted" &&
+                            oldStatus != "Review" &&
+                            oldStatus != "RecountRequired")
+                        {
+                            throw new InvalidOperationException(
+                                "حالة أحد البنود لا تسمح بالإلغاء.");
+                        }
+
+                        using (var command = new SQLiteCommand(@"
+UPDATE InventoryCountItems
+SET ItemStatus='Cancelled',
+    ManagerNote=@R,
+    LockUserId=NULL,
+    LockToken=NULL,
+    LockUntil=NULL
+WHERE Id=@I AND SessionId=@S
+  AND ItemStatus IN
+      ('Pending','Counting','Counted','Review','RecountRequired');",
+                            connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@R", reason.Trim());
+                            command.Parameters.AddWithValue("@I", itemId);
+                            command.Parameters.AddWithValue("@S", sessionId);
+
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException(
+                                    "تغيرت حالة أحد البنود أثناء الإلغاء؛ لم يتم إلغاء أي بند.");
+                        }
+
+                        Revision(
+                            connection, transaction, itemId,
+                            actualQuantity, actualQuantity,
+                            oldStatus, "Cancelled", managerId, reason.Trim());
+
+                        Event(
+                            connection, transaction, sessionId, itemId,
+                            "ItemCancelled", managerId, reason.Trim());
+
+                        affectedProducts.Add(productId);
+                    }
+
+                    // نعالج الحركات بعد إلغاء كل الأهداف المحددة،
+                    // حتى لا تتحرك أرصدة أثناء تطبيق جزء من العملية.
+                    foreach (int productId in affectedProducts)
+                    {
+                        ProcessPendingMovementsForProduct(
+                            connection, transaction, productId, managerId);
+                    }
+
+                    transaction.Commit();
                 }
             }
         }
@@ -1026,7 +1147,7 @@ WHERE SessionId=@S
                     using (var command = new SQLiteCommand(@"
 UPDATE InventoryCountSessions
 SET Status='Closed',ClosedBy=@U,ClosedAt=@N
-WHERE Id=@S AND Status='PartiallyApproved';",
+WHERE Id=@S AND Status IN('Open','Submitted','PartiallyApproved');",
                         connection, transaction))
                     {
                         command.Parameters.AddWithValue("@U", managerId);

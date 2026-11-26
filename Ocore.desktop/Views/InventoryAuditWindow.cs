@@ -162,6 +162,9 @@ namespace Ocore.desktop.Views
                     "اعتماد المحدد جماعيًا", ApproveSelectedItems));
 
                 actions.Children.Add(MakeButton(
+                    "إلغاء البنود المحددة", CancelSelectedItems));
+
+                actions.Children.Add(MakeButton(
                     "طلب إعادة عد", RequestSelectedRecount));
 
                 actions.Children.Add(MakeButton(
@@ -767,6 +770,53 @@ namespace Ocore.desktop.Views
                 LoadSessions(selectedSessionId);
 
                 Info("تم اعتماد البنود المحددة بالكامل داخل معاملة واحدة.");
+            });
+        }
+
+        private void CancelSelectedItems()
+        {
+            if (!isManager || selectedSessionId <= 0)
+                return;
+
+            var selected = itemsGrid.SelectedItems
+                .Cast<object>()
+                .OfType<DataRowView>()
+                .ToList();
+
+            if (selected.Count == 0)
+            {
+                Warn("حدد بندًا واحدًا على الأقل للإلغاء.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(noteBox.Text))
+            {
+                Warn("اكتب سبب إلغاء البنود في خانة الملاحظة.");
+                return;
+            }
+
+            if (MessageBox.Show(
+                "سيتم إلغاء " + selected.Count +
+                " بندًا، وتحرير أقفال العد ومعالجة الحركات المرتبطة بها. لن يتم اعتماد فروق هذه البنود. هل تريد المتابعة؟",
+                "تأكيد إلغاء البنود",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            RunAction(() =>
+            {
+                auditService.CancelItems(
+                    currentUserId,
+                    selectedSessionId,
+                    selected.Select(x => Convert.ToInt32(x["Id"])),
+                    noteBox.Text.Trim());
+
+                noteBox.Clear();
+                LoadSessions(selectedSessionId);
+
+                Info("تم إلغاء البنود المحددة وتسجيل الأسباب.");
             });
         }
 
