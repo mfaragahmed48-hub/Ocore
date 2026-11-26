@@ -2173,6 +2173,124 @@ ORDER BY OriginalCreatedAt,Id;", c, t))
 
             foreach (var movement in movements)
             {
+                // A legacy duplicate must never apply the same source movement twice.
+                int handledDuplicateCount;
+                using (var duplicate = new SQLiteCommand(@"
+SELECT COUNT(*)
+FROM InventoryCountPendingMovements
+WHERE SourceTable=@ST AND SourceRecordId=@SR AND MovementType=@T
+  AND Id<>@I AND ProcessingStatus IN ('Processed','Cancelled');", c, t))
+                {
+                    duplicate.Parameters.AddWithValue("@ST", movement.SourceTable);
+                    duplicate.Parameters.AddWithValue("@SR", movement.SourceRecordId);
+                    duplicate.Parameters.AddWithValue("@T", movement.MovementType);
+                    duplicate.Parameters.AddWithValue("@I", movement.Id);
+                    handledDuplicateCount = Convert.ToInt32(duplicate.ExecuteScalar());
+                }
+
+                if (handledDuplicateCount > 0)
+                {
+                    using (var duplicate = new SQLiteCommand(@"
+UPDATE InventoryCountPendingMovements
+SET ProcessingStatus='Cancelled',ProcessedAt=@N,
+    ProcessingMessage='تم إلغاء السجل المكرر لأن مصدر الحركة سبق التعامل معه.'
+WHERE Id=@I AND ProcessingStatus IN ('Pending','Failed');", c, t))
+                    {
+                        duplicate.Parameters.AddWithValue("@N", Now());
+                        duplicate.Parameters.AddWithValue("@I", movement.Id);
+                        duplicate.ExecuteNonQuery();
+                    }
+                    Event(c, t, movement.SessionId, null,
+                        "PendingMovementDuplicateSkipped", actorUserId,
+                        "تم منع تكرار الحركة المعلقة رقم " + movement.Id +
+                        " لأن مصدرها سبق التعامل معه.");
+                    continue;
+                }
+
+                int conflictingDuplicateCount;
+                using (var duplicate = new SQLiteCommand(@"
+SELECT COUNT(*)
+FROM InventoryCountPendingMovements
+WHERE SourceTable=@ST AND SourceRecordId=@SR AND MovementType=@T
+  AND Id<>@I AND ProcessingStatus IN ('Pending','Failed')
+  AND (
+      SessionId<>@S OR ProductId<>@P OR BatchId<>@B
+      OR CountItemId IS NOT @CI
+      OR ABS(Quantity-@Q)>=0.00000001
+      OR COALESCE(TargetKey,'')<>@K
+      OR COALESCE(UnitSnapshot,'')<>@U
+  );", c, t))
+                {
+                    duplicate.Parameters.AddWithValue("@ST", movement.SourceTable);
+                    duplicate.Parameters.AddWithValue("@SR", movement.SourceRecordId);
+                    duplicate.Parameters.AddWithValue("@T", movement.MovementType);
+                    duplicate.Parameters.AddWithValue("@I", movement.Id);
+                    duplicate.Parameters.AddWithValue("@S", movement.SessionId);
+                    duplicate.Parameters.AddWithValue("@P", movement.ProductId);
+                    duplicate.Parameters.AddWithValue("@B", movement.BatchId);
+                    duplicate.Parameters.AddWithValue("@CI",
+                        movement.CountItemId.HasValue ? (object)movement.CountItemId.Value : DBNull.Value);
+                    duplicate.Parameters.AddWithValue("@Q", movement.Quantity);
+                    duplicate.Parameters.AddWithValue("@K", movement.TargetKey ?? "");
+                    duplicate.Parameters.AddWithValue("@U", movement.UnitSnapshot ?? "");
+                    conflictingDuplicateCount = Convert.ToInt32(duplicate.ExecuteScalar());
+                }
+
+                if (conflictingDuplicateCount > 0)
+                {
+                    using (var duplicate = new SQLiteCommand(@"
+UPDATE InventoryCountPendingMovements
+SET ProcessingStatus='Failed',ProcessedAt=@N,
+    ProcessingMessage='توجد سجلات مكررة لمصدر الحركة ببيانات مختلفة؛ يلزم فحصها يدويًا قبل الترحيل.'
+WHERE SourceTable=@ST AND SourceRecordId=@SR AND MovementType=@T
+  AND ProcessingStatus IN ('Pending','Failed');", c, t))
+                    {
+                        duplicate.Parameters.AddWithValue("@N", Now());
+                        duplicate.Parameters.AddWithValue("@ST", movement.SourceTable);
+                        duplicate.Parameters.AddWithValue("@SR", movement.SourceRecordId);
+                        duplicate.Parameters.AddWithValue("@T", movement.MovementType);
+                        duplicate.ExecuteNonQuery();
+                    }
+                    Event(c, t, movement.SessionId, null,
+                        "PendingMovementDuplicateConflict", actorUserId,
+                        "تم إيقاف ترحيل الحركة المعلقة رقم " + movement.Id +
+                        " لاختلاف بيانات سجلات مكررة لنفس المصدر.");
+                    continue;
+                }
+
+                int earlierDuplicateCount;
+                using (var duplicate = new SQLiteCommand(@"
+SELECT COUNT(*)
+FROM InventoryCountPendingMovements
+WHERE SourceTable=@ST AND SourceRecordId=@SR AND MovementType=@T
+  AND Id<@I;", c, t))
+                {
+                    duplicate.Parameters.AddWithValue("@ST", movement.SourceTable);
+                    duplicate.Parameters.AddWithValue("@SR", movement.SourceRecordId);
+                    duplicate.Parameters.AddWithValue("@T", movement.MovementType);
+                    duplicate.Parameters.AddWithValue("@I", movement.Id);
+                    earlierDuplicateCount = Convert.ToInt32(duplicate.ExecuteScalar());
+                }
+
+                if (earlierDuplicateCount > 0)
+                {
+                    using (var duplicate = new SQLiteCommand(@"
+UPDATE InventoryCountPendingMovements
+SET ProcessingStatus='Cancelled',ProcessedAt=@N,
+    ProcessingMessage='تم إلغاء السجل المكرر والإبقاء على أقدم سجل للمصدر نفسه.'
+WHERE Id=@I AND ProcessingStatus IN ('Pending','Failed');", c, t))
+                    {
+                        duplicate.Parameters.AddWithValue("@N", Now());
+                        duplicate.Parameters.AddWithValue("@I", movement.Id);
+                        duplicate.ExecuteNonQuery();
+                    }
+                    Event(c, t, movement.SessionId, null,
+                        "PendingMovementDuplicateSkipped", actorUserId,
+                        "تم تجاهل الحركة المعلقة المكررة رقم " + movement.Id +
+                        " والإبقاء على أقدم سجل للمصدر نفسه.");
+                    continue;
+                }
+
                 int activeCount;
 
                 string activeSql = string.IsNullOrWhiteSpace(movement.TargetKey)
