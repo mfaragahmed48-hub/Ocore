@@ -1201,6 +1201,61 @@ WHERE Id=@I AND SessionId=@S
             ApproveItems(managerId, sessionId, new[] { itemId }, note);
         }
 
+        public void ApproveAndCloseSession(int managerId, int sessionId, string note = "")
+        {
+            if (sessionId <= 0) throw new ArgumentException("جلسة الجرد المحددة غير صحيحة.");
+            note = (note ?? string.Empty).Trim();
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    EnsureManager(connection, transaction, managerId);
+                    using (var c = new SQLiteCommand("SELECT Status FROM InventoryCountSessions WHERE Id=@S;", connection, transaction))
+                    {
+                        c.Parameters.AddWithValue("@S", sessionId);
+                        if (!string.Equals(Convert.ToString(c.ExecuteScalar()), "Open", StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException("اعتماد الجرد متاح للجلسات المفتوحة فقط.");
+                    }
+                    var ids = new List<int>(); bool variance = false;
+                    using (var c = new SQLiteCommand(@"SELECT Id,BookQuantity,ActualQuantity,AppliedQuantity,ItemStatus,LockUserId,LockToken,LockUntil FROM InventoryCountItems WHERE SessionId=@S ORDER BY Id;", connection, transaction))
+                    {
+                        c.Parameters.AddWithValue("@S", sessionId);
+                        using (var r = c.ExecuteReader()) while (r.Read())
+                        {
+                            if (r["ActualQuantity"] == DBNull.Value) throw new InvalidOperationException("توجد بنود لم يتم إدخال كميتها الفعلية.");
+                            if (!string.Equals(Convert.ToString(r["ItemStatus"]), "Counted", StringComparison.OrdinalIgnoreCase))
+                                throw new InvalidOperationException("يجب إكمال عد جميع بنود الجلسة أولًا. حالة أحد البنود: " + Convert.ToString(r["ItemStatus"]));
+                            if (r["LockUserId"] != DBNull.Value || r["LockToken"] != DBNull.Value || r["LockUntil"] != DBNull.Value)
+                                throw new InvalidOperationException("يوجد بند ما زال عليه قفل عد.");
+                            double book = Convert.ToDouble(r["BookQuantity"]), actual = Convert.ToDouble(r["ActualQuantity"]);
+                            double? applied = r["AppliedQuantity"] == DBNull.Value ? (double?)null : Convert.ToDouble(r["AppliedQuantity"]);
+                            if (Math.Abs(Math.Round(actual - (applied ?? book), 8)) > 0.00000001) variance = true;
+                            ids.Add(Convert.ToInt32(r["Id"]));
+                        }
+                    }
+                    if (ids.Count == 0) throw new InvalidOperationException("لا توجد بنود في جلسة الجرد لاعتمادها.");
+                    if (variance && string.IsNullOrWhiteSpace(note)) throw new InvalidOperationException("يوجد عجز أو زيادة. اكتب سبب الفرق في ملاحظة المدير قبل اعتماد الجرد.");
+                    using (var c = new SQLiteCommand(@"SELECT COUNT(*) FROM InventoryCountPendingMovements WHERE SessionId=@S AND ProcessingStatus IN ('Pending','Failed');", connection, transaction))
+                    { c.Parameters.AddWithValue("@S", sessionId); if (Convert.ToInt32(c.ExecuteScalar()) > 0) throw new InvalidOperationException("توجد حركات معلقة أو فاشلة. استخدم معالجة الحركات أولًا."); }
+                    using (var c = new SQLiteCommand("UPDATE InventoryCountSessions SET Status='Submitted' WHERE Id=@S AND Status='Open';", connection, transaction))
+                    { c.Parameters.AddWithValue("@S", sessionId); if (c.ExecuteNonQuery() != 1) throw new InvalidOperationException("تغيرت حالة الجلسة أثناء الاعتماد."); }
+                    Event(connection, transaction, sessionId, null, "SessionSubmitted", managerId, "بدء الاعتماد المباشر الكامل للجلسة.");
+                    ValidateItemsForApproval(connection, transaction, sessionId, ids, note);
+                    var products = new SortedSet<int>();
+                    foreach (int id in ids) products.Add(ApproveItemWithinTransaction(connection, transaction, managerId, sessionId, id, note));
+                    foreach (int productId in products) ProcessPendingMovementsForProduct(connection, transaction, productId, managerId);
+                    using (var c = new SQLiteCommand(@"SELECT COUNT(*) FROM InventoryCountPendingMovements WHERE SessionId=@S AND ProcessingStatus IN ('Pending','Failed');", connection, transaction))
+                    { c.Parameters.AddWithValue("@S", sessionId); if (Convert.ToInt32(c.ExecuteScalar()) > 0) throw new InvalidOperationException("تعذر إنهاء الحركات المرتبطة بالجرد. تم التراجع عن الاعتماد بالكامل."); }
+                    using (var c = new SQLiteCommand(@"UPDATE InventoryCountSessions SET Status='Closed',ClosedBy=@U,ClosedAt=@N WHERE Id=@S AND Status='PartiallyApproved';", connection, transaction))
+                    { c.Parameters.AddWithValue("@U", managerId); c.Parameters.AddWithValue("@N", Now()); c.Parameters.AddWithValue("@S", sessionId); if (c.ExecuteNonQuery() != 1) throw new InvalidOperationException("تعذر إغلاق الجلسة؛ تم التراجع عن الاعتماد بالكامل."); }
+                    Event(connection, transaction, sessionId, null, "SessionClosed", managerId, "تم اعتماد جميع بنود الجلسة وتطبيق الفروق وإغلاقها في معاملة واحدة.");
+                    transaction.Commit();
+                }
+            }
+        }
+
+
         public void ApproveItems(int managerId, int sessionId, IEnumerable<int> itemIds, string note = "")
         {
             var ids = (itemIds ?? Enumerable.Empty<int>()).ToList();

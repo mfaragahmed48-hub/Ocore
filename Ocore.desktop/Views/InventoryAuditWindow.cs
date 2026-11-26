@@ -204,14 +204,7 @@ namespace Ocore.desktop.Views
                 Margin = new Thickness(0, 6, 0, 4),
                 Orientation = Orientation.Horizontal
             };
-            actions.Children.Add(MakeButton("إرسال للمراجعة", SubmitSelectedSession));
-            actions.Children.Add(MakeButton("اعتماد البند", ApproveSelectedItem));
-            actions.Children.Add(MakeButton("اعتماد المحدد", ApproveSelectedItems));
-            actions.Children.Add(MakeButton("إلغاء البنود", CancelSelectedItems));
-            actions.Children.Add(MakeButton("طلب إعادة عد", RequestSelectedRecount));
-            actions.Children.Add(MakeButton("إعادة مراجعة", ReopenSelectedItems));
-            actions.Children.Add(MakeButton("إلغاء المراجعة", CancelReopenedSelectedItems));
-            actions.Children.Add(MakeButton("إغلاق الجلسة", CloseSelectedSession));
+            actions.Children.Add(MakeButton("اعتماد الجرد", ApproveWholeSession));
             actions.Children.Add(MakeButton("إلغاء الجلسة", CancelSelectedSession));
             actions.Children.Add(MakeButton("معالجة الحركات", RetryPending));
             Grid.SetRow(actions, 3);
@@ -245,7 +238,7 @@ namespace Ocore.desktop.Views
                 Padding = new Thickness(6, 2, 6, 2),
                 FontSize = 11,
                 VerticalContentAlignment = VerticalAlignment.Center,
-                ToolTip = "ملاحظة المدير أو سبب الفرق أو إعادة العد أو الإلغاء"
+                ToolTip = "ملاحظة المدير أو سبب فرق الجرد"
             };
             footer.Children.Add(noteBox);
             var closeButton = MakeButton("إغلاق الشاشة", () => Close());
@@ -1211,6 +1204,22 @@ namespace Ocore.desktop.Views
                 }
             }
             Info("تم حفظ العد. لا توجد بنود أخرى غير معدودة.");
+        }
+
+        private void ApproveWholeSession()
+        {
+            if (selectedSessionId <= 0) { Warn("اختر جلسة جرد أولًا."); return; }
+            var session = sessionsGrid.SelectedItem as DataRowView;
+            if (session == null || !string.Equals(Convert.ToString(session["Status"]), "Open", StringComparison.OrdinalIgnoreCase))
+            { Warn("اعتماد الجرد متاح للجلسات المفتوحة فقط."); return; }
+            if (MessageBox.Show("سيتم اعتماد جميع بنود الجلسة وتطبيق العجز والزيادة على المخزون ثم إغلاق الجلسة تلقائيًا. عند حدوث خطأ لن يتم تطبيق أي جزء. هل تريد المتابعة؟",
+                "تأكيد اعتماد الجرد بالكامل", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            RunAction(() =>
+            {
+                auditService.ApproveAndCloseSession(currentUserId, selectedSessionId, noteBox.Text.Trim());
+                noteBox.Clear(); LoadSessions(selectedSessionId);
+                Info("تم اعتماد جميع بنود الجرد وتحديث المخزون وإغلاق الجلسة بنجاح.");
+            });
         }
 
         private void SubmitSelectedSession()
