@@ -345,12 +345,30 @@ namespace Ocore.desktop.Views
 
         private DataTemplate CreateAuditProductDisplayTemplate()
         {
-            var factory = new FrameworkElementFactory(typeof(TextBlock));
-            factory.SetBinding(TextBlock.TextProperty, new Binding("ProductName"));
-            factory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-            factory.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
-            factory.SetValue(TextBlock.MarginProperty, new Thickness(5, 3, 5, 3));
-            return new DataTemplate { VisualTree = factory };
+            var panel = new FrameworkElementFactory(typeof(StackPanel));
+            panel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+            panel.SetValue(StackPanel.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+            var name = new FrameworkElementFactory(typeof(TextBlock));
+            name.SetBinding(TextBlock.TextProperty, new Binding("ProductName"));
+            name.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+            name.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+            name.SetValue(TextBlock.MarginProperty, new Thickness(5, 3, 5, 3));
+            panel.AppendChild(name);
+
+            var choose = new FrameworkElementFactory(typeof(Button));
+            choose.SetValue(ContentControl.ContentProperty, "اختيار التشغيلات");
+            choose.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 0, 0, 0));
+            choose.SetValue(Control.PaddingProperty, new Thickness(8, 2, 8, 2));
+            choose.SetBinding(FrameworkElement.TagProperty, new Binding("ProductId"));
+            choose.SetBinding(UIElement.VisibilityProperty, new Binding("IsEntryRow")
+            {
+                Converter = new BooleanToVisibilityConverter()
+            });
+            choose.AddHandler(Button.ClickEvent, new RoutedEventHandler(AuditProductBatchPicker_Click));
+            panel.AppendChild(choose);
+
+            return new DataTemplate { VisualTree = panel };
         }
 
         private DataTemplate CreateAuditProductTemplate()
@@ -463,12 +481,40 @@ namespace Ocore.desktop.Views
         {
             var combo = sender as ComboBox;
             if (combo == null || !string.Equals(Convert.ToString(combo.Tag), "ready", StringComparison.Ordinal)) return;
+
             var entryRow = combo.DataContext as DataRowView;
             var product = combo.SelectedItem as DataRowView;
             if (entryRow == null || !IsEntryRow(entryRow) || product == null) return;
-            combo.Tag = "processing";
+
             int productId = Convert.ToInt32(product["ProductId"]);
-            Dispatcher.BeginInvoke(new Action(() => AddProductToInvoiceRow(productId, combo)), DispatcherPriority.Background);
+            string productName = Convert.ToString(product["ProductName"]);
+
+            entryRow["ProductId"] = productId;
+            entryRow["ProductName"] = productName;
+            if (entryRow.Row.Table.Columns.Contains("ProductCode"))
+                entryRow["ProductCode"] = Convert.ToString(product["ProductCode"]);
+            if (entryRow.Row.Table.Columns.Contains("Barcode"))
+                entryRow["Barcode"] = Convert.ToString(product["Barcode"]);
+
+            combo.Text = productName;
+            combo.Tag = "ready";
+        }
+
+        private void AuditProductBatchPicker_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button == null) return;
+
+            int productId;
+            if (button.Tag == null ||
+                !int.TryParse(Convert.ToString(button.Tag), out productId) ||
+                productId <= 0)
+            {
+                Warn("اختر الصنف أولًا من خانة الصنف.");
+                return;
+            }
+
+            AddProductToInvoiceRow(productId, null);
         }
 
         private void AddProductToInvoiceRow(int productId, ComboBox sourceCombo)
