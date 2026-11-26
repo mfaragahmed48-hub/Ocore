@@ -13,8 +13,8 @@ namespace Ocore.desktop.Data
         private readonly string databasePath;
         private readonly string backupFolder;
 
-        // الإصدار 9: تأسيس نظام الضرائب.
-        private const int CurrentDatabaseVersion = 10;
+        // الإصدار 11: تأسيس جداول الجرد والضرائب.
+        private const int CurrentDatabaseVersion = 11;
         private const int MaximumBackupCount = 30;
 
         public static string GetStorageRootPath()
@@ -129,13 +129,20 @@ namespace Ocore.desktop.Data
                         connection,
                         "PrinterConfigurations");
 
+                bool requiresInventoryAuditSchemaRepair =
+                    databaseAlreadyExisted &&
+                    !TableExists(
+                        connection,
+                        "InventoryCountSessions");
+
                 bool requiresSchemaRepair =
                     requiresSalesCustomerIdRepair ||
                     requiresCustomerAccountCustomerIdRepair ||
                     requiresProductMaxDiscountRepair ||
                     requiresThermalPrinterSettingsRepair ||
                     requiresPrintingProfilesRepair ||
-                    requiresPrinterConfigurationsRepair;
+                    requiresPrinterConfigurationsRepair ||
+                    requiresInventoryAuditSchemaRepair;
 
                 if (databaseAlreadyExisted &&
                     (requiresUpgrade || requiresSchemaRepair))
@@ -150,6 +157,7 @@ namespace Ocore.desktop.Data
 
                 DatabaseSchema.CreateCoreTables(connection);
                 TaxDatabaseSchema.Ensure(connection);
+                InventoryAuditSchema.Ensure(connection);
                 // ترحيل قاعدة البيانات إلى الإصدار 8:
                 // السماح بوجود عدة كروت أسعار مرتبطة بالدواء الأساسي نفسه.
                 if (currentVersion < 8)
