@@ -311,6 +311,11 @@ ORDER BY
                         string expiryText = expiryDate.ToString(
                             "yyyy-MM-dd",
                             CultureInfo.InvariantCulture);
+                        string createdAt = DateTime.Now.ToString(
+                            "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        int? activeAuditSessionId =
+                            InventoryAuditService.FindActiveSessionForIncomingBatch(
+                                connection, transaction, productId, expiryText);
 
                         using (var command = new SQLiteCommand(
                             @"INSERT INTO Batches
@@ -337,7 +342,7 @@ ORDER BY
                                 "@PurchasePrice", purchasePrice);
 
                             command.Parameters.AddWithValue(
-                                "@Quantity", quantity);
+                                "@Quantity", activeAuditSessionId.HasValue ? 0d : quantity);
 
                             command.ExecuteNonQuery();
                         }
@@ -349,6 +354,15 @@ ORDER BY
                             connection, transaction))
                         {
                             batchId = Convert.ToInt64(command.ExecuteScalar());
+                        }
+
+                        if (activeAuditSessionId.HasValue)
+                        {
+                            InventoryAuditService.QueuePendingMovement(
+                                connection, transaction, activeAuditSessionId.Value,
+                                productId, Convert.ToInt32(batchId), "ManualAdd",
+                                "Batches", Convert.ToInt32(batchId),
+                                quantity, string.Empty, userId, createdAt);
                         }
 
                         using (var command = new SQLiteCommand(
@@ -452,6 +466,9 @@ ORDER BY
                             StringComparison.OrdinalIgnoreCase))
                             throw new UnauthorizedAccessException(
                                 "تسوية أرصدة المخزون متاحة للمدير فقط.");
+
+                        InventoryAuditService.EnsureBatchNotFrozen(
+                            connection, transaction, batchId, "تسوية رصيد التشغيلة");
 
                         string productName;
                         string batchNumber;
