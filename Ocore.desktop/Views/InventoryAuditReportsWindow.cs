@@ -3,6 +3,7 @@ using System.Data;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using ClosedXML.Excel;
 using Microsoft.Win32;
@@ -192,19 +193,108 @@ namespace Ocore.desktop.Views
             try
             {
                 var dialog = new PrintDialog();
-
-                if (dialog.ShowDialog() == true)
-                    dialog.PrintVisual(this, "تقرير الجرد رقم " + sessionId);
+                if (dialog.ShowDialog() != true) return;
+                DataTable summary = queryService.GetVarianceSummary(sessionId, managerId);
+                DataTable variance = queryService.GetVarianceReport(sessionId, managerId);
+                DataTable decisions = queryService.GetCostDecisionDetails(sessionId, managerId);
+                DataTable comparison = queryService.GetPreviousCountComparison(sessionId, managerId);
+                DataTable repeated = queryService.GetRepeatedShortages(managerId);
+                var document = new System.Windows.Documents.FlowDocument
+                {
+                    FlowDirection = FlowDirection.RightToLeft,
+                    FontFamily = new FontFamily("Segoe UI"),
+                    FontSize = 9,
+                    PageWidth = dialog.PrintableAreaWidth,
+                    PageHeight = dialog.PrintableAreaHeight,
+                    PagePadding = new Thickness(28),
+                    ColumnWidth = Math.Max(100, dialog.PrintableAreaWidth - 56),
+                    IsColumnWidthFlexible = false
+                };
+                document.Blocks.Add(new System.Windows.Documents.Paragraph(
+                    new System.Windows.Documents.Run("تقرير الجرد رقم " + sessionId))
+                {
+                    FontSize = 18,
+                    FontWeight = FontWeights.Bold,
+                    TextAlignment = TextAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 12)
+                });
+                string summaryLine = "الأهداف المعتمدة: 0 | أهداف بها عجز: 0 | قيمة العجز: 0.00 | أهداف بها زيادة: 0 | قيمة الزيادة: 0.00";
+                if (summary.Rows.Count > 0)
+                {
+                    DataRow row = summary.Rows[0];
+                    summaryLine = string.Format(CultureInfo.CurrentCulture,
+                        "الأهداف المعتمدة: {0} | أهداف بها عجز: {1} | قيمة العجز: {2:N2} | أهداف بها زيادة: {3} | قيمة الزيادة: {4:N2}",
+                        Value(row, "ApprovedTargets"), Value(row, "ShortageTargets"),
+                        Value(row, "ShortageValue"), Value(row, "ExcessTargets"), Value(row, "ExcessValue"));
+                }
+                document.Blocks.Add(new System.Windows.Documents.Paragraph(
+                    new System.Windows.Documents.Run(summaryLine))
+                { FontSize = 11, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 10) });
+                AddPrintSection(document, "ملخص الفروق المعتمدة", variance);
+                AddPrintSection(document, "تفاصيل قرارات التكلفة", decisions);
+                AddPrintSection(document, "مقارنة بالجرد السابق", comparison);
+                AddPrintSection(document, "الأهداف المتكرر بها العجز", repeated);
+                dialog.PrintDocument(document.DocumentPaginator, "تقرير الجرد رقم " + sessionId);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    this,
-                    "تعذرت طباعة التقرير: " + ex.Message,
-                    "خطأ في الطباعة",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                MessageBox.Show(this, "تعذرت طباعة التقرير: " + ex.Message,
+                    "خطأ في الطباعة", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private static void AddPrintSection(
+            System.Windows.Documents.FlowDocument document, string title, DataTable data)
+        {
+            document.Blocks.Add(new System.Windows.Documents.Paragraph(
+                new System.Windows.Documents.Run(title))
+            { FontSize = 13, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 12, 0, 6) });
+            if (data == null || data.Columns.Count == 0 || data.Rows.Count == 0)
+            {
+                document.Blocks.Add(new System.Windows.Documents.Paragraph(
+                    new System.Windows.Documents.Run("لا توجد بيانات لهذا التقرير.")));
+                return;
+            }
+            var table = new System.Windows.Documents.Table
+            { CellSpacing = 0, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.5) };
+            for (int i = 0; i < data.Columns.Count; i++)
+                table.Columns.Add(new System.Windows.Documents.TableColumn
+                { Width = new GridLength(1, GridUnitType.Star) });
+            var headerGroup = new System.Windows.Documents.TableRowGroup();
+            var headerRow = new System.Windows.Documents.TableRow
+            { Background = new SolidColorBrush(Color.FromRgb(225, 233, 230)), FontWeight = FontWeights.Bold };
+            foreach (DataColumn column in data.Columns)
+                headerRow.Cells.Add(CreatePrintCell(column.ColumnName, true));
+            headerGroup.Rows.Add(headerRow);
+            table.RowGroups.Add(headerGroup);
+            var bodyGroup = new System.Windows.Documents.TableRowGroup();
+            foreach (DataRow dataRow in data.Rows)
+            {
+                var row = new System.Windows.Documents.TableRow();
+                foreach (DataColumn column in data.Columns)
+                {
+                    string value = dataRow[column] == DBNull.Value ? string.Empty :
+                        Convert.ToString(dataRow[column], CultureInfo.CurrentCulture);
+                    row.Cells.Add(CreatePrintCell(value, false));
+                }
+                bodyGroup.Rows.Add(row);
+            }
+            table.RowGroups.Add(bodyGroup);
+            document.Blocks.Add(table);
+        }
+
+        private static System.Windows.Documents.TableCell CreatePrintCell(string value, bool isHeader)
+        {
+            var paragraph = new System.Windows.Documents.Paragraph(
+                new System.Windows.Documents.Run(value ?? string.Empty))
+            { FontSize = 8, Margin = new Thickness(1), TextAlignment = TextAlignment.Right };
+            return new System.Windows.Documents.TableCell(paragraph)
+            {
+                Padding = new Thickness(4, 3, 4, 3),
+                BorderBrush = Brushes.LightGray,
+                BorderThickness = new Thickness(0.35),
+                Background = isHeader ? new SolidColorBrush(Color.FromRgb(225, 233, 230)) : Brushes.White
+            };
         }
 
         private void LoadReports()
