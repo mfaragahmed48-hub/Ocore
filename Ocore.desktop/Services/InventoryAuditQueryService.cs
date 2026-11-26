@@ -207,6 +207,9 @@ ORDER BY FullName;";
 
             const string sql = @"
 SELECT b.Id AS BatchId,b.ProductId,p.Name AS ProductName,
+       COALESCE(p.ProductCode,'') AS ProductCode,
+       COALESCE((SELECT pb.Barcode FROM ProductBarcodes pb
+                 WHERE pb.ProductId=p.Id ORDER BY pb.Id LIMIT 1),'') AS Barcode,
        COALESCE(b.BatchNumber,'') AS BatchNumber,
        COALESCE(b.ExpiryDate,'') AS ExpiryDate,
        COALESCE(p.UnitName,'') AS Unit,

@@ -92,6 +92,7 @@ namespace Ocore.desktop.Views
             actions.Children.Add(reasonBox);
             actions.Children.Add(MakeButton("بدء جرد شامل", CreateFullSession));
             actions.Children.Add(MakeButton("بدء جرد محدد", CreateSelectedSession));
+            actions.Children.Add(MakeButton("إضافة أصناف للجلسة", AddItemsToOpenSession));
 
             pUnitLabel = new TextBlock
             {
@@ -457,6 +458,106 @@ namespace Ocore.desktop.Views
             buttons.Children.Add(MakeButton("إلغاء", () => picker.DialogResult = false));
             DockPanel.SetDock(buttons, Dock.Bottom);
             layout.Children.Add(buttons);
+            picker.Content = layout;
+            picker.ShowDialog();
+        }
+
+
+        private void AddItemsToOpenSession()
+        {
+            var session = sessionsGrid.SelectedItem as DataRowView;
+            if (session == null || selectedSessionId <= 0)
+            {
+                Warn("اختر جلسة جرد مفتوحة أولًا.");
+                return;
+            }
+            if (!string.Equals(Convert.ToString(session["Status"]), "Open", StringComparison.OrdinalIgnoreCase))
+            {
+                Warn("إضافة أصناف جديدة متاحة فقط قبل إرسال الجلسة للمراجعة.");
+                return;
+            }
+
+            var available = queryService.GetAvailableBatches(currentUserId);
+            var view = available.DefaultView;
+            var picker = new Window
+            {
+                Title = "إضافة أصناف وتشغيلات إلى الجرد الحالي",
+                Width = 1050,
+                Height = 650,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                FlowDirection = FlowDirection.RightToLeft,
+                Background = Brushes.White
+            };
+
+            var layout = new DockPanel { Margin = new Thickness(12) };
+            var search = new TextBox
+            {
+                Height = 36,
+                Margin = new Thickness(0, 0, 0, 8),
+                Padding = new Thickness(8),
+                FontSize = 14,
+                ToolTip = "ابحث باسم الصنف أو الكود أو الباركود أو رقم التشغيلة"
+            };
+            search.TextChanged += (sender, args) =>
+            {
+                string term = search.Text.Trim().Replace("'", "''");
+                if (string.IsNullOrWhiteSpace(term))
+                    view.RowFilter = "";
+                else
+                    view.RowFilter =
+                        "ProductName LIKE '%" + term + "%' OR " +
+                        "ProductCode LIKE '%" + term + "%' OR " +
+                        "Barcode LIKE '%" + term + "%' OR " +
+                        "BatchNumber LIKE '%" + term + "%' OR " +
+                        "ExpiryDate LIKE '%" + term + "%'";
+            };
+            DockPanel.SetDock(search, Dock.Top);
+            layout.Children.Add(search);
+
+            var choose = CreateGrid();
+            choose.SelectionMode = DataGridSelectionMode.Extended;
+            choose.ItemsSource = view;
+            DockPanel.SetDock(choose, Dock.Top);
+            layout.Children.Add(choose);
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            buttons.Children.Add(MakeButton("إضافة المحدد للجلسة", () =>
+            {
+                var ids = choose.SelectedItems.Cast<object>()
+                    .OfType<DataRowView>()
+                    .Select(x => Convert.ToInt32(x["BatchId"]))
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
+
+                if (ids.Count == 0)
+                {
+                    Warn("حدد صنفًا أو تشغيلة واحدة على الأقل.");
+                    return;
+                }
+
+                try
+                {
+                    int added = auditService.AddTargetsToOpenSession(
+                        currentUserId, selectedSessionId, ids);
+                    LoadSessions(selectedSessionId);
+                    SelectNextUncountedItem(0);
+                    progressText.Text += " | تمت إضافة " + added + " هدفًا";
+                    picker.DialogResult = true;
+                }
+                catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
+                catch (Exception ex) { Error(ex.Message); }
+            }));
+            buttons.Children.Add(MakeButton("إلغاء", () => picker.DialogResult = false));
+            DockPanel.SetDock(buttons, Dock.Bottom);
+            layout.Children.Add(buttons);
+
             picker.Content = layout;
             picker.ShowDialog();
         }
