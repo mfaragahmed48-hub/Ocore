@@ -1029,7 +1029,7 @@ namespace Ocore.desktop.Views
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left
             };
-            buttons.Children.Add(MakeButton("إنشاء الجرد المحدد", () =>
+            Action addSelectedAction = () =>
             {
                 var ids = choose.SelectedItems.Cast<DataRowView>()
                     .Select(x => Convert.ToInt32(x["BatchId"])).Distinct().ToList();
@@ -1047,7 +1047,7 @@ namespace Ocore.desktop.Views
                 }
                 catch (Exception ex) { Error(ex.Message); }
             };
-            buttons.Children.Add(MakeButton("إضافة المحدد للجرد", addSelectedAction));
+            buttons.Children.Add(MakeButton("إنشاء الجرد المحدد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
             {
                 if (args.Key != Key.Enter) return;
