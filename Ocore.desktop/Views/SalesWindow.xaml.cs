@@ -1603,7 +1603,7 @@ namespace Ocore.desktop.Views
                             NormalizeSearchField(result.Name),
                             NormalizeSearchField(result.TradeNameArabic),
                             NormalizeSearchField(result.GenericName),
-                            NormalizeSearchField(searchResult.ProductCode),
+                            NormalizeSearchField(result.ProductCode),
                             NormalizeSearchField(result.Barcode)
                         }
                     });
