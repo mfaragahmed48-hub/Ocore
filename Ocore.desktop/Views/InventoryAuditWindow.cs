@@ -47,6 +47,7 @@ namespace Ocore.desktop.Views
             Loaded += (sender, args) => Dispatcher.BeginInvoke(new Action(FocusEntrySearchRow), DispatcherPriority.Loaded);
             LoadAvailableProducts();
             LoadSessions();
+            StartNewInvoice();
         }
 
         private UIElement BuildLayout()
