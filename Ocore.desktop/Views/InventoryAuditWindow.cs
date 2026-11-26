@@ -1122,17 +1122,16 @@ namespace Ocore.desktop.Views
 
         private void CancelSelectedSession()
         {
-            if (selectedSessionId <= 0 || string.IsNullOrWhiteSpace(reasonBox.Text))
+            if (selectedSessionId <= 0)
             {
-                Warn("اكتب سبب إلغاء الجلسة أولًا.");
+                Warn("اختر جلسة جرد أولًا.");
                 return;
             }
             if (MessageBox.Show("سيتم إلغاء الجلسة ورفع التجميد المرتبط بها. هل تريد المتابعة؟",
                 "تأكيد الإلغاء", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             RunAction(() =>
             {
-                auditService.CancelSession(currentUserId, selectedSessionId, reasonBox.Text.Trim());
-                reasonBox.Clear();
+                auditService.CancelSession(currentUserId, selectedSessionId, string.Empty);
                 LoadSessions(selectedSessionId);
             });
         }
