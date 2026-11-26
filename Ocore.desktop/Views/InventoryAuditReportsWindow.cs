@@ -127,65 +127,117 @@ namespace Ocore.desktop.Views
                 DefaultExt = ".xlsx"
             };
 
-            if (dialog.ShowDialog(this) != true)
-                return;
+            if (dialog.ShowDialog(this) != true) return;
 
             try
             {
                 using (var workbook = new XLWorkbook())
                 {
-                    var summarySheet = workbook.Worksheets.Add("ملخص الجرد");
-                    summarySheet.Cell(1, 1).Value = "تقرير الجرد رقم " + sessionId;
-                    summarySheet.Cell(3, 1).InsertTable(
-                        queryService.GetVarianceSummary(sessionId, managerId));
-                    summarySheet.Columns().AdjustToContents();
+                    DataTable summary = queryService.GetVarianceSummary(sessionId, managerId);
+                    DataTable variance = queryService.GetVarianceReport(sessionId, managerId);
+                    DataTable decisions = queryService.GetCostDecisionDetails(sessionId, managerId);
+                    DataTable comparison = queryService.GetPreviousCountComparison(sessionId, managerId);
+                    DataTable repeated = queryService.GetRepeatedShortages(managerId);
 
-                    var varianceSheet = workbook.Worksheets.Add("الفروق");
-                    varianceSheet.Cell(1, 1).Value = "الفروق المعتمدة";
-                    varianceSheet.Cell(3, 1).InsertTable(
-                        queryService.GetVarianceReport(sessionId, managerId));
-                    varianceSheet.Columns().AdjustToContents();
-
-                    var decisionsSheet = workbook.Worksheets.Add("قرارات التكلفة");
-                    decisionsSheet.Cell(1, 1).Value =
-                        "تفاصيل قرارات تقييم العجز والزيادة";
-                    decisionsSheet.Cell(3, 1).InsertTable(
-                        queryService.GetCostDecisionDetails(sessionId, managerId));
-                    decisionsSheet.Columns().AdjustToContents();
-
-                    var comparisonSheet = workbook.Worksheets.Add("مقارنة السابق");
-                    comparisonSheet.Cell(1, 1).Value =
-                        "مقارنة الهدف بآخر جرد سابق مغلق";
-                    comparisonSheet.Cell(3, 1).InsertTable(
-                        queryService.GetPreviousCountComparison(sessionId, managerId));
-                    comparisonSheet.Columns().AdjustToContents();
-
-                    var repeatedSheet = workbook.Worksheets.Add("العجز المتكرر");
-                    repeatedSheet.Cell(1, 1).Value =
-                        "الأهداف التي تجاوزت حد تكرار العجز";
-                    repeatedSheet.Cell(3, 1).InsertTable(
-                        queryService.GetRepeatedShortages(managerId));
-                    repeatedSheet.Columns().AdjustToContents();
+                    AddExportSheet(workbook, "ملخص الجرد", "تقرير الجرد رقم " + sessionId, summary);
+                    AddExportSheet(workbook, "الفروق", "الفروق المعتمدة - الجرد رقم " + sessionId, variance);
+                    AddExportSheet(workbook, "قرارات التكلفة", "تفاصيل قرارات تقييم العجز والزيادة", decisions);
+                    AddExportSheet(workbook, "مقارنة السابق", "مقارنة الهدف بآخر جرد سابق مغلق", comparison);
+                    AddExportSheet(workbook, "العجز المتكرر", "الأهداف التي تجاوزت حد تكرار العجز", repeated);
 
                     workbook.SaveAs(dialog.FileName);
                 }
 
-                MessageBox.Show(
-                    this,
-                    "تم تصدير تقرير الجرد إلى Excel.",
-                    "تم التصدير",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                MessageBox.Show(this, "تم تصدير تقرير الجرد إلى Excel.", "تم التصدير",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    this,
-                    "تعذر تصدير التقرير: " + ex.Message,
-                    "خطأ في التصدير",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                MessageBox.Show(this, "تعذر تصدير التقرير: " + ex.Message, "خطأ في التصدير",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private static void AddExportSheet(
+            XLWorkbook workbook, string sheetName, string title, DataTable data)
+        {
+            var sheet = workbook.Worksheets.Add(sheetName);
+            int columnCount = Math.Max(1, data.Columns.Count);
+
+            sheet.RightToLeft = true;
+            sheet.Cell(1, 1).Value = title;
+            sheet.Range(1, 1, 1, columnCount).Merge();
+            sheet.Row(1).Height = 30;
+
+            var titleRange = sheet.Range(1, 1, 1, columnCount);
+            titleRange.Style.Font.Bold = true;
+            titleRange.Style.Font.FontSize = 16;
+            titleRange.Style.Font.FontColor = XLColor.White;
+            titleRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#1F6955");
+            titleRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            titleRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+            if (data.Columns.Count == 0)
+            {
+                sheet.Cell(3, 1).Value = "لا توجد بيانات لهذا التقرير.";
+                sheet.Cell(3, 1).Style.Font.Italic = true;
+                sheet.Column(1).Width = 36;
+            }
+            else
+            {
+                string tableName = "AuditReport" + workbook.Worksheets.Count.ToString(CultureInfo.InvariantCulture);
+                sheet.Cell(3, 1).InsertTable(data, tableName, true);
+                int lastRow = Math.Max(3, data.Rows.Count + 3);
+                var header = sheet.Range(3, 1, 3, data.Columns.Count);
+                header.Style.Font.Bold = true;
+                header.Style.Font.FontColor = XLColor.White;
+                header.Style.Fill.BackgroundColor = XLColor.FromHtml("#315F52");
+                header.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                header.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                header.Style.Alignment.WrapText = true;
+                sheet.Row(3).Height = 34;
+
+                var used = sheet.Range(3, 1, lastRow, data.Columns.Count);
+                used.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                used.Style.Alignment.WrapText = true;
+                used.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+                used.Style.Border.BottomBorderColor = XLColor.FromHtml("#D9E2DE");
+
+                for (int i = 0; i < data.Columns.Count; i++)
+                {
+                    string name = data.Columns[i].ColumnName ?? string.Empty;
+                    var column = sheet.Column(i + 1);
+                    column.AdjustToContents(1, lastRow);
+                    if (column.Width < 12) column.Width = 12;
+                    if (column.Width > 36) column.Width = 36;
+
+                    if (name.IndexOf("Value", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("Price", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("Cost", StringComparison.OrdinalIgnoreCase) >= 0)
+                        sheet.Range(4, i + 1, Math.Max(4, lastRow), i + 1)
+                            .Style.NumberFormat.Format = "#,##0.00;[Red]-#,##0.00";
+                    else if (name.IndexOf("Quantity", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             name.IndexOf("Variance", StringComparison.OrdinalIgnoreCase) >= 0)
+                        sheet.Range(4, i + 1, Math.Max(4, lastRow), i + 1)
+                            .Style.NumberFormat.Format = "#,##0.###;[Red]-#,##0.###";
+
+                    if (name.IndexOf("Date", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("At", StringComparison.OrdinalIgnoreCase) >= 0)
+                        column.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                }
+
+                sheet.SheetView.FreezeRows(3);
+                used.SetAutoFilter();
+            }
+
+            sheet.PageSetup.PageOrientation = XLPageOrientation.Landscape;
+            sheet.PageSetup.FitToPages(1, 0);
+            sheet.PageSetup.PagesWide = 1;
+            sheet.PageSetup.CenterHorizontally = true;
+            sheet.PageMargins.Top = 0.5;
+            sheet.PageMargins.Bottom = 0.5;
+            sheet.PageMargins.Left = 0.25;
+            sheet.PageMargins.Right = 0.25;
         }
 
         private void PrintReport()
