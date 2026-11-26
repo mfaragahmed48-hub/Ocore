@@ -61,7 +61,7 @@ ON InventoryCountReopenSnapshots(CountItemId,RestoredAt);", connection))
             }
         }
 
-        public int CreateSession(int managerId, string reason, IEnumerable<int> selectedBatchIds = null)
+        public int CreateSession(int managerId, string reason, IEnumerable<int> selectedBatchIds = null, bool forceBatchTargets = false, int? selectedProductId = null)
         {
             if (string.IsNullOrWhiteSpace(reason))
                 throw new ArgumentException("سبب بدء الجرد مطلوب.");
@@ -141,17 +141,45 @@ ORDER BY p.Id,
                             bool hasBatch = reader["BatchId"] != DBNull.Value;
 
                             if (!hasBatch)
+                            {
+                                if (forceBatchTargets && selectedProductId.HasValue && selectedProductId.Value == productId)
+                                {
+                                    string productTargetKey = "P:" + productId.ToString(CultureInfo.InvariantCulture);
+                                    if (!targetsByKey.ContainsKey(productTargetKey))
+                                        targetsByKey.Add(productTargetKey, new Target
+                                        {
+                                            ProductId = productId,
+                                            Name = Convert.ToString(reader["ProductName"]),
+                                            Unit = BuildUnitSnapshot(Convert.ToString(reader["UnitName"]),
+                                                Convert.ToString(reader["SmallUnitName"]),
+                                                Convert.ToInt32(reader["UnitsPerPackage"])),
+                                            UnitsPerPackage = Convert.ToInt32(reader["UnitsPerPackage"]),
+                                            TargetType = "Product",
+                                            TargetKey = productTargetKey,
+                                            Expiry = "",
+                                            Batch = "",
+                                            Batches = new List<TargetBatch>()
+                                        });
+                                }
                                 continue;
+                            }
 
                             string expiry = Convert.ToString(reader["ExpiryDate"]);
                             int batchId = Convert.ToInt32(reader["BatchId"]);
+                            if (forceBatchTargets && (selected == null || !selected.Contains(batchId)))
+                                continue;
                             bool trackBatchNumber = Convert.ToInt32(reader["TrackBatchNumber"]) == 1;
                             bool trackExpiryDate = Convert.ToInt32(reader["TrackExpiryDate"]) == 1;
 
                             string targetType;
                             string targetKey;
 
-                            if (trackBatchNumber)
+                            if (forceBatchTargets)
+                            {
+                                targetType = "Batch";
+                                targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
+                            }
+                            else if (trackBatchNumber)
                             {
                                 targetType = "Batch";
                                 targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
@@ -212,7 +240,9 @@ ORDER BY p.Id,
                     }
 
                     var targets = targetsByKey.Values
-                        .Where(x => selected == null || x.Batches.Any(b => selected.Contains(b.BatchId)))
+                        .Where(x => selected == null || x.Batches.Any(b => selected.Contains(b.BatchId)) ||
+                            (forceBatchTargets && selectedProductId.HasValue &&
+                             x.ProductId == selectedProductId.Value && x.TargetType == "Product"))
                         .OrderBy(x => x.Name, StringComparer.CurrentCulture)
                         .ThenBy(x => x.TargetKey, StringComparer.Ordinal)
                         .ToList();
@@ -241,11 +271,23 @@ ORDER BY p.Id,
 SELECT COUNT(*)
 FROM InventoryCountItems i
 INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
-WHERE i.TargetKey=@K
+WHERE
+  (
+      i.TargetKey=@K
+      OR (@FB=1 AND
+          (
+              i.TargetKey='P:' || @P
+              OR i.TargetKey='E:' || @P || ':' ||
+                 CASE WHEN TRIM(COALESCE(@E,''))='' THEN '~NONE~' ELSE TRIM(@E) END
+          ))
+  )
   AND i.ItemStatus<>'Cancelled'
   AND s.Status IN ('Open','Submitted','PartiallyApproved');", connection, transaction))
                         {
                             check.Parameters.AddWithValue("@K", target.TargetKey);
+                            check.Parameters.AddWithValue("@FB", forceBatchTargets ? 1 : 0);
+                            check.Parameters.AddWithValue("@P", target.ProductId);
+                            check.Parameters.AddWithValue("@E", target.Expiry ?? "");
 
                             if (Convert.ToInt32(check.ExecuteScalar()) > 0)
                             {
@@ -329,7 +371,8 @@ VALUES(@I,@B,@Q,@C,@BN,@E,@U,@RA,@RI,@D);", connection, transaction))
 
 
         public int AddTargetsToOpenSession(
-            int managerId, int sessionId, IEnumerable<int> selectedBatchIds)
+            int managerId, int sessionId, IEnumerable<int> selectedBatchIds,
+            bool forceBatchTargets = false, int? selectedProductId = null)
         {
             var selected = selectedBatchIds == null
                 ? new HashSet<int>()
@@ -337,8 +380,8 @@ VALUES(@I,@B,@Q,@C,@BN,@E,@U,@RA,@RI,@D);", connection, transaction))
 
             if (sessionId <= 0)
                 throw new ArgumentException("جلسة الجرد المحددة غير صحيحة.");
-            if (selected.Count == 0)
-                throw new ArgumentException("حدد تشغيلة واحدة على الأقل لإضافتها للجرد.");
+            if (selected.Count == 0 && !selectedProductId.HasValue)
+                throw new ArgumentException("حدد تشغيلة أو صنفًا بلا تشغيلات لإضافته للجرد.");
 
             using (var connection = new SQLiteConnection(connectionString))
             {
@@ -390,8 +433,13 @@ LEFT JOIN Batches b ON b.ProductId=p.Id
 LEFT JOIN PurchaseInvoiceItems pii ON pii.BatchId=b.Id
 LEFT JOIN PurchaseInvoices pi ON pi.Id=pii.InvoiceId
 WHERE p.IsArchived=0
-  AND p.Id IN
-      (SELECT DISTINCT ProductId FROM Batches WHERE Id IN (" + batchFilter + @"))
+  AND
+      (
+          p.Id IN
+              (SELECT DISTINCT ProductId FROM Batches WHERE Id IN (" +
+              (selectedList.Count == 0 ? "NULL" : batchFilter) + @"))
+          OR (@P IS NOT NULL AND p.Id=@P)
+      )
 ORDER BY p.Id,
          COALESCE(pi.CreatedAt,
              (SELECT MAX(al.CreatedAt)
@@ -403,23 +451,53 @@ ORDER BY p.Id,
                     {
                         for (int i = 0; i < selectedList.Count; i++)
                             command.Parameters.AddWithValue(placeholders[i], selectedList[i]);
+                        command.Parameters.AddWithValue("@P",
+                            selectedProductId.HasValue ? (object)selectedProductId.Value : DBNull.Value);
 
                         using (var reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                if (reader["BatchId"] == DBNull.Value)
-                                    continue;
-
                                 int productId = Convert.ToInt32(reader["ProductId"]);
+                                if (reader["BatchId"] == DBNull.Value)
+                                {
+                                    if (forceBatchTargets && selectedProductId.HasValue && selectedProductId.Value == productId)
+                                    {
+                                        string productTargetKey = "P:" + productId.ToString(CultureInfo.InvariantCulture);
+                                        if (!targetsByKey.ContainsKey(productTargetKey))
+                                            targetsByKey.Add(productTargetKey, new Target
+                                            {
+                                                ProductId = productId,
+                                                Name = Convert.ToString(reader["ProductName"]),
+                                                Unit = BuildUnitSnapshot(Convert.ToString(reader["UnitName"]),
+                                                    Convert.ToString(reader["SmallUnitName"]),
+                                                    Convert.ToInt32(reader["UnitsPerPackage"])),
+                                                UnitsPerPackage = Convert.ToInt32(reader["UnitsPerPackage"]),
+                                                TargetType = "Product",
+                                                TargetKey = productTargetKey,
+                                                Expiry = "",
+                                                Batch = "",
+                                                Batches = new List<TargetBatch>()
+                                            });
+                                    }
+                                    continue;
+                                }
+
                                 int batchId = Convert.ToInt32(reader["BatchId"]);
+                                if (forceBatchTargets && !selected.Contains(batchId))
+                                    continue;
                                 string expiry = Convert.ToString(reader["ExpiryDate"]);
                                 bool trackBatchNumber = Convert.ToInt32(reader["TrackBatchNumber"]) == 1;
                                 bool trackExpiryDate = Convert.ToInt32(reader["TrackExpiryDate"]) == 1;
 
                                 string targetType;
                                 string targetKey;
-                                if (trackBatchNumber)
+                                if (forceBatchTargets)
+                                {
+                                    targetType = "Batch";
+                                    targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
+                                }
+                                else if (trackBatchNumber)
                                 {
                                     targetType = "Batch";
                                     targetKey = "B:" + batchId.ToString(CultureInfo.InvariantCulture);
@@ -476,7 +554,9 @@ ORDER BY p.Id,
                     }
 
                     var targets = targetsByKey.Values
-                        .Where(x => x.Batches.Any(b => selected.Contains(b.BatchId)))
+                        .Where(x => x.Batches.Any(b => selected.Contains(b.BatchId)) ||
+                            (forceBatchTargets && selectedProductId.HasValue &&
+                             x.ProductId == selectedProductId.Value && x.TargetType == "Product"))
                         .OrderBy(x => x.Name, StringComparer.CurrentCulture)
                         .ThenBy(x => x.TargetKey, StringComparer.Ordinal)
                         .ToList();
@@ -493,10 +573,23 @@ ORDER BY p.Id,
                     {
                         using (var duplicate = new SQLiteCommand(@"
 SELECT COUNT(*) FROM InventoryCountItems
-WHERE SessionId=@S AND TargetKey=@K;", connection, transaction))
+WHERE SessionId=@S
+  AND
+  (
+      TargetKey=@K
+      OR (@FB=1 AND
+          (
+              TargetKey='P:' || @P
+              OR TargetKey='E:' || @P || ':' ||
+                 CASE WHEN TRIM(COALESCE(@E,''))='' THEN '~NONE~' ELSE TRIM(@E) END
+          ))
+  );", connection, transaction))
                         {
                             duplicate.Parameters.AddWithValue("@S", sessionId);
                             duplicate.Parameters.AddWithValue("@K", target.TargetKey);
+                            duplicate.Parameters.AddWithValue("@FB", forceBatchTargets ? 1 : 0);
+                            duplicate.Parameters.AddWithValue("@P", target.ProductId);
+                            duplicate.Parameters.AddWithValue("@E", target.Expiry ?? "");
                             if (Convert.ToInt32(duplicate.ExecuteScalar()) > 0)
                                 throw new InvalidOperationException(
                                     "أحد الأهداف المحددة موجود بالفعل داخل جلسة الجرد؛ لم تتم إضافة أي هدف.");
@@ -506,13 +599,25 @@ WHERE SessionId=@S AND TargetKey=@K;", connection, transaction))
 SELECT COUNT(*)
 FROM InventoryCountItems i
 INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
-WHERE i.TargetKey=@K
+WHERE
+  (
+      i.TargetKey=@K
+      OR (@FB=1 AND
+          (
+              i.TargetKey='P:' || @P
+              OR i.TargetKey='E:' || @P || ':' ||
+                 CASE WHEN TRIM(COALESCE(@E,''))='' THEN '~NONE~' ELSE TRIM(@E) END
+          ))
+  )
   AND i.ItemStatus<>'Cancelled'
   AND s.Id<>@S
   AND s.Status IN ('Open','Submitted','PartiallyApproved');", connection, transaction))
                         {
                             conflict.Parameters.AddWithValue("@K", target.TargetKey);
                             conflict.Parameters.AddWithValue("@S", sessionId);
+                            conflict.Parameters.AddWithValue("@FB", forceBatchTargets ? 1 : 0);
+                            conflict.Parameters.AddWithValue("@P", target.ProductId);
+                            conflict.Parameters.AddWithValue("@E", target.Expiry ?? "");
                             if (Convert.ToInt32(conflict.ExecuteScalar()) > 0)
                                 throw new InvalidOperationException(
                                     "أحد الأهداف مرتبط بجلسة جرد أخرى مفتوحة أو قيد المراجعة؛ لم تتم الإضافة.");

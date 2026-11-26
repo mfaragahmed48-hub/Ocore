@@ -372,7 +372,7 @@ namespace Ocore.desktop.Views
         {
             try
             {
-                availableBatchesTable = queryService.GetAvailableBatches(currentUserId);
+                availableBatchesTable = queryService.GetAvailableAuditTargets(currentUserId);
                 availableProductsTable = availableBatchesTable.DefaultView.ToTable(true, "ProductId", "ProductName", "ProductCode", "Barcode");
             }
             catch (Exception ex) { Error("تعذر تحميل قائمة أصناف الجرد: " + ex.Message); }
@@ -401,6 +401,8 @@ namespace Ocore.desktop.Views
             {
                 editor.TextChanged -= AuditProductSearchTextChanged;
                 editor.TextChanged += AuditProductSearchTextChanged;
+                editor.PreviewKeyDown -= AuditProductSearchKeyDown;
+                editor.PreviewKeyDown += AuditProductSearchKeyDown;
             }
 
             // ابدأ استقبال الاختيارات بعد اكتمال تهيئة القائمة.
@@ -419,6 +421,34 @@ namespace Ocore.desktop.Views
             auditProductViews[combo].RowFilter = string.IsNullOrWhiteSpace(term) ? "" :
                 "ProductName LIKE '%" + term + "%' OR ProductCode LIKE '%" + term + "%' OR Barcode LIKE '%" + term + "%'";
             if (combo.Items.Count > 0) combo.IsDropDownOpen = true;
+        }
+
+        private void AuditProductSearchKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter) return;
+            var editor = sender as TextBox;
+            var combo = editor == null ? null : FindAncestorComboBox(editor);
+            if (editor == null || combo == null || availableProductsTable == null) return;
+
+            string scanned = editor.Text.Trim();
+            if (string.IsNullOrWhiteSpace(scanned)) return;
+
+            var exactMatches = availableProductsTable.Rows.Cast<DataRow>()
+                .Where(row =>
+                    (row["Barcode"] != DBNull.Value &&
+                     Convert.ToString(row["Barcode"]).Split('|').Any(code =>
+                         string.Equals(code.Trim(), scanned, StringComparison.OrdinalIgnoreCase))) ||
+                    string.Equals(Convert.ToString(row["ProductCode"]).Trim(), scanned, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (exactMatches.Count == 1)
+            {
+                int productId = Convert.ToInt32(exactMatches[0]["ProductId"]);
+                combo.SelectedValue = productId;
+                combo.Text = Convert.ToString(exactMatches[0]["ProductName"]);
+                combo.IsDropDownOpen = false;
+                e.Handled = true;
+            }
         }
 
         private static ComboBox FindAncestorComboBox(DependencyObject child)
@@ -449,15 +479,7 @@ namespace Ocore.desktop.Views
                 Warn("قائمة الأصناف غير جاهزة. اضغط تحديث ثم حاول مرة أخرى.");
                 return;
             }
-            var batchIds = availableBatchesTable.Rows.Cast<DataRow>()
-                .Where(row => Convert.ToInt32(row["ProductId"]) == productId)
-                .Select(row => Convert.ToInt32(row["BatchId"])).Where(id => id > 0).Distinct().ToList();
-            if (batchIds.Count == 0)
-            {
-                if (sourceCombo != null) sourceCombo.Tag = "ready";
-                Warn("لا توجد تشغيلات متاحة لهذا الصنف.");
-                return;
-            }
+
             var selectedSession = sessionsGrid.SelectedItem as DataRowView;
             if (selectedSessionId > 0 &&
                 (selectedSession == null || !string.Equals(Convert.ToString(selectedSession["Status"]), "Open", StringComparison.OrdinalIgnoreCase)))
@@ -466,34 +488,122 @@ namespace Ocore.desktop.Views
                 Warn("هذه الجلسة ليست مفتوحة. اضغط «فاتورة جرد جديدة» لبدء جرد جديد.");
                 return;
             }
-            try
-            {
-                if (selectedSessionId <= 0)
-                {
-                    string reason = string.IsNullOrWhiteSpace(reasonBox.Text) ? "جرد سريع من فاتورة الجرد" : reasonBox.Text.Trim();
-                    selectedSessionId = auditService.CreateSession(currentUserId, reason, batchIds);
-                }
-                else auditService.AddTargetsToOpenSession(currentUserId, selectedSessionId, batchIds);
 
-                LoadSessions(selectedSessionId);
-                var first = itemsGrid.Items.Cast<object>().OfType<DataRowView>()
-                    .FirstOrDefault(item => !IsEntryRow(item) &&
-                        Convert.ToInt32(item["ProductId"]) == productId &&
-                        (Convert.ToString(item["ItemStatus"]) == "Pending" || Convert.ToString(item["ItemStatus"]) == "RecountRequired"));
-                if (first != null)
-                {
-                    itemsGrid.SelectedItem = first;
-                    itemsGrid.ScrollIntoView(first);
-                    var pColumn = itemsGrid.Columns.FirstOrDefault(column => column.SortMemberPath == "ActualPQuantity");
-                    if (pColumn != null)
-                    {
-                        itemsGrid.CurrentCell = new DataGridCellInfo(first, pColumn);
-                        itemsGrid.BeginEdit();
-                    }
-                }
+            var productTargets = availableBatchesTable.AsEnumerable()
+                .Where(row => Convert.ToInt32(row["ProductId"]) == productId).ToList();
+
+            if (productTargets.Count == 0)
+            {
+                if (sourceCombo != null) sourceCombo.Tag = "ready";
+                Warn("لا توجد تشغيلات أو كارتة صنف متاحة لهذا الصنف؛ ربما أُضيف بالفعل إلى جلسة جرد نشطة.");
+                return;
             }
-            catch (UnauthorizedAccessException ex) { if (sourceCombo != null) sourceCombo.Tag = "ready"; Warn(ex.Message); }
-            catch (Exception ex) { if (sourceCombo != null) sourceCombo.Tag = "ready"; Error(ex.Message); }
+
+            var picker = new Window
+            {
+                Title = "اختيار التشغيلات وتواريخ الصلاحية",
+                Width = 900,
+                Height = 540,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                FlowDirection = FlowDirection.RightToLeft,
+                Background = Brushes.White
+            };
+
+            var layout = new DockPanel { Margin = new Thickness(12) };
+            var heading = new TextBlock
+            {
+                Text = "الصنف: " + Convert.ToString(productTargets[0]["ProductName"]) +
+                       " — اختر التشغيلات/الصلاحيات المطلوب جردها",
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            DockPanel.SetDock(heading, Dock.Top);
+            layout.Children.Add(heading);
+
+            var choose = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                SelectionMode = DataGridSelectionMode.Extended,
+                SelectionUnit = DataGridSelectionUnit.FullRow,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.All,
+                RowHeight = 34,
+                FontSize = 12,
+                ItemsSource = productTargets.CopyToDataTable().DefaultView
+            };
+            choose.Columns.Add(new DataGridTextColumn { Header = "الكود", Binding = new Binding("ProductCode"), Width = 95 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "رقم التشغيلة", Binding = new Binding("BatchNumber"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            choose.Columns.Add(new DataGridTextColumn { Header = "تاريخ الصلاحية", Binding = new Binding("ExpiryDate"), Width = 145 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "الرصيد", Binding = new Binding("Quantity"), Width = 95 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "الوحدة", Binding = new Binding("Unit"), Width = 100 });
+            choose.Columns.Add(new DataGridTextColumn { Header = "النوع", Binding = new Binding("TargetKind"), Width = 120 });
+            layout.Children.Add(choose);
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            buttons.Children.Add(MakeButton("إضافة المحدد للجرد", () =>
+            {
+                var selectedRows = choose.SelectedItems.Cast<object>().OfType<DataRowView>().ToList();
+                if (selectedRows.Count == 0)
+                {
+                    Warn("اختر تشغيلة واحدة أو أكثر، أو اختر كارتة الصنف إذا لم توجد تشغيلات.");
+                    return;
+                }
+
+                bool productOnly = selectedRows.Any(row => row["BatchId"] == DBNull.Value);
+                if (productOnly && selectedRows.Count != 1)
+                {
+                    Warn("كارتة الصنف تُضاف كبند واحد فقط.");
+                    return;
+                }
+
+                var batchIds = selectedRows.Where(row => row["BatchId"] != DBNull.Value)
+                    .Select(row => Convert.ToInt32(row["BatchId"])).Where(id => id > 0).Distinct().ToList();
+
+                try
+                {
+                    int sessionId;
+                    if (selectedSessionId <= 0)
+                    {
+                        string reason = string.IsNullOrWhiteSpace(reasonBox.Text)
+                            ? "جرد سريع من فاتورة الجرد"
+                            : reasonBox.Text.Trim();
+                        sessionId = auditService.CreateSession(currentUserId, reason, batchIds, true, productId);
+                    }
+                    else
+                    {
+                        auditService.AddTargetsToOpenSession(currentUserId, selectedSessionId, batchIds, true, productId);
+                        sessionId = selectedSessionId;
+                    }
+
+                    LoadSessions(sessionId);
+                    LoadAvailableProducts();
+                    picker.DialogResult = true;
+                }
+                catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
+                catch (Exception ex) { Error(ex.Message); }
+            }));
+            buttons.Children.Add(MakeButton("إلغاء", () => picker.DialogResult = false));
+            DockPanel.SetDock(buttons, Dock.Bottom);
+            layout.Children.Add(buttons);
+
+            picker.Content = layout;
+            picker.ShowDialog();
+
+            if (sourceCombo != null)
+            {
+                sourceCombo.Tag = "ready";
+                sourceCombo.SelectedIndex = -1;
+                sourceCombo.Text = "";
+            }
         }
 
         private static bool IsEntryRow(DataRowView row)

@@ -261,6 +261,60 @@ ORDER BY p.Name,b.ExpiryDate,b.Id;";
             return ReadTable(sql, null);
         }
 
+
+        public DataTable GetAvailableAuditTargets(int managerId)
+        {
+            EnsureManager(managerId);
+
+            const string sql = @"
+SELECT p.Id AS ProductId,p.Name AS ProductName,
+       COALESCE(p.ProductCode,'') AS ProductCode,
+       COALESCE((SELECT GROUP_CONCAT(pb.Barcode,'|') FROM ProductBarcodes pb
+                 WHERE pb.ProductId=p.Id),'') AS Barcode,
+       b.Id AS BatchId,
+       COALESCE(b.BatchNumber,'') AS BatchNumber,
+       COALESCE(b.ExpiryDate,'') AS ExpiryDate,
+       COALESCE(p.UnitName,'') AS Unit,
+       COALESCE(b.Quantity,0) AS Quantity,
+       COALESCE(b.PurchasePrice,0) AS PurchasePrice,
+       CASE WHEN b.Id IS NULL THEN 'كارتة الصنف' ELSE 'تشغيلة' END AS TargetKind,
+       CASE WHEN b.Id IS NULL THEN 'P:' || p.Id ELSE 'B:' || b.Id END AS TargetKey
+FROM Products p
+LEFT JOIN Batches b ON b.ProductId=p.Id
+WHERE p.IsArchived=0
+  AND
+  (
+      (b.Id IS NOT NULL AND NOT EXISTS
+       (
+           SELECT 1
+           FROM InventoryCountItems i
+           INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
+           WHERE
+             (
+                 i.TargetKey='B:' || b.Id
+                 OR i.TargetKey='P:' || p.Id
+                 OR i.TargetKey='E:' || p.Id || ':' ||
+                    CASE WHEN TRIM(COALESCE(b.ExpiryDate,''))='' THEN '~NONE~' ELSE TRIM(b.ExpiryDate) END
+             )
+             AND i.ItemStatus NOT IN ('Approved','Cancelled')
+             AND s.Status IN ('Open','Submitted','PartiallyApproved')
+       ))
+      OR
+      (b.Id IS NULL AND NOT EXISTS
+       (
+           SELECT 1
+           FROM InventoryCountItems i
+           INNER JOIN InventoryCountSessions s ON s.Id=i.SessionId
+           WHERE i.TargetKey='P:' || p.Id
+             AND i.ItemStatus NOT IN ('Approved','Cancelled')
+             AND s.Status IN ('Open','Submitted','PartiallyApproved')
+       ))
+  )
+ORDER BY p.Name,b.ExpiryDate,b.BatchNumber,b.Id;";
+
+            return ReadTable(sql, null);
+        }
+
         public DataTable GetPendingMovements(int sessionId, int managerId)
         {
             EnsureManager(managerId);
