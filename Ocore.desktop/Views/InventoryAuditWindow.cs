@@ -550,7 +550,7 @@ namespace Ocore.desktop.Views
             var heading = new TextBlock
             {
                 Text = "الصنف: " + Convert.ToString(productTargets[0]["ProductName"]) +
-                       " — اختر التشغيلات/الصلاحيات المطلوب جردها",
+                       " — حدد التشغيلة بالضغط عليها ثم اضغط Enter للإضافة",
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 10)
@@ -559,7 +559,6 @@ namespace Ocore.desktop.Views
             layout.Children.Add(heading);
 
             var pickerTable = productTargets.CopyToDataTable();
-            pickerTable.Columns.Add(new DataColumn("IsSelected", typeof(bool)) { DefaultValue = false });
 
             var choose = new DataGrid
             {
@@ -577,16 +576,6 @@ namespace Ocore.desktop.Views
                 FontSize = 12,
                 ItemsSource = pickerTable.DefaultView
             };
-            choose.Columns.Add(new DataGridCheckBoxColumn
-            {
-                Header = "اختيار",
-                Binding = new Binding("IsSelected")
-                {
-                    Mode = BindingMode.TwoWay,
-                    UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
-                },
-                Width = 65
-            });
             choose.Columns.Add(new DataGridTextColumn { Header = "الكود", Binding = new Binding("ProductCode"), IsReadOnly = true, Width = 95 });
             choose.Columns.Add(new DataGridTextColumn { Header = "رقم التشغيلة", Binding = new Binding("BatchNumber"), IsReadOnly = true, Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
             choose.Columns.Add(new DataGridTextColumn { Header = "تاريخ الصلاحية", Binding = new Binding("ExpiryDate"), IsReadOnly = true, Width = 145 });
@@ -601,17 +590,18 @@ namespace Ocore.desktop.Views
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 10, 0, 0)
             };
-            buttons.Children.Add(MakeButton("إضافة المحدد للجرد", () =>
+            var addSelectedButton = MakeButton("إضافة المحدد للجرد", () =>
             {
                 choose.CommitEdit(DataGridEditingUnit.Cell, true);
                 choose.CommitEdit(DataGridEditingUnit.Row, true);
 
-                var selectedRows = choose.Items.Cast<object>()
+                var selectedRows = choose.SelectedItems.Cast<object>()
                     .OfType<DataRowView>()
-                    .Where(row =>
-                        (row["IsSelected"] != DBNull.Value && Convert.ToBoolean(row["IsSelected"])) ||
-                        choose.SelectedItems.Contains(row))
+                    .Distinct()
                     .ToList();
+
+                if (selectedRows.Count == 0 && choose.CurrentItem is DataRowView currentRow)
+                    selectedRows.Add(currentRow);
                 if (selectedRows.Count == 0)
                 {
                     Warn("اختر تشغيلة واحدة أو أكثر، أو اختر كارتة الصنف إذا لم توجد تشغيلات.");
@@ -650,7 +640,16 @@ namespace Ocore.desktop.Views
                 }
                 catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
                 catch (Exception ex) { Error(ex.Message); }
-            }));
+            });
+            buttons.Children.Add(addSelectedButton);
+            choose.PreviewKeyDown += (sender, args) =>
+            {
+                if (args.Key != Key.Enter) return;
+                args.Handled = true;
+                addSelectedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            };
+            choose.Focus();
+            choose.SelectedIndex = 0;
             buttons.Children.Add(MakeButton("إلغاء", () => picker.DialogResult = false));
             DockPanel.SetDock(buttons, Dock.Bottom);
             layout.Children.Add(buttons);
@@ -1047,7 +1046,16 @@ namespace Ocore.desktop.Views
                     LoadSessions(id);
                 }
                 catch (Exception ex) { Error(ex.Message); }
-            }));
+            });
+            buttons.Children.Add(addSelectedButton);
+            choose.PreviewKeyDown += (sender, args) =>
+            {
+                if (args.Key != Key.Enter) return;
+                args.Handled = true;
+                addSelectedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            };
+            choose.Focus();
+            choose.SelectedIndex = 0;
             buttons.Children.Add(MakeButton("إلغاء", () => picker.DialogResult = false));
             DockPanel.SetDock(buttons, Dock.Bottom);
             layout.Children.Add(buttons);
@@ -1146,7 +1154,16 @@ namespace Ocore.desktop.Views
                 }
                 catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
                 catch (Exception ex) { Error(ex.Message); }
-            }));
+            });
+            buttons.Children.Add(addSelectedButton);
+            choose.PreviewKeyDown += (sender, args) =>
+            {
+                if (args.Key != Key.Enter) return;
+                args.Handled = true;
+                addSelectedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            };
+            choose.Focus();
+            choose.SelectedIndex = 0;
             buttons.Children.Add(MakeButton("إلغاء", () => picker.DialogResult = false));
             DockPanel.SetDock(buttons, Dock.Bottom);
             layout.Children.Add(buttons);
