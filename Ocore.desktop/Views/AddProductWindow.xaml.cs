@@ -16,10 +16,10 @@ namespace Ocore.desktop.Views
     {
         private readonly int currentUserId;
         private readonly ProductService productService;
-        
+
         private readonly string connectionString;
 
-        
+
 
         private List<CatalogDrugItem> allCatalogDrugs;
         private ICollectionView catalogDrugsView;
@@ -62,9 +62,9 @@ namespace Ocore.desktop.Views
 
             currentUserId = userId;
             productService = new ProductService();
-            
 
-            
+
+
 
             var database = new Ocore.desktop.Data.DatabaseManager();
 
@@ -103,7 +103,7 @@ namespace Ocore.desktop.Views
             CategoriesDataGrid.SelectionChanged +=
                 CategoriesDataGrid_SelectionChanged;
 
-            
+
 
             UseCatalogDrugButton.IsEnabled = false;
 
@@ -125,7 +125,7 @@ namespace Ocore.desktop.Views
             RoutedEventArgs e)
         {
             LoadCategories();
-           
+
 
             if (isEditMode)
             {
@@ -136,7 +136,7 @@ namespace Ocore.desktop.Views
             LoadDrugCatalog();
         }
 
-        
+
         private void ConfigureEditMode()
         {
             Title = "O CORE - تعديل بيانات الصنف";
@@ -195,7 +195,7 @@ namespace Ocore.desktop.Views
                 productBeingEdited.PurchasePrice.ToString(
                     CultureInfo.CurrentCulture);
 
-              
+
 
             if (productBeingEdited.CategoryId.HasValue)
             {
@@ -255,11 +255,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل التصنيفات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل تصنيفات الأصناف", ex);
             }
         }
 
@@ -279,11 +275,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحميل التصنيفات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل التصنيفات لإدارتها", ex);
             }
         }
 
@@ -551,11 +543,7 @@ ORDER BY TradeName;";
                 CatalogSelectionStatusText.Text =
                     "تعذر تحميل دليل الأدوية.";
 
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل دليل الأدوية:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل دليل الأدوية", ex);
             }
         }
 
@@ -683,7 +671,7 @@ ORDER BY TradeName;";
                     return;
                 }
 
-                
+
                 if (!TryReadNumber(
                     SalePriceTextBox.Text, out double salePrice))
                 {
@@ -836,7 +824,7 @@ ORDER BY TradeName;";
                     SalePrice = salePrice,
                     PurchasePrice = purchasePrice,
 
-                   
+
                     DrugCatalogId = isEditMode
                         ? productBeingEdited.DrugCatalogId
                         : selectedCatalogDrug?.Id
@@ -906,11 +894,9 @@ ORDER BY TradeName;";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء حفظ الصنف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    isEditMode ? "تعديل بيانات الصنف" : "حفظ الصنف",
+                    ex);
             }
             finally
             {
