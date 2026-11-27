@@ -68,15 +68,16 @@ namespace Ocore.desktop.Views
                     Close();
                 }
             }
-            catch (SQLiteException)
+            catch (SQLiteException ex)
             {
-                MessageBox.Show(
-                    "تعذر إنشاء الحساب. تحقق من اسم المستخدم، " +
-                    "أو تأكد من عدم إنشاء حساب المدير مسبقاً.");
+                Ocore.desktop.ErrorDialog.Show(
+                    "إنشاء حساب المدير",
+                    "تعذر إنشاء الحساب. تحقق من اسم المستخدم، أو تأكد من عدم إنشاء حساب المدير مسبقاً.\r\n\r\n" +
+                    ex.ToString());
             }
             catch (Exception ex)
             {
-                MessageBox.Show("حدث خطأ: " + ex.Message);
+                Ocore.desktop.ErrorDialog.Show("إنشاء حساب المدير", ex);
             }
         }
     }
