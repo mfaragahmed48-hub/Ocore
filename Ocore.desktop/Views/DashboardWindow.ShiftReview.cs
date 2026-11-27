@@ -40,11 +40,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر فتح مراجعة الشيفت:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح مراجعة الشيفت", ex);
             }
         }
     }
@@ -388,12 +384,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحديث بيانات الشيفت:\n" +
-                    ex.Message,
-                    "مراجعة الشيفت",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحديث بيانات الشيفت", ex);
             }
         }
 
