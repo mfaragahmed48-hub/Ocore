@@ -61,11 +61,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تصدير ملف Excel:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تصدير بيانات الأصناف إلى Excel", ex);
             }
         }
 
@@ -142,11 +138,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر استيراد ملف Excel:\n" + ex.Message,
-                    "خطأ في الاستيراد",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("استيراد بيانات الأصناف من Excel", ex);
             }
         }
 
