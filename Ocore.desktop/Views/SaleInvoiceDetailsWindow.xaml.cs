@@ -106,11 +106,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل تفاصيل الفاتورة:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل تفاصيل فاتورة البيع", ex);
 
                 Close();
             }
@@ -176,12 +172,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح إعدادات الطابعات:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح إعدادات الطابعات", ex);
             }
         }
 
@@ -232,12 +223,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح المعاينة الحرارية:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح المعاينة الحرارية", ex);
             }
         }
 
