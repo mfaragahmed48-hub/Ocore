@@ -19,15 +19,18 @@ namespace Ocore.desktop.Views
 
         private SaleInvoiceDetails currentInvoice;
         private PharmacySettings pharmacySettings;
+        private readonly bool autoPrintReceipt;
 
         public SaleInvoiceDetailsWindow(
             int userId,
-            string selectedInvoiceNumber)
+            string selectedInvoiceNumber,
+            bool printReceipt = false)
         {
             InitializeComponent();
 
             currentUserId = userId;
             invoiceNumber = selectedInvoiceNumber;
+            autoPrintReceipt = printReceipt;
 
             salesService = new SalesService();
             settingsService = new PharmacySettingsService();
@@ -40,6 +43,10 @@ namespace Ocore.desktop.Views
             RoutedEventArgs e)
         {
             LoadInvoiceDetails();
+
+            // عند طلب الطباعة من شاشة المبيعات، افتح معاينة الريسيت تلقائيًا بعد تحميل الفاتورة والإعدادات.
+            if (autoPrintReceipt && currentInvoice != null)
+                OpenThermalPreview();
         }
 
         private void LoadInvoiceDetails()

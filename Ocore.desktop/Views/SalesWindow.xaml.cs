@@ -91,6 +91,9 @@ namespace Ocore.desktop.Views
 
             Loaded += SalesWindow_Loaded;
 
+            // اختصارات حفظ الفاتورة من أي عنصر داخل شاشة المبيعات.
+            PreviewKeyDown += SalesWindow_PreviewKeyDown;
+
             SearchTextBox.TextChanged += SearchTextBox_TextChanged;
 
             SearchTextBox.PreviewKeyDown +=
@@ -3452,6 +3455,35 @@ namespace Ocore.desktop.Views
             object sender,
             RoutedEventArgs e)
         {
+            // نحافظ على سلوك زر الحفظ الحالي: حفظ ثم فتح تفاصيل الفاتورة.
+            SaveInvoice(false, true);
+        }
+
+        private void SalesWindow_PreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
+        {
+            if (e.Key != Key.S)
+                return;
+
+            ModifierKeys modifiers = Keyboard.Modifiers;
+
+            if (modifiers == ModifierKeys.Control)
+            {
+                e.Handled = true;
+                SaveInvoice(false, false);
+            }
+            else if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                e.Handled = true;
+                SaveInvoice(true, true);
+            }
+        }
+
+        private void SaveInvoice(
+            bool printReceipt,
+            bool showInvoiceDetails)
+        {
             if (isSaving)
                 return;
 
@@ -3578,13 +3610,17 @@ namespace Ocore.desktop.Views
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
 
-                    SaleInvoiceDetailsWindow detailsWindow =
-                        new SaleInvoiceDetailsWindow(
-                            currentUserId,
-                            invoiceNumber);
+                    if (showInvoiceDetails)
+                    {
+                        SaleInvoiceDetailsWindow detailsWindow =
+                            new SaleInvoiceDetailsWindow(
+                                currentUserId,
+                                invoiceNumber,
+                                printReceipt);
 
-                    detailsWindow.Owner = this;
-                    detailsWindow.ShowDialog();
+                        detailsWindow.Owner = this;
+                        detailsWindow.ShowDialog();
+                    }
                 }
                 catch (UnauthorizedAccessException ex)
                 {
