@@ -69,11 +69,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل سجل المرتجعات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل سجل المرتجعات", ex);
 
                 StatusText.Text = "تعذر تحميل البيانات.";
             }
@@ -166,11 +162,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر فتح تفاصيل المرتجع:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح تفاصيل المرتجع", ex);
             }
         }
 
