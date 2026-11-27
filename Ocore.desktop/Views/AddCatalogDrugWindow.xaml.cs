@@ -1,5 +1,4 @@
-﻿
-using Ocore.desktop.Models;
+﻿using Ocore.desktop.Models;
 using Ocore.desktop.Services;
 using System;
 using System.Collections.Generic;
@@ -88,11 +87,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل التصنيفات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تحميل التصنيفات",
+                    ex);
 
                 SaveButtonEnabled(false);
             }
@@ -261,11 +258,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تسجيل الدواء في المخزون:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تسجيل الدواء في المخزون",
+                    ex);
             }
         }
 
