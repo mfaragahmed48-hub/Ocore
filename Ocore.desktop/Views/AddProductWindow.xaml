@@ -202,20 +202,13 @@
                                        FontWeight="SemiBold"
                                        Margin="0,0,0,6"/>
 
-                            <ComboBox x:Name="UnitComboBox"
-                                      Height="38"
-                                      FontSize="14"
-                                      SelectedIndex="0"
-                                      VerticalContentAlignment="Center">
-
-                                <ComboBoxItem Content="علبة"/>
-                                <ComboBoxItem Content="زجاجة"/>
-                                <ComboBoxItem Content="كيس"/>
-                                <ComboBoxItem Content="أنبوبة"/>
-                                <ComboBoxItem Content="أمبول"/>
-                                <ComboBoxItem Content="قطعة"/>
-
-                            </ComboBox>
+                            <TextBox Height="38"
+                                     Padding="8"
+                                     FontSize="14"
+                                     Text="P"
+                                     IsReadOnly="True"
+                                     HorizontalContentAlignment="Center"
+                                     VerticalContentAlignment="Center"/>
                         </StackPanel>
 
                         <!-- الوحدة الصغيرة -->
@@ -227,20 +220,13 @@
                                        FontWeight="SemiBold"
                                        Margin="0,0,0,6"/>
 
-                            <ComboBox x:Name="SmallUnitComboBox"
-                                      Height="38"
-                                      FontSize="14"
-                                      IsEditable="True"
-                                      Text="شريط"
-                                      VerticalContentAlignment="Center">
-
-                                <ComboBoxItem Content="شريط"/>
-                                <ComboBoxItem Content="قرص"/>
-                                <ComboBoxItem Content="كبسولة"/>
-                                <ComboBoxItem Content="قطعة"/>
-                                <ComboBoxItem Content="أمبول"/>
-
-                            </ComboBox>
+                            <TextBox Height="38"
+                                     Padding="8"
+                                     FontSize="14"
+                                     Text="U"
+                                     IsReadOnly="True"
+                                     HorizontalContentAlignment="Center"
+                                     VerticalContentAlignment="Center"/>
                         </StackPanel>
 
                         <!-- عدد الوحدات -->
@@ -418,7 +404,7 @@
                             Padding="12"
                             Margin="5,12,5,5">
 
-                        <TextBlock Text="مثال: إذا كانت العبوة الأساسية (P) علبة والوحدة الصغيرة (U) شريط، وعدد الوحدات 3، فهذا يعني أن كل P تحتوي على 3 U."
+                        <TextBlock Text="P هي العبوة الأساسية وU هي الوحدة الصغيرة، وعدد الوحدات يحدد كم U داخل كل P."
                                    TextWrapping="Wrap"
                                    Foreground="#246B58"
                                    FontSize="13"/>

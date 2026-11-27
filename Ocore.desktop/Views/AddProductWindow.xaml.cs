@@ -155,33 +155,7 @@ namespace Ocore.desktop.Views
             BarcodeTextBox.Text =
                 productBeingEdited.Barcode ?? string.Empty;
 
-            string unitName =
-                productBeingEdited.UnitName ?? string.Empty;
-
-            ComboBoxItem unitItem = UnitComboBox.Items
-                .OfType<ComboBoxItem>()
-                .FirstOrDefault(item =>
-                    string.Equals(
-                        Convert.ToString(item.Content),
-                        unitName,
-                        StringComparison.OrdinalIgnoreCase));
-
-            if (unitItem == null &&
-                !string.IsNullOrWhiteSpace(unitName))
-            {
-                unitItem = new ComboBoxItem
-                {
-                    Content = unitName
-                };
-
-                UnitComboBox.Items.Add(unitItem);
-            }
-
-            if (unitItem != null)
-                UnitComboBox.SelectedItem = unitItem;
-
-            SmallUnitComboBox.Text =
-                productBeingEdited.SmallUnitName ?? string.Empty;
+            // رموز الوحدات ثابتة: P للعبوة الأساسية وU للوحدة الصغيرة.
 
             UnitsPerPackageTextBox.Text =
                 productBeingEdited.UnitsPerPackage.ToString(
@@ -713,28 +687,8 @@ ORDER BY TradeName;";
                     }
                 }
 
-                string unitName = "علبة";
-
-                if (UnitComboBox.SelectedItem is ComboBoxItem selectedUnit)
-                {
-                    unitName = Convert.ToString(selectedUnit.Content);
-                }
-
-                if (string.IsNullOrWhiteSpace(unitName))
-                {
-                    MessageBox.Show("اختر العبوة الأساسية.");
-                    UnitComboBox.Focus();
-                    return;
-                }
-
-                string smallUnitName = SmallUnitComboBox.Text.Trim();
-
-                if (string.IsNullOrWhiteSpace(smallUnitName))
-                {
-                    MessageBox.Show("أدخل اسم الوحدة الصغيرة.");
-                    SmallUnitComboBox.Focus();
-                    return;
-                }
+                string unitName = "P";
+                string smallUnitName = "U";
 
                 int unitsPerPackage;
 
