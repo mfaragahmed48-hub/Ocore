@@ -946,7 +946,7 @@ namespace Ocore.desktop.Services
                                         supplierId,
                                         inventoryPackageCost,
                                         totalPackageQuantity,
-                                        activeAuditSessionId.HasValue);
+                                        activeAuditSessionId);
                             }
                             else
                             {
@@ -1140,7 +1140,7 @@ namespace Ocore.desktop.Services
                                     createdAt,
                                     inventoryPackageCost,
                                     totalPackageQuantity,
-                                    activeAuditSessionId);
+                                    activeAuditSessionId.HasValue);
                             }
 
                             if (activeAuditSessionId.HasValue)
