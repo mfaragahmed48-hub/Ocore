@@ -619,6 +619,7 @@ namespace Ocore.desktop.Data
     "InventoryCountItemCostDecisions",
     "InventoryCountRevisions",
     "InventoryCountEvents",
+    "InventoryCountReopenSnapshots",
     "InventoryCountMessages",
     "InventoryCountPendingMovements",
     "InventoryProductTracking",
