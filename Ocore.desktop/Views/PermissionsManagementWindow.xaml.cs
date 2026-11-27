@@ -141,11 +141,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر حفظ الصلاحيات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("حفظ صلاحيات الدور", ex);
             }
         }
 
