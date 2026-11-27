@@ -1081,6 +1081,28 @@ ORDER BY Name;";
 
 
 
+                        // Prevent duplicate product cards using normalized name and exact selling price.
+                        // This checks active and archived products alike.
+                        using (var duplicateCommand = new SQLiteCommand(
+                            @"SELECT COUNT(*)
+                              FROM Products
+                              WHERE TRIM(Name) COLLATE NOCASE = TRIM(@Name) COLLATE NOCASE
+                                AND SalePrice = @SalePrice;",
+                            connection, transaction))
+                        {
+                            duplicateCommand.Parameters.AddWithValue(
+                                "@Name", product.Name.Trim());
+
+                            duplicateCommand.Parameters.AddWithValue(
+                                "@SalePrice", product.SalePrice);
+
+                            if (Convert.ToInt32(duplicateCommand.ExecuteScalar()) > 0)
+                            {
+                                throw new InvalidOperationException(
+                                    "يوجد صنف بنفس الاسم وسعر البيع بالفعل. لا يمكن إنشاء كارت مكرر.");
+                            }
+                        }
+
                         string generatedCode;
                         string generatedBarcode;
 
