@@ -79,11 +79,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحميل الأصناف.\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل الأصناف", ex);
             }
         }
 
@@ -110,12 +106,7 @@ namespace Ocore.desktop.Views
 
                 DisplayPrinterConfiguration();
 
-                MessageBox.Show(
-                    "تعذر تحميل إعدادات طابعة الباركود من قاعدة البيانات.\n\n" +
-                    ex.Message,
-                    "إعدادات طابعة الباركود",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل إعدادات طابعة الباركود", ex);
             }
         }
 
@@ -570,11 +561,7 @@ namespace Ocore.desktop.Views
                 ShowPreviewMessage(
                     "تعذر إنشاء المعاينة.");
 
-                MessageBox.Show(
-                    ex.Message,
-                    "خطأ في معاينة الباركود",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Ocore.desktop.ErrorDialog.Show("إنشاء معاينة الباركود", ex);
             }
         }
 
@@ -788,12 +775,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر إنشاء مستند الطباعة أو إرساله إلى الطابعة.\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("طباعة ملصقات الباركود", ex);
             }
         }
 
