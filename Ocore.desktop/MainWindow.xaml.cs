@@ -1,5 +1,4 @@
-﻿
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 using Ocore.desktop.Services;
 using Ocore.desktop.Views;
@@ -109,8 +108,7 @@ namespace Ocore.desktop
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تسجيل الدخول: " + ex.Message);
+                ErrorDialog.Show("تسجيل الدخول", ex);
             }
         }
     }
