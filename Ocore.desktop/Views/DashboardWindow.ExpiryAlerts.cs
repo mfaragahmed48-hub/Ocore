@@ -97,12 +97,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح تنبيهات الصلاحية:\n\n" +
-                    ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح تنبيهات صلاحية المخزون", ex);
             }
         }
     }
