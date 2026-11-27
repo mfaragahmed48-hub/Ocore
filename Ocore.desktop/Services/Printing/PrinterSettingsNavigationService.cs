@@ -26,11 +26,9 @@ namespace Ocore.desktop.Services.Printing
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر فتح إعدادات الطابعات:\n\n" + ex.Message,
-                    "إعدادات الطابعات",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "فتح إعدادات الطابعات",
+                    ex);
 
                 return false;
             }
