@@ -162,12 +162,7 @@ namespace Ocore.desktop.Views
 
                 StatusText.Text = ex.Message;
 
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل بيانات الشيفت:\n" +
-                    ex.Message,
-                    "مصروفات الصيدلية",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل بيانات الشيفت", ex);
             }
             finally
             {
@@ -344,11 +339,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تسجيل المصروف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تسجيل المصروف", ex);
             }
             finally
             {
@@ -468,11 +459,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر إلغاء المصروف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("إلغاء المصروف", ex);
 
                 LoadCurrentShift();
             }
