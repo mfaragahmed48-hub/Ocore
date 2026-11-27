@@ -325,7 +325,7 @@ SELECT
          FROM Batches b
          WHERE b.ProductId = p.Id
            AND (
-                b.ExpiryDate = ''
+                COALESCE(TRIM(b.ExpiryDate), '') = ''
                 OR b.ExpiryDate >= @Today
            )
            AND b.Quantity > 0),
@@ -336,7 +336,7 @@ SELECT
         (SELECT SUM(b.Quantity)
          FROM Batches b
          WHERE b.ProductId = p.Id
-           AND b.ExpiryDate <> ''
+           AND COALESCE(TRIM(b.ExpiryDate), '') <> ''
            AND b.ExpiryDate < @Today
            AND b.Quantity > 0),
         0
@@ -455,7 +455,7 @@ SELECT
          FROM Batches b
          WHERE b.ProductId = p.Id
            AND (
-                b.ExpiryDate = ''
+                COALESCE(TRIM(b.ExpiryDate), '') = ''
                 OR b.ExpiryDate >= @Today
            )
            AND b.Quantity > 0),
@@ -466,7 +466,7 @@ SELECT
         (SELECT SUM(b.Quantity)
          FROM Batches b
          WHERE b.ProductId = p.Id
-           AND b.ExpiryDate <> ''
+           AND COALESCE(TRIM(b.ExpiryDate), '') <> ''
            AND b.ExpiryDate < @Today
            AND b.Quantity > 0),
         0
@@ -613,7 +613,7 @@ SELECT
          FROM Batches b
          WHERE b.ProductId = p.Id
            AND (
-                b.ExpiryDate = ''
+                COALESCE(TRIM(b.ExpiryDate), '') = ''
                 OR b.ExpiryDate >= @Today
            )
            AND b.Quantity > 0),
@@ -624,7 +624,7 @@ SELECT
         (SELECT SUM(b.Quantity)
          FROM Batches b
          WHERE b.ProductId = p.Id
-           AND b.ExpiryDate <> ''
+           AND COALESCE(TRIM(b.ExpiryDate), '') <> ''
            AND b.ExpiryDate < @Today
            AND b.Quantity > 0),
         0
@@ -647,7 +647,7 @@ WHERE p.IsArchived = 0
       WHERE b.ProductId = p.Id
         AND b.Quantity > 0
         AND (
-            b.ExpiryDate = ''
+            COALESCE(TRIM(b.ExpiryDate), '') = ''
             OR b.ExpiryDate >= @Today
         )
   )
@@ -773,8 +773,8 @@ FROM Batches b
 INNER JOIN Products p ON p.Id = b.ProductId
 LEFT JOIN InventoryProductTracking t ON t.ProductId = p.Id
 WHERE b.ProductId = @ProductId AND p.IsArchived = 0 AND b.Quantity > 0
-  AND (b.ExpiryDate = '' OR b.ExpiryDate >= @Today)
-ORDER BY CASE WHEN b.ExpiryDate = '' THEN 1 ELSE 0 END, b.ExpiryDate, b.Id;";
+  AND (COALESCE(TRIM(b.ExpiryDate), '') = '' OR b.ExpiryDate >= @Today)
+ORDER BY CASE WHEN COALESCE(TRIM(b.ExpiryDate), '') = '' THEN 1 ELSE 0 END, b.ExpiryDate, b.Id;";
 
                 using (var command = new SQLiteCommand(sql, connection))
                 {
