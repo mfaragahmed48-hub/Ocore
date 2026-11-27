@@ -222,12 +222,9 @@ namespace Ocore.desktop.Views
                 if (!IsLoaded)
                     return;
 
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل الأدوية والأصناف:\n" +
-                    ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تحميل الأدوية والأصناف",
+                    ex);
             }
         }
 
@@ -280,11 +277,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر فتح إدارة العملاء:\n\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "فتح إدارة العملاء",
+                    ex);
             }
         }
         private void LoadCustomers()
@@ -2838,11 +2833,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر فتح نافذة اختيار التشغيلات.\n\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "فتح نافذة اختيار التشغيلات",
+                    ex);
             }
         }
 
@@ -3227,12 +3220,9 @@ namespace Ocore.desktop.Views
                     }
                     else
                     {
-                        MessageBox.Show(
-                            "تعذر حفظ الفاتورة.\n\n" +
-                            ex.Message,
-                            "خطأ في البيع",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
+                        Ocore.desktop.ErrorDialog.Show(
+                            "حفظ فاتورة البيع",
+                            ex);
                     }
                 }
             }
