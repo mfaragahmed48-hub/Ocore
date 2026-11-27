@@ -98,11 +98,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحميل حساب العميل:\n\n" + ex.Message,
-                    "كشف حساب العميل",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("كشف حساب العميل", ex);
             }
         }
 
@@ -218,11 +214,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تسجيل التحصيل:\n\n" + ex.Message,
-                    "التحصيل",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تسجيل التحصيل", ex);
             }
             finally
             {
