@@ -78,11 +78,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل الدفعات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل دفعات المخزون", ex);
             }
         }
 
@@ -228,11 +224,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر إضافة الدفعة:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("إضافة دفعة للمخزون", ex);
             }
         }
 
@@ -381,11 +373,7 @@ namespace Ocore.desktop.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(
-                        "تعذر تنفيذ التسوية:\n" + ex.Message,
-                        "خطأ",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    Ocore.desktop.ErrorDialog.Show("تنفيذ تسوية المخزون", ex);
                 }
             };
 
