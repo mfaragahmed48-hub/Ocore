@@ -57,8 +57,7 @@ namespace Ocore.desktop.Views
             try { OpenIndependentWindow(new KpiDashboardWindow(currentUserId)); }
             catch (Exception ex)
             {
-                MessageBox.Show("تعذر فتح لوحة مؤشرات الأداء:\n\n" + ex.Message,
-                    "O CORE", MessageBoxButton.OK, MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح لوحة مؤشرات الأداء", ex);
             }
         }
 
@@ -74,8 +73,7 @@ namespace Ocore.desktop.Views
             try { OpenIndependentWindow(new ExpensesWindow(currentUserId, currentRole)); }
             catch (Exception ex)
             {
-                MessageBox.Show("حدث خطأ أثناء فتح شاشة المصروفات:\n\n" + ex.Message,
-                    "O CORE", MessageBoxButton.OK, MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة المصروفات", ex);
             }
         }
     }
@@ -272,8 +270,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("حدث خطأ أثناء حساب مؤشرات الأداء:\n\n" + ex.Message,
-                    "O CORE - KPI", MessageBoxButton.OK, MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("حساب مؤشرات الأداء KPI", ex);
             }
         }
 
