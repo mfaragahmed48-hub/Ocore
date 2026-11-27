@@ -99,8 +99,9 @@ namespace Ocore.desktop.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(
-                        "تعذر تعديل المستخدم: " + ex.Message);
+                    Ocore.desktop.ErrorDialog.Show(
+                        "تعديل بيانات المستخدم",
+                        ex);
                 }
             }
         }
@@ -166,8 +167,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تغيير حالة المستخدم: " + ex.Message);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تغيير حالة المستخدم",
+                    ex);
             }
         }
 
@@ -328,8 +330,9 @@ namespace Ocore.desktop.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(
-                        "تعذر تغيير كلمة المرور: " + ex.Message);
+                    Ocore.desktop.ErrorDialog.Show(
+                        "تغيير كلمة مرور المستخدم",
+                        ex);
                 }
             };
 
@@ -399,8 +402,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر إنشاء المستخدم: " + ex.Message);
+                Ocore.desktop.ErrorDialog.Show(
+                    "إنشاء مستخدم جديد",
+                    ex);
             }
         }
     }
