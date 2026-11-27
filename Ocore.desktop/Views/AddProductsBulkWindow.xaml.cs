@@ -70,11 +70,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحميل التصنيفات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل تصنيفات الأصناف", ex);
 
                 Close();
             }
@@ -291,11 +287,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر لصق البيانات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("لصق بيانات الأصناف", ex);
             }
         }
 
@@ -499,6 +491,7 @@ namespace Ocore.desktop.Views
 
             int savedCount = 0;
             int errorCount = 0;
+            List<string> saveErrorDetails = new List<string>();
 
             foreach (BulkProductRow row in rows.ToList())
             {
@@ -539,11 +532,25 @@ namespace Ocore.desktop.Views
                 catch (Exception ex)
                 {
                     row.Status = "خطأ: " + ex.Message;
+                    saveErrorDetails.Add(
+                        "الصنف: " + (row.Name ?? "غير محدد") +
+                        Environment.NewLine + ex.ToString());
                     errorCount++;
                 }
             }
 
             UpdateSummary();
+
+            if (saveErrorDetails.Count > 0)
+            {
+                Ocore.desktop.ErrorDialog.Show(
+                    "أخطاء حفظ الأصناف",
+                    new Exception(string.Join(
+                        Environment.NewLine + Environment.NewLine +
+                        "------------------------------" +
+                        Environment.NewLine + Environment.NewLine,
+                        saveErrorDetails)));
+            }
 
             if (savedCount > 0)
             {
