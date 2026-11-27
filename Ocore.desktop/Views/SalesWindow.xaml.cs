@@ -322,11 +322,9 @@ namespace Ocore.desktop.Views
                 allCustomers = null;
                 customersView = null;
 
-                MessageBox.Show(
-                    "تعذر تحميل قائمة العملاء.\n\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تحميل قائمة العملاء",
+                    ex);
             }
             finally
             {
@@ -3437,13 +3435,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحديث أسعار الفاتورة.\n\n" +
-                    ex.Message +
-                    "\n\nلم يتم حفظ الفاتورة.",
-                    "تعذر تحديث الأسعار",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تحديث أسعار الفاتورة. لم يتم حفظ الفاتورة.",
+                    ex);
             }
         }
 
