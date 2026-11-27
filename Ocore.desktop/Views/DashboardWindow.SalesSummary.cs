@@ -723,11 +723,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحديث تفاصيل مبيعات الشيفت:\n\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحديث تفاصيل مبيعات الشيفت", ex);
             }
         }
     }
