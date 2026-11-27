@@ -156,11 +156,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تجهيز عملية تسليم الشيفت:\n\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تجهيز عملية تسليم الشيفت", ex);
             }
         }
 
@@ -204,11 +200,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تجهيز عملية استلام الشيفت:\n\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تجهيز عملية استلام الشيفت", ex);
             }
         }
 
@@ -472,11 +464,7 @@ namespace Ocore.desktop.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(
-                        "تعذر تنفيذ العملية:\n\n" + ex.Message,
-                        "O CORE",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    Ocore.desktop.ErrorDialog.Show("تنفيذ عملية تسليم أو استلام الشيفت", ex);
                 }
             };
 
