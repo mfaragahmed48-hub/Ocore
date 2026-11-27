@@ -582,7 +582,8 @@ namespace Ocore.desktop.Data
                 "PrintingProfiles",
                 "PrintingMigrationState",
                 "PrinterConfigurations",
-                "PharmacySettings"
+                "PharmacySettings",
+                "InventoryCountSettings"
             };
 
                     // جميع جداول البيانات التشغيلية المسموح بتنظيفها.
@@ -612,6 +613,16 @@ namespace Ocore.desktop.Data
     "SalesInvoiceCostAllocations",
     "SalesReturnCostAllocations",
     "InventoryCostLayerMovements",
+    "InventoryCountSessions",
+    "InventoryCountItems",
+    "InventoryCountItemBatchSnapshots",
+    "InventoryCountItemCostDecisions",
+    "InventoryCountRevisions",
+    "InventoryCountEvents",
+    "InventoryCountMessages",
+    "InventoryCountPendingMovements",
+    "InventoryProductTracking",
+    "InventoryProductTrackingHistory",
     "AuditLogs",
     "TaxProfiles",
     "TaxProfileRates",
@@ -713,6 +724,13 @@ namespace Ocore.desktop.Data
                         {
                             try
                             {
+                                // السماح بإزالة سجلات الجرد append-only أثناء إعادة الضبط فقط.
+                                // ستتم إعادة إنشاء حواجز الحذف قبل اعتماد Transaction.
+                                SetInventoryAuditDeleteProtection(
+                                    connection,
+                                    transaction,
+                                    false);
+
                                 // حذف جميع البيانات التشغيلية.
                                 foreach (string tableName in tablesToClear)
                                 {
@@ -778,6 +796,12 @@ namespace Ocore.desktop.Data
                                     }
                                 }
 
+                                // إعادة حواجز منع حذف سجل الجرد بعد انتهاء إعادة الضبط.
+                                SetInventoryAuditDeleteProtection(
+                                    connection,
+                                    transaction,
+                                    true);
+
                                 // فحص العلاقات قبل اعتماد الحذف.
                                 using (var command = new SQLiteCommand(
                                     "PRAGMA foreign_key_check;",
@@ -838,6 +862,72 @@ namespace Ocore.desktop.Data
             }
         }
 
+
+        private void SetInventoryAuditDeleteProtection(
+            SQLiteConnection connection,
+            SQLiteTransaction transaction,
+            bool restore)
+        {
+            var triggerStatements = new[]
+            {
+                new
+                {
+                    Drop = "DROP TRIGGER IF EXISTS TR_InventoryCountItemBatchSnapshots_NoDelete;",
+                    Create = @"CREATE TRIGGER IF NOT EXISTS TR_InventoryCountItemBatchSnapshots_NoDelete
+BEFORE DELETE ON InventoryCountItemBatchSnapshots
+BEGIN
+ SELECT RAISE(ABORT,'Inventory count batch snapshots are immutable.');
+END;"
+                },
+                new
+                {
+                    Drop = "DROP TRIGGER IF EXISTS TR_InventoryCountItemCostDecisions_NoDelete;",
+                    Create = @"CREATE TRIGGER IF NOT EXISTS TR_InventoryCountItemCostDecisions_NoDelete
+BEFORE DELETE ON InventoryCountItemCostDecisions
+BEGIN
+ SELECT RAISE(ABORT,'Inventory count cost decisions are append-only.');
+END;"
+                },
+                new
+                {
+                    Drop = "DROP TRIGGER IF EXISTS TR_InventoryCountRevisions_NoDelete;",
+                    Create = @"CREATE TRIGGER IF NOT EXISTS TR_InventoryCountRevisions_NoDelete
+BEFORE DELETE ON InventoryCountRevisions
+BEGIN
+ SELECT RAISE(ABORT,'Inventory count revisions are append-only.');
+END;"
+                },
+                new
+                {
+                    Drop = "DROP TRIGGER IF EXISTS TR_InventoryCountEvents_NoDelete;",
+                    Create = @"CREATE TRIGGER IF NOT EXISTS TR_InventoryCountEvents_NoDelete
+BEFORE DELETE ON InventoryCountEvents
+BEGIN
+ SELECT RAISE(ABORT,'Inventory count event history is append-only.');
+END;"
+                },
+                new
+                {
+                    Drop = "DROP TRIGGER IF EXISTS TR_InventoryProductTrackingHistory_NoDelete;",
+                    Create = @"CREATE TRIGGER IF NOT EXISTS TR_InventoryProductTrackingHistory_NoDelete
+BEFORE DELETE ON InventoryProductTrackingHistory
+BEGIN
+ SELECT RAISE(ABORT,'Tracking history is append-only.');
+END;"
+                }
+            };
+
+            foreach (var trigger in triggerStatements)
+            {
+                using (var command = new SQLiteCommand(
+                    restore ? trigger.Create : trigger.Drop,
+                    connection,
+                    transaction))
+                {
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
 
         private static void DeleteTableDataIfExists(
             SQLiteConnection connection,
