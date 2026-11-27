@@ -125,11 +125,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح إدارة الأصناف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح إدارة الأصناف", ex);
 
                 Close();
             }
@@ -156,11 +152,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل الأصناف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل الأصناف", ex);
             }
         }
 
@@ -278,11 +270,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح شاشة إضافة الصنف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة إضافة الصنف", ex);
             }
         }
 
@@ -303,11 +291,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح شاشة إضافة مجموعة الأصناف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة إضافة مجموعة الأصناف", ex);
             }
         }
         private void EditProductButton_Click(
@@ -353,11 +337,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح شاشة تعديل الصنف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة تعديل الصنف", ex);
             }
         }
 
@@ -402,11 +382,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح إدارة التشغيلات:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح إدارة التشغيلات", ex);
             }
         }
 
@@ -585,11 +561,7 @@ namespace Ocore.desktop.Views
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(
-                            "تعذر حفظ حد الخصم:\n" + ex.Message,
-                            "خطأ",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
+                        Ocore.desktop.ErrorDialog.Show("حفظ الحد الأقصى للخصم", ex);
                     }
                 };
 
@@ -616,11 +588,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحديد الحد الأقصى للخصم:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحديد الحد الأقصى للخصم", ex);
             }
         }
 
@@ -799,11 +767,7 @@ namespace Ocore.desktop.Views
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(
-                            "تعذر حفظ الحد الأدنى للمخزون:\n" + ex.Message,
-                            "خطأ",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
+                        Ocore.desktop.ErrorDialog.Show("حفظ الحد الأدنى للمخزون", ex);
                     }
                 };
 
@@ -830,11 +794,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحديد الحد الأدنى للمخزون:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحديد الحد الأدنى للمخزون", ex);
             }
         }
 
@@ -882,11 +842,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر أرشفة الصنف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("أرشفة الصنف", ex);
             }
         }
 
@@ -944,11 +900,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر حذف الصنف:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("حذف الصنف", ex);
             }
         }
 
