@@ -212,6 +212,19 @@
                                     Binding="{Binding ExpiryDate, UpdateSourceTrigger=PropertyChanged}"
                                     Width="1.1*"/>
 
+                <!-- إلزام تاريخ الصلاحية لهذا الصنف فقط -->
+                <DataGridTemplateColumn Header="يتطلب تاريخ الصلاحية"
+                                        Width="0.9*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding RequiresExpiryDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      ToolTip="فعّل هذا الخيار إذا كان يجب إدخال تاريخ صلاحية للصنف عند الشراء."/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
                 <!-- حالة الصف -->
                 <DataGridTextColumn Header="حالة الصف"
                                     Binding="{Binding Status}"

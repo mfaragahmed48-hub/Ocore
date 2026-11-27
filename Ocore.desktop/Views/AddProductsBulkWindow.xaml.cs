@@ -271,6 +271,8 @@ namespace Ocore.desktop.Views
                     row.InitialQuantity = GetCell(cells, 7);
                     row.BatchNumber = GetCell(cells, 8);
                     row.ExpiryDate = GetCell(cells, 9);
+                    row.RequiresExpiryDate =
+                        ParseRequiresExpiryDate(GetCell(cells, 10));
 
                     rows.Add(row);
                     addedCount++;
@@ -310,7 +312,7 @@ namespace Ocore.desktop.Views
             // الأعمدة المسموح باللصق فيها.
             int[] editableColumns =
             {
-        0, 1, 4, 5, 6, 7, 8, 9
+        0, 1, 4, 5, 6, 7, 8, 9, 10
     };
 
             if (!editableColumns.Contains(columnIndex))
@@ -452,6 +454,10 @@ namespace Ocore.desktop.Views
                 case 9:
                     row.ExpiryDate = value;
                     break;
+
+                case 10:
+                    row.RequiresExpiryDate = ParseRequiresExpiryDate(value);
+                    break;
             }
         }
 
@@ -467,6 +473,7 @@ namespace Ocore.desktop.Views
                 case 7: return "الكمية الافتتاحية";
                 case 8: return "رقم التشغيلة";
                 case 9: return "تاريخ الصلاحية";
+                case 10: return "يتطلب تاريخ الصلاحية";
                 default: return "غير معروف";
             }
         }
@@ -592,7 +599,8 @@ namespace Ocore.desktop.Views
                    IsDefaultValue(row.PurchasePrice, "0") &&
                    IsDefaultValue(row.InitialQuantity, "0") &&
                    string.IsNullOrWhiteSpace(row.BatchNumber) &&
-                   string.IsNullOrWhiteSpace(row.ExpiryDate);
+                   string.IsNullOrWhiteSpace(row.ExpiryDate) &&
+                   !row.RequiresExpiryDate;
         }
 
         private bool IsDefaultValue(string value, string defaultValue)
@@ -654,6 +662,7 @@ namespace Ocore.desktop.Views
                 UnitsPerPackage = unitsPerPackage,
                 SalePrice = salePrice,
                 PurchasePrice = purchasePrice,
+                RequiresExpiryDate = row.RequiresExpiryDate,
                 DrugCatalogId = null
             };
         }
@@ -688,6 +697,37 @@ namespace Ocore.desktop.Views
             }
 
             return result;
+        }
+
+        private bool ParseRequiresExpiryDate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "1":
+                case "true":
+                case "yes":
+                case "y":
+                case "نعم":
+                case "صح":
+                case "✓":
+                    return true;
+
+                case "0":
+                case "false":
+                case "no":
+                case "n":
+                case "لا":
+                case "خطأ":
+                case "✗":
+                    return false;
+
+                default:
+                    throw new ArgumentException(
+                        "قيمة إلزام تاريخ الصلاحية غير صحيحة. استخدم نعم أو لا.");
+            }
         }
 
         private DateTime? ParseExpiryDate(string value)
@@ -759,6 +799,7 @@ namespace Ocore.desktop.Views
         private string batchNumber;
         private string expiryDate;
         private string status;
+        private bool requiresExpiryDate;
         private bool isSaved;
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -895,6 +936,16 @@ namespace Ocore.desktop.Views
             {
                 status = value;
                 OnPropertyChanged("Status");
+            }
+        }
+
+        public bool RequiresExpiryDate
+        {
+            get { return requiresExpiryDate; }
+            set
+            {
+                requiresExpiryDate = value;
+                OnPropertyChanged("RequiresExpiryDate");
             }
         }
 
