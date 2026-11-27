@@ -283,24 +283,12 @@ namespace Ocore.desktop.Views
                 args.Cancel = true;
 
                 // احتفظ بعمود واحد فقط للصنف حتى لو أعاد WPF توليد الأعمدة عند تغيير مصدر البيانات.
+                // الأعمدة الموجودة قد تكون DataGridTextColumn؛ احذفها وأنشئ عمود قالب صريحًا.
                 var existingProductColumns = itemsGrid.Columns
                     .Where(column => string.Equals(column.SortMemberPath, "ProductName", StringComparison.Ordinal))
                     .ToList();
-
-                if (existingProductColumns.Count > 0)
-                {
-                    var firstColumn = existingProductColumns[0];
-                    firstColumn.Header = "اسم الصنف / بحث";
-                    firstColumn.IsReadOnly = false;
-                    firstColumn.CellTemplate = CreateAuditProductSearchTemplate("ProductName");
-                    firstColumn.CellEditingTemplate = CreateAuditProductSearchTemplate("ProductName");
-
-                    foreach (var duplicateColumn in existingProductColumns.Skip(1))
-                        itemsGrid.Columns.Remove(duplicateColumn);
-
-                    firstColumn.DisplayIndex = 0;
-                    return;
-                }
+                foreach (var existingColumn in existingProductColumns)
+                    itemsGrid.Columns.Remove(existingColumn);
 
                 var productColumn = new DataGridTemplateColumn
                 {
@@ -320,21 +308,12 @@ namespace Ocore.desktop.Views
             if (name == "ProductCode")
             {
                 args.Cancel = true;
+                // لا نعدل خصائص قالب على DataGridColumn عام؛ ننشئ DataGridTemplateColumn صريحًا.
                 var existingCodeColumns = itemsGrid.Columns
                     .Where(column => string.Equals(column.SortMemberPath, "ProductCode", StringComparison.Ordinal))
                     .ToList();
-                if (existingCodeColumns.Count > 0)
-                {
-                    var firstColumn = existingCodeColumns[0];
-                    firstColumn.Header = "كود الصنف / بحث";
-                    firstColumn.IsReadOnly = false;
-                    firstColumn.CellTemplate = CreateAuditProductSearchTemplate("ProductCode");
-                    firstColumn.CellEditingTemplate = CreateAuditProductSearchTemplate("ProductCode");
-                    foreach (var duplicateColumn in existingCodeColumns.Skip(1))
-                        itemsGrid.Columns.Remove(duplicateColumn);
-                    firstColumn.DisplayIndex = 1;
-                    return;
-                }
+                foreach (var existingColumn in existingCodeColumns)
+                    itemsGrid.Columns.Remove(existingColumn);
                 var codeColumn = new DataGridTemplateColumn
                 {
                     Header = "كود الصنف / بحث",
@@ -352,21 +331,12 @@ namespace Ocore.desktop.Views
             if (name == "Barcode")
             {
                 args.Cancel = true;
+                // استبدال أي عمود مولد تلقائيًا بعمود قالب قابل للبحث.
                 var existingBarcodeColumns = itemsGrid.Columns
                     .Where(column => string.Equals(column.SortMemberPath, "Barcode", StringComparison.Ordinal))
                     .ToList();
-                if (existingBarcodeColumns.Count > 0)
-                {
-                    var firstColumn = existingBarcodeColumns[0];
-                    firstColumn.Header = "باركود الصنف / بحث";
-                    firstColumn.IsReadOnly = false;
-                    firstColumn.CellTemplate = CreateAuditProductSearchTemplate("Barcode");
-                    firstColumn.CellEditingTemplate = CreateAuditProductSearchTemplate("Barcode");
-                    foreach (var duplicateColumn in existingBarcodeColumns.Skip(1))
-                        itemsGrid.Columns.Remove(duplicateColumn);
-                    firstColumn.DisplayIndex = 2;
-                    return;
-                }
+                foreach (var existingColumn in existingBarcodeColumns)
+                    itemsGrid.Columns.Remove(existingColumn);
 
                 var barcodeColumn = new DataGridTemplateColumn
                 {
