@@ -152,8 +152,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "تعذر تصدير التقرير: " + ex.Message, "خطأ في التصدير",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تصدير تقرير الجرد", ex);
             }
         }
 
@@ -289,8 +288,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "تعذرت طباعة التقرير: " + ex.Message,
-                    "خطأ في الطباعة", MessageBoxButton.OK, MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("طباعة تقرير الجرد", ex);
             }
         }
 
