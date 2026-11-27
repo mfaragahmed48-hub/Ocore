@@ -1,12 +1,15 @@
 ﻿
 using Ocore.desktop.Models;
 using Ocore.desktop.Services;
+using ClosedXML.Excel;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -44,6 +47,8 @@ namespace Ocore.desktop.Views
             AddRowButton.Click += AddRowButton_Click;
             RemoveRowButton.Click += RemoveRowButton_Click;
             PasteButton.Click += PasteButton_Click;
+            ImportExcelButton.Click += ImportExcelButton_Click;
+            ExportExcelButton.Click += ExportExcelButton_Click;
             SaveButton.Click += SaveButton_Click;
             CloseButton.Click += CloseButton_Click;
 
@@ -484,6 +489,367 @@ namespace Ocore.desktop.Views
                 return string.Empty;
 
             return (cells[index] ?? string.Empty).Trim();
+        }
+
+
+        // استيراد ملف Excel وإضافة صفوفه إلى الجدول الحالي دون حذف البيانات الموجودة.
+        private void ImportExcelButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "اختيار ملف أصناف Excel",
+                Filter = "Excel Workbook (*.xlsx)|*.xlsx",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                ProductsDataGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+                ProductsDataGrid.CommitEdit(DataGridEditingUnit.Row, true);
+
+                int importedCount = 0;
+                int warningCount = 0;
+
+                using (var workbook = new XLWorkbook(dialog.FileName))
+                {
+                    var sheet = workbook.Worksheets.FirstOrDefault();
+
+                    if (sheet == null)
+                        throw new InvalidOperationException(
+                            "ملف Excel لا يحتوي على ورقة عمل.");
+
+                    var headerMap = new Dictionary<string, int>(
+                        StringComparer.OrdinalIgnoreCase);
+
+                    var lastHeaderCell = sheet.Row(1).LastCellUsed();
+
+                    if (lastHeaderCell == null)
+                        throw new InvalidOperationException(
+                            "الصف الأول في ملف Excel يجب أن يحتوي على عناوين الأعمدة.");
+
+                    for (int column = 1;
+                         column <= lastHeaderCell.Address.ColumnNumber;
+                         column++)
+                    {
+                        string header = NormalizeExcelHeader(
+                            sheet.Cell(1, column).GetString());
+
+                        if (string.IsNullOrWhiteSpace(header))
+                            continue;
+
+                        if (headerMap.ContainsKey(header))
+                            throw new InvalidOperationException(
+                                "يوجد عنوان عمود مكرر في ملف Excel: " + header);
+
+                        headerMap.Add(header, column);
+                    }
+
+                    int nameColumn = FindExcelColumn(
+                        headerMap, "اسم الصنف", "اسم الصنف*");
+                    int unitsColumn = FindExcelColumn(
+                        headerMap, "عدد الوحدات", "عدد الوحدات*", "عدد الوحدات داخل العبوة");
+                    int saleColumn = FindExcelColumn(
+                        headerMap, "سعر البيع", "سعر البيع*");
+                    int purchaseColumn = FindExcelColumn(
+                        headerMap, "سعر الشراء", "سعر الشراء*");
+
+                    if (nameColumn == 0 ||
+                        unitsColumn == 0 ||
+                        saleColumn == 0 ||
+                        purchaseColumn == 0)
+                    {
+                        throw new InvalidOperationException(
+                            "ملف Excel لا يحتوي على الأعمدة الأساسية المطلوبة:" +
+                            Environment.NewLine +
+                            "اسم الصنف، عدد الوحدات، سعر البيع، سعر الشراء.");
+                    }
+
+                    int categoryColumn = FindExcelColumn(headerMap, "التصنيف");
+                    int batchColumn = FindExcelColumn(headerMap, "رقم التشغيلة");
+                    int expiryColumn = FindExcelColumn(headerMap, "تاريخ الصلاحية");
+                    int requiresExpiryColumn = FindExcelColumn(
+                        headerMap, "يتطلب تاريخ الصلاحية", "إلزام تاريخ الصلاحية");
+
+                    int lastRow = sheet.LastRowUsed() == null
+                        ? 1
+                        : sheet.LastRowUsed().RowNumber();
+
+                    for (int rowNumber = 2;
+                         rowNumber <= lastRow;
+                         rowNumber++)
+                    {
+                        bool isEmpty = true;
+
+                        for (int column = 1;
+                             column <= lastHeaderCell.Address.ColumnNumber;
+                             column++)
+                        {
+                            if (!string.IsNullOrWhiteSpace(
+                                sheet.Cell(rowNumber, column).GetFormattedString()))
+                            {
+                                isEmpty = false;
+                                break;
+                            }
+                        }
+
+                        if (isEmpty)
+                            continue;
+
+                        var row = new BulkProductRow(categories)
+                        {
+                            Name = ReadExcelText(sheet.Cell(rowNumber, nameColumn)),
+                            UnitsPerPackage = ReadExcelText(sheet.Cell(rowNumber, unitsColumn)),
+                            SalePrice = ReadExcelText(sheet.Cell(rowNumber, saleColumn)),
+                            PurchasePrice = ReadExcelText(sheet.Cell(rowNumber, purchaseColumn))
+                        };
+
+                        var rowWarnings = new List<string>();
+
+                        if (categoryColumn > 0)
+                        {
+                            string categoryName = ReadExcelText(
+                                sheet.Cell(rowNumber, categoryColumn));
+
+                            if (!string.IsNullOrWhiteSpace(categoryName))
+                            {
+                                var category = categories.FirstOrDefault(
+                                    item => item.Key > 0 &&
+                                    string.Equals(
+                                        item.Value,
+                                        categoryName,
+                                        StringComparison.OrdinalIgnoreCase));
+
+                                if (category.Key > 0)
+                                    row.CategoryId = category.Key;
+                                else
+                                    rowWarnings.Add(
+                                        "التصنيف غير موجود وسيتم تركه بدون تصنيف");
+                            }
+                        }
+
+                        if (batchColumn > 0)
+                            row.BatchNumber = ReadExcelText(
+                                sheet.Cell(rowNumber, batchColumn));
+
+                        if (expiryColumn > 0)
+                            row.ExpiryDate = ReadExcelDateOrText(
+                                sheet.Cell(rowNumber, expiryColumn));
+
+                        if (requiresExpiryColumn > 0)
+                        {
+                            string requiresExpiry = ReadExcelText(
+                                sheet.Cell(rowNumber, requiresExpiryColumn));
+
+                            try
+                            {
+                                row.RequiresExpiryDate =
+                                    ParseRequiresExpiryDate(requiresExpiry);
+                            }
+                            catch (Exception ex)
+                            {
+                                row.RequiresExpiryDate = false;
+                                rowWarnings.Add(ex.Message);
+                            }
+                        }
+
+                        if (string.IsNullOrWhiteSpace(row.Name))
+                            rowWarnings.Add("اسم الصنف مطلوب");
+
+                        if (rowWarnings.Count > 0)
+                        {
+                            row.Status = "مراجعة: " +
+                                string.Join("؛ ", rowWarnings);
+                            warningCount++;
+                        }
+
+                        rows.Add(row);
+                        importedCount++;
+                    }
+                }
+
+                UpdateSummary();
+
+                MessageBox.Show(
+                    "تم استيراد " + importedCount +
+                    " صف وإضافتها إلى الجدول الحالي." +
+                    (warningCount > 0
+                        ? Environment.NewLine + "توجد " + warningCount +
+                          " صفوف تحتاج إلى مراجعة قبل الحفظ."
+                        : Environment.NewLine + "راجع البيانات ثم اضغط حفظ الأصناف."),
+                    "نتيجة استيراد Excel",
+                    MessageBoxButton.OK,
+                    warningCount > 0
+                        ? MessageBoxImage.Warning
+                        : MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Ocore.desktop.ErrorDialog.Show(
+                    "استيراد أصناف من Excel",
+                    ex);
+            }
+        }
+
+        // تصدير الصفوف التي لم يتم حفظها بعد حتى لا يعاد استيراد أصناف محفوظة بالخطأ.
+        private void ExportExcelButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            ProductsDataGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+            ProductsDataGrid.CommitEdit(DataGridEditingUnit.Row, true);
+
+            var exportRows = rows
+                .Where(row => !row.IsSaved && !IsRowEmpty(row))
+                .ToList();
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "تصدير مجموعة الأصناف إلى Excel",
+                Filter = "Excel Workbook (*.xlsx)|*.xlsx",
+                DefaultExt = ".xlsx",
+                AddExtension = true,
+                FileName = "مجموعة_أصناف_" +
+                    DateTime.Now.ToString("yyyyMMdd_HHmm")
+            };
+
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                string[] headers =
+                {
+                    "اسم الصنف",
+                    "التصنيف",
+                    "العبوة",
+                    "الوحدة الصغيرة",
+                    "عدد الوحدات",
+                    "سعر البيع",
+                    "سعر الشراء",
+                    "الكمية الافتتاحية",
+                    "رقم التشغيلة",
+                    "تاريخ الصلاحية",
+                    "يتطلب تاريخ الصلاحية"
+                };
+
+                using (var workbook = new XLWorkbook())
+                {
+                    var sheet = workbook.Worksheets.Add("مجموعة الأصناف");
+
+                    for (int column = 0; column < headers.Length; column++)
+                        sheet.Cell(1, column + 1).Value = headers[column];
+
+                    var header = sheet.Range(1, 1, 1, headers.Length);
+                    header.Style.Font.Bold = true;
+                    header.Style.Font.FontColor = XLColor.White;
+                    header.Style.Fill.BackgroundColor =
+                        XLColor.FromHtml("#217346");
+                    header.Style.Alignment.Horizontal =
+                        XLAlignmentHorizontalValues.Center;
+                    header.Style.Alignment.Vertical =
+                        XLAlignmentVerticalValues.Center;
+                    header.Style.Alignment.WrapText = true;
+
+                    int excelRow = 2;
+
+                    foreach (var row in exportRows)
+                    {
+                        sheet.Cell(excelRow, 1).Value = row.Name ?? "";
+                        sheet.Cell(excelRow, 2).Value = row.CategoryName ?? "";
+                        sheet.Cell(excelRow, 3).Value = row.UnitName ?? "p";
+                        sheet.Cell(excelRow, 4).Value = row.SmallUnitName ?? "u";
+                        sheet.Cell(excelRow, 5).Value = row.UnitsPerPackage ?? "1";
+                        sheet.Cell(excelRow, 6).Value = row.SalePrice ?? "0";
+                        sheet.Cell(excelRow, 7).Value = row.PurchasePrice ?? "0";
+                        sheet.Cell(excelRow, 8).Value = row.InitialQuantity ?? "0";
+                        sheet.Cell(excelRow, 9).Value = row.BatchNumber ?? "";
+                        sheet.Cell(excelRow, 10).Value = row.ExpiryDate ?? "";
+                        sheet.Cell(excelRow, 11).Value =
+                            row.RequiresExpiryDate ? "نعم" : "لا";
+
+                        excelRow++;
+                    }
+
+                    sheet.RightToLeft = true;
+                    sheet.SheetView.FreezeRows(1);
+                    sheet.Range(1, 1, Math.Max(1, excelRow - 1), headers.Length)
+                        .SetAutoFilter();
+
+                    sheet.Column(1).Width = 32;
+                    sheet.Column(2).Width = 22;
+                    sheet.Columns(3, 4).Width = 16;
+                    sheet.Columns(5, 8).Width = 18;
+                    sheet.Columns(9, 10).Width = 20;
+                    sheet.Column(11).Width = 22;
+                    sheet.Row(1).Height = 32;
+
+                    workbook.SaveAs(dialog.FileName);
+                }
+
+                MessageBox.Show(
+                    "تم تصدير " + exportRows.Count +
+                    " صف إلى ملف Excel بنجاح." +
+                    (exportRows.Count == 0
+                        ? Environment.NewLine +
+                          "تم إنشاء قالب فارغ بعناوين الأعمدة."
+                        : ""),
+                    "تم التصدير",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Ocore.desktop.ErrorDialog.Show(
+                    "تصدير مجموعة الأصناف إلى Excel",
+                    ex);
+            }
+        }
+
+        private int FindExcelColumn(
+            Dictionary<string, int> headers,
+            params string[] possibleNames)
+        {
+            foreach (string name in possibleNames)
+            {
+                string normalized = NormalizeExcelHeader(name);
+                int column;
+
+                if (headers.TryGetValue(normalized, out column))
+                    return column;
+            }
+
+            return 0;
+        }
+
+        private string NormalizeExcelHeader(string value)
+        {
+            return new string(
+                (value ?? "")
+                    .Trim()
+                    .Replace("*", "")
+                    .Where(character => !char.IsWhiteSpace(character))
+                    .ToArray());
+        }
+
+        private string ReadExcelText(IXLCell cell)
+        {
+            return (cell.GetFormattedString() ?? "").Trim();
+        }
+
+        private string ReadExcelDateOrText(IXLCell cell)
+        {
+            DateTime date;
+
+            if (cell.TryGetValue<DateTime>(out date))
+                return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+            return ReadExcelText(cell);
         }
 
         private void SaveButton_Click(
