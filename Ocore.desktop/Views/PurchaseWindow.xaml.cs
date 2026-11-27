@@ -731,8 +731,7 @@ namespace Ocore.desktop.Views
                 return;
             }
 
-            bool requiresExpiryDate =
-                product.DrugCatalogId.HasValue;
+            bool requiresExpiryDate = product.RequiresExpiryDate;
 
             DateTime? expiryDate = null;
 
@@ -751,7 +750,7 @@ namespace Ocore.desktop.Views
             else if (requiresExpiryDate)
             {
                 MessageBox.Show(
-                    "هذا الصنف مرتبط بدليل الأدوية، لذلك يجب تحديد تاريخ الصلاحية.");
+                    "هذا الصنف يتطلب تاريخ صلاحية، لذلك يجب إدخال تاريخ الصلاحية قبل إضافته إلى الفاتورة.");
 
                 ExpiryDatePicker.Focus();
                 return;
@@ -1694,7 +1693,7 @@ namespace Ocore.desktop.Views
                     FindProductRequiresExpiry(item.ProductId))
                 {
                     MessageBox.Show(
-                        "يوجد دواء مرتبط بدليل الأدوية بدون تاريخ صلاحية.");
+                        "يوجد صنف يتطلب تاريخ صلاحية ولم يتم إدخال التاريخ في الفاتورة.");
                     return;
                 }
             }
@@ -1764,7 +1763,7 @@ namespace Ocore.desktop.Views
                 p => p.Id == productId);
 
             return product != null &&
-                   product.DrugCatalogId.HasValue;
+                   product.RequiresExpiryDate;
         }
 
         private bool TryReadNumber(

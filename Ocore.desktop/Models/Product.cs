@@ -13,6 +13,9 @@ namespace Ocore.desktop.Models
         // null للأصناف القديمة أو غير المرتبطة بالدليل
         public int? DrugCatalogId { get; set; }
 
+        // يحدد ما إذا كان يجب إدخال تاريخ صلاحية لكل تشغيلة عند الشراء.
+        public bool RequiresExpiryDate { get; set; }
+
         public int? CategoryId { get; set; }
 
         // الوحدة الأساسية مثل علبة أو شريط

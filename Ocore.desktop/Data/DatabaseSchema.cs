@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS Products (
     UnitsPerPackage INTEGER NOT NULL DEFAULT 1,
     SalePrice REAL NOT NULL DEFAULT 0,
     PurchasePrice REAL NOT NULL DEFAULT 0,
+    RequiresExpiryDate INTEGER NOT NULL DEFAULT 0,
     MaxDiscountPercentage REAL NOT NULL DEFAULT 0,
     IsArchived INTEGER NOT NULL DEFAULT 0,
     CreatedAt TEXT NOT NULL,
@@ -453,6 +454,7 @@ VALUES (1);
             EnsureProductMinimumStockLevelColumn(connection);
 
             EnsureProductDrugCatalogIdColumn(connection);
+            EnsureProductRequiresExpiryDateColumn(connection);
             EnsurePurchaseInvoiceDateColumn(connection);
             EnsurePurchaseInvoiceItemUnitColumns(connection);
             EnsureSalesReturnAllocationRestockedColumn(connection);
@@ -1012,6 +1014,37 @@ CREATE TABLE IF NOT EXISTS PrinterConfigurations
     ", connection))
             {
                 command.ExecuteNonQuery();
+            }
+        }
+
+        // إضافة إعداد إلزام تاريخ الصلاحية لكل صنف مع الحفاظ على سلوك الأصناف القديمة.
+        // الأصناف المرتبطة بدليل الأدوية كانت تتطلب الصلاحية سابقًا، لذلك يتم ترحيلها مفعّلة مرة واحدة.
+        private static void EnsureProductRequiresExpiryDateColumn(
+            SQLiteConnection connection)
+        {
+            var existingColumns = new List<string>();
+
+            using (var command = new SQLiteCommand(
+                "PRAGMA table_info(Products);", connection))
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                    existingColumns.Add(reader["name"].ToString());
+            }
+
+            if (!ContainsColumn(existingColumns, "RequiresExpiryDate"))
+            {
+                using (var command = new SQLiteCommand(@"
+                    ALTER TABLE Products
+                    ADD COLUMN RequiresExpiryDate INTEGER NOT NULL DEFAULT 0;
+
+                    UPDATE Products
+                    SET RequiresExpiryDate = 1
+                    WHERE DrugCatalogId IS NOT NULL;",
+                    connection))
+                {
+                    command.ExecuteNonQuery();
+                }
             }
         }
 

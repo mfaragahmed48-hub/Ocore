@@ -299,6 +299,19 @@
                                      FontSize="14"/>
                         </StackPanel>
 
+
+                        <!-- إعداد إلزام تاريخ الصلاحية -->
+                        <CheckBox x:Name="RequiresExpiryDateCheckBox"
+                                  Grid.Row="4"
+                                  Grid.Column="1"
+                                  Content="يتطلب تاريخ صلاحية (إلزامي في فواتير الشراء)"
+                                  ToolTip="عند تفعيل هذا الخيار يجب إدخال تاريخ صلاحية لكل تشغيلة من هذا الصنف."
+                                  FontWeight="SemiBold"
+                                  Foreground="#183F36"
+                                  VerticalAlignment="Center"
+                                  Margin="5,24,5,5"
+                                  IsChecked="False"/>
+
                     </Grid>
 
 

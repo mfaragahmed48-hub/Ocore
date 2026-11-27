@@ -433,6 +433,7 @@ namespace Ocore.desktop.Services
             string productCode;
             string manufacturer;
             int unitsPerPackage;
+            bool requiresExpiryDate;
 
             using (var command = new SQLiteCommand(@"
                 SELECT
@@ -441,6 +442,7 @@ namespace Ocore.desktop.Services
                     p.UnitsPerPackage,
                     p.ProductCode,
                     p.DrugCatalogId,
+                    p.RequiresExpiryDate,
                     COALESCE(dc.Manufacturer, '') AS Manufacturer
 
                 FROM Products p
@@ -467,6 +469,9 @@ namespace Ocore.desktop.Services
                     item.DrugCatalogId = reader["DrugCatalogId"] == DBNull.Value
                         ? (int?)null
                         : Convert.ToInt32(reader["DrugCatalogId"]);
+
+                    requiresExpiryDate =
+                        Convert.ToInt32(reader["RequiresExpiryDate"]) == 1;
                 }
             }
 
@@ -530,13 +535,13 @@ namespace Ocore.desktop.Services
                     item.ItemName);
             }
 
-            // تاريخ الصلاحية إلزامي للأدوية المرتبطة بدليل الأدوية
-            if (item.DrugCatalogId.HasValue)
+            // تاريخ الصلاحية إلزامي فقط إذا كانت الخاصية مفعّلة في كارتة الصنف.
+            if (requiresExpiryDate)
             {
                 if (!item.ExpiryDate.HasValue)
                 {
                     throw new Exception(
-                        "يجب إدخال تاريخ صلاحية للصنف الدوائي: " +
+                        "يجب إدخال تاريخ صلاحية للصنف الذي يتطلب الصلاحية: " +
                         item.ItemName);
                 }
 

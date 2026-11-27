@@ -169,6 +169,9 @@ namespace Ocore.desktop.Views
                 productBeingEdited.PurchasePrice.ToString(
                     CultureInfo.CurrentCulture);
 
+            RequiresExpiryDateCheckBox.IsChecked =
+                productBeingEdited.RequiresExpiryDate;
+
 
 
             if (productBeingEdited.CategoryId.HasValue)
@@ -581,6 +584,7 @@ ORDER BY TradeName;";
             }
 
             selectedCatalogDrug = drug;
+            RequiresExpiryDateCheckBox.IsChecked = true;
 
             ProductNameTextBox.Text = drug.Name;
 
@@ -738,7 +742,9 @@ ORDER BY TradeName;";
                 {
                     expiryDate = ExpiryDatePicker.SelectedDate;
 
-                    if (quantity > 0 && !expiryDate.HasValue)
+                    if (quantity > 0 &&
+                        RequiresExpiryDateCheckBox.IsChecked == true &&
+                        !expiryDate.HasValue)
                     {
                         MessageBox.Show(
                             "يجب تحديد تاريخ الصلاحية عند إدخال كمية افتتاحية.");
@@ -747,7 +753,7 @@ ORDER BY TradeName;";
                         return;
                     }
 
-                    if (quantity > 0 &&
+                    if (quantity > 0 && expiryDate.HasValue &&
                         expiryDate.Value.Date < DateTime.Today)
                     {
                         MessageBox.Show(
@@ -777,7 +783,8 @@ ORDER BY TradeName;";
                     CategoryId = categoryId,
                     SalePrice = salePrice,
                     PurchasePrice = purchasePrice,
-
+                    RequiresExpiryDate =
+                        RequiresExpiryDateCheckBox.IsChecked == true,
 
                     DrugCatalogId = isEditMode
                         ? productBeingEdited.DrugCatalogId

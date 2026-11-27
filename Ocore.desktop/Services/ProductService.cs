@@ -301,6 +301,7 @@ SELECT
     p.ProductCode,
     p.Name,
     p.DrugCatalogId,
+    p.RequiresExpiryDate,
     p.CategoryId,
     p.UnitName,
     p.SmallUnitName,
@@ -373,6 +374,8 @@ ORDER BY p.Name;";
                                         ? (int?)null
                                         : Convert.ToInt32(reader["DrugCatalogId"]),
 
+                                RequiresExpiryDate = Convert.ToInt32(reader["RequiresExpiryDate"]) == 1,
+
                                 CategoryId = reader["CategoryId"] == DBNull.Value
                                     ? (int?)null
                                     : Convert.ToInt32(reader["CategoryId"]),
@@ -433,6 +436,7 @@ SELECT
     p.ProductCode,
     p.Name,
     p.DrugCatalogId,
+    p.RequiresExpiryDate,
     p.CategoryId,
     p.UnitName,
     p.SmallUnitName,
@@ -503,6 +507,8 @@ ORDER BY p.Name;";
                                     reader["DrugCatalogId"] == DBNull.Value
                                         ? (int?)null
                                         : Convert.ToInt32(reader["DrugCatalogId"]),
+
+                                RequiresExpiryDate = Convert.ToInt32(reader["RequiresExpiryDate"]) == 1,
 
                                 CategoryId = reader["CategoryId"] == DBNull.Value
                                     ? (int?)null
@@ -591,6 +597,7 @@ SELECT
     p.ProductCode,
     p.Name,
     p.DrugCatalogId,
+    p.RequiresExpiryDate,
     p.CategoryId,
     p.UnitName,
     p.SmallUnitName,
@@ -1049,7 +1056,7 @@ ORDER BY Name;";
             if (string.IsNullOrWhiteSpace(product.SmallUnitName))
                 throw new ArgumentException("اسم الوحدة الصغيرة مطلوب.");
 
-            if (initialQuantity > 0 && !expiryDate.HasValue)
+            if (initialQuantity > 0 && product.RequiresExpiryDate && !expiryDate.HasValue)
                 throw new ArgumentException(
                     "يجب تحديد تاريخ الصلاحية عند إدخال رصيد افتتاحي.");
 
@@ -1117,14 +1124,14 @@ ORDER BY Name;";
                         using (var command = new SQLiteCommand(
 
 @"INSERT INTO Products
-  (ProductCode, Name, DrugCatalogId,
+  (ProductCode, Name, DrugCatalogId, RequiresExpiryDate,
    CategoryId, UnitName,
    SmallUnitName, UnitsPerPackage,
    SalePrice, PurchasePrice,
    TaxProfileId, TaxPriceMode,
    IsArchived, CreatedAt)
   VALUES
-  (@Code, @Name, @DrugCatalogId,
+  (@Code, @Name, @DrugCatalogId, @RequiresExpiryDate,
    @CategoryId, @Unit,
    @SmallUnitName, @UnitsPerPackage,
    @SalePrice, @PurchasePrice,
@@ -1141,6 +1148,10 @@ ORDER BY Name;";
                             command.Parameters.AddWithValue(
                                 "@DrugCatalogId",
                                 (object)product.DrugCatalogId ?? DBNull.Value);
+
+                            command.Parameters.AddWithValue(
+                                "@RequiresExpiryDate",
+                                product.RequiresExpiryDate ? 1 : 0);
 
                             command.Parameters.AddWithValue(
                                 "@CategoryId",
@@ -1222,7 +1233,9 @@ ORDER BY Name;";
 
                                 command.Parameters.AddWithValue(
                                     "@ExpiryDate",
-                                    expiryDate.Value.ToString("yyyy-MM-dd"));
+                                    expiryDate.HasValue
+                                        ? expiryDate.Value.ToString("yyyy-MM-dd")
+                                        : "");
 
                                 command.Parameters.AddWithValue(
                                     "@PurchasePrice", product.PurchasePrice);
@@ -1341,7 +1354,7 @@ ORDER BY Name;";
                         using (var command = new SQLiteCommand(
                             @"SELECT ProductCode, Name, CategoryId,
                              UnitName, SmallUnitName, UnitsPerPackage,
-                                                          SalePrice, PurchasePrice
+                             SalePrice, PurchasePrice, RequiresExpiryDate
                       FROM Products
                       WHERE Id = @Id;",
                             connection, transaction))
@@ -1357,6 +1370,8 @@ ORDER BY Name;";
                                         Id = product.Id,
                                         ProductCode = reader["ProductCode"].ToString(),
                                         Name = reader["Name"].ToString(),
+
+                                        RequiresExpiryDate = Convert.ToInt32(reader["RequiresExpiryDate"]) == 1,
 
                                         CategoryId = reader["CategoryId"] == DBNull.Value
                                             ? (int?)null
@@ -1427,7 +1442,8 @@ ORDER BY Name;";
                           SmallUnitName = @SmallUnitName,
                           UnitsPerPackage = @UnitsPerPackage,
                           SalePrice = @SalePrice,
-                          PurchasePrice = @PurchasePrice
+                          PurchasePrice = @PurchasePrice,
+                          RequiresExpiryDate = @RequiresExpiryDate
                           WHERE Id = @Id;",
                             connection, transaction))
                         {
@@ -1456,6 +1472,9 @@ ORDER BY Name;";
                             command.Parameters.AddWithValue(
                                 "@PurchasePrice", product.PurchasePrice);
 
+                            command.Parameters.AddWithValue(
+                                "@RequiresExpiryDate",
+                                product.RequiresExpiryDate ? 1 : 0);
 
                             command.Parameters.AddWithValue("@Id", product.Id);
 
