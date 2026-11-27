@@ -485,11 +485,7 @@ namespace Ocore.desktop.Views
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(
-                            "تعذر إغلاق الشيفت:\n\n" + ex.Message,
-                            "O CORE",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
+                        Ocore.desktop.ErrorDialog.Show("إغلاق الشيفت", ex);
                     }
                 };
 
@@ -545,12 +541,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تجهيز شاشة إغلاق الشيفت:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تجهيز شاشة إغلاق الشيفت", ex);
 
                 RefreshShiftSummary();
             }
@@ -871,12 +862,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء عرض نواقص المخزون:\n\n"
-                    + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("عرض نواقص المخزون", ex);
             }
         }
 
@@ -974,12 +960,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح شاشة النسخ الاحتياطي والاستعادة:\n\n"
-                    + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة النسخ الاحتياطي والاستعادة", ex);
             }
         }
 
@@ -1013,11 +994,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح سجل الشيفتات:\n\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح سجل الشيفتات", ex);
             }
         }
 
@@ -1231,11 +1208,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح شاشة الجرد:\n\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة الجرد", ex);
             }
         }
 
@@ -1292,12 +1265,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح شاشة طباعة الباركود:\n\n"
-                    + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة طباعة الباركود", ex);
             }
         }
 
@@ -1402,12 +1370,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء فتح شاشة إدارة العملاء:\n\n"
-                    + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح شاشة إدارة العملاء", ex);
             }
         }
 
