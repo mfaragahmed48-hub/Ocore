@@ -98,11 +98,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل تفاصيل الفاتورة:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل تفاصيل فاتورة الشراء", ex);
             }
         }
 
@@ -296,12 +292,7 @@ namespace Ocore.desktop.Views
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show(
-                                "تعذر تحديث معاينة فاتورة الشراء:\n\n" +
-                                ex.Message,
-                                "O CORE",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Error);
+                            Ocore.desktop.ErrorDialog.Show("تحديث معاينة فاتورة الشراء", ex);
                         }
                     }
                 };
@@ -317,11 +308,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تجهيز معاينة الطباعة:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تجهيز معاينة طباعة فاتورة الشراء", ex);
             }
         }
 
@@ -384,7 +371,7 @@ namespace Ocore.desktop.Views
                         "هاتف: " + pharmacySettings.Phone));
             }
 
-            
+
             Paragraph subtitle = new Paragraph(
                 new Run("فاتورة شراء"))
             {
@@ -646,11 +633,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء الطباعة:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("طباعة فاتورة الشراء", ex);
             }
         }
 
@@ -1080,12 +1063,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذرت طباعة باركود أصناف الفاتورة:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("طباعة باركود أصناف فاتورة الشراء", ex);
             }
         }
 
