@@ -198,7 +198,7 @@
                                     Grid.Column="1"
                                     Margin="5">
 
-                            <TextBlock Text="العبوة الأساسية"
+                            <TextBlock Text="العبوة الأساسية (P)"
                                        FontWeight="SemiBold"
                                        Margin="0,0,0,6"/>
 
@@ -223,7 +223,7 @@
                                     Grid.Column="0"
                                     Margin="5">
 
-                            <TextBlock Text="اسم الوحدة الصغيرة"
+                            <TextBlock Text="اسم الوحدة الصغيرة (U)"
                                        FontWeight="SemiBold"
                                        Margin="0,0,0,6"/>
 
@@ -315,7 +315,7 @@
 
                     </Grid>
 
-                    
+
 
                     <!-- لوحة إدارة التصنيفات -->
                     <Border x:Name="CategoryManagementPanel"
@@ -418,7 +418,7 @@
                             Padding="12"
                             Margin="5,12,5,5">
 
-                        <TextBlock Text="مثال: إذا كانت العبوة علبة والوحدة الصغيرة شريط، وعدد الوحدات 3، فهذا يعني أن كل علبة تحتوي على 3 أشرطة."
+                        <TextBlock Text="مثال: إذا كانت العبوة الأساسية (P) علبة والوحدة الصغيرة (U) شريط، وعدد الوحدات 3، فهذا يعني أن كل P تحتوي على 3 U."
                                    TextWrapping="Wrap"
                                    Foreground="#246B58"
                                    FontSize="13"/>
