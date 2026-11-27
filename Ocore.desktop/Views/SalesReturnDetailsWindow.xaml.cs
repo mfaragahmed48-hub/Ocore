@@ -93,12 +93,12 @@ namespace Ocore.desktop.Views
 
             ItemsDataGrid.ItemsSource = returnDetails.Items;
 
-            
-            
+
+
             double accountingReturnValue =
                 CalculateAccountingReturnValue();
 
-            
+
             string summary =
                 "إجمالي الأصناف: " +
                 returnDetails.Total.ToString("N2") + " ج.م" +
@@ -114,7 +114,7 @@ namespace Ocore.desktop.Views
     Environment.NewLine +
     "المبلغ المصروف فعليًا للعميل: " +
     returnDetails.RefundAmount.ToString("N2") + " ج.م";
-            
+
             if (returnDetails.RefundAmount > 0)
             {
                 summary +=
@@ -242,12 +242,9 @@ namespace Ocore.desktop.Views
             {
                 pharmacySettings = null;
 
-                MessageBox.Show(
-                    "تعذر تحميل إعدادات الصيدلية:\n" +
-                    ex.Message,
-                    "تنبيه",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تحميل إعدادات الصيدلية للطباعة",
+                    ex);
             }
         }
 
@@ -368,12 +365,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر فتح معاينة الإيصال:\n" +
-                    ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "فتح معاينة إيصال المرتجع",
+                    ex);
             }
         }
 
@@ -495,12 +489,9 @@ namespace Ocore.desktop.Views
 
                 previewViewer.Document = null;
 
-                MessageBox.Show(
-                    "تعذر تحديث معاينة المرتجع:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تحديث معاينة المرتجع",
+                    ex);
             }
         }
 
@@ -564,7 +555,7 @@ namespace Ocore.desktop.Views
                         false);
                 }
 
-                
+
             }
 
             AddSeparator(document);
@@ -698,7 +689,7 @@ namespace Ocore.desktop.Views
                 }
             }
 
-            
+
             double netReturnTotal =
                 CalculateAccountingReturnValue();
 
@@ -998,12 +989,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء طباعة إيصال المرتجع:\n\n" +
-                    ex.Message,
-                    "خطأ في الطباعة",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "طباعة إيصال المرتجع",
+                    ex);
             }
             finally
             {
