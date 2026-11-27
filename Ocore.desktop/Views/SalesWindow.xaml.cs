@@ -3017,11 +3017,9 @@ namespace Ocore.desktop.Views
                 availableProductQuantity + BatchQuantityEpsilon)
             {
                 MessageBox.Show(
-                    "الكمية المطلوبة تتجاوز رصيد الصنف.
-" +
+                    "الكمية المطلوبة تتجاوز رصيد الصنف.\n" +
                     "المطلوب: " + newPackageQuantity.ToString("0.########") +
-                    " من الوحدة الأساسية P
-" +
+                    " من الوحدة الأساسية P\n" +
                     "الرصيد الحالي: " + availableProductQuantity.ToString("0.###"),
                     "رصيد غير كافٍ",
                     MessageBoxButton.OK,
@@ -3110,8 +3108,7 @@ namespace Ocore.desktop.Views
                     remainingBatchQuantity + BatchQuantityEpsilon)
                 {
                     MessageBox.Show(
-                        "رصيد التشغيلة لا يكفي للكمية المطلوبة.
-" +
+                        "رصيد التشغيلة لا يكفي للكمية المطلوبة.\n" +
                         "المتاح: " + remainingBatchQuantity.ToString("0.###") +
                         " من الوحدة الأساسية P",
                         "رصيد التشغيلة غير كافٍ",
@@ -3188,8 +3185,7 @@ namespace Ocore.desktop.Views
                     totalAvailable + BatchQuantityEpsilon)
                 {
                     MessageBox.Show(
-                        "رصيد مجموعة السعر المختارة لا يكفي.
-" +
+                        "رصيد مجموعة السعر المختارة لا يكفي.\n" +
                         "المتاح: " + totalAvailable.ToString("0.###") +
                         " من الوحدة الأساسية P",
                         "رصيد غير كافٍ",
