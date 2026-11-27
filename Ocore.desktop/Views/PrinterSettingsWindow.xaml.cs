@@ -304,11 +304,9 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر قراءة قائمة الطابعات المثبتة على الجهاز:\n" + ex.Message,
-                    "الطابعات",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Ocore.desktop.ErrorDialog.Show(
+                    "قراءة قائمة الطابعات المثبتة على الجهاز",
+                    ex);
             }
         }
 
