@@ -43,11 +43,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحميل قائمة العملاء:\n\n" + ex.Message,
-                    "إدارة العملاء",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("إدارة العملاء - تحميل القائمة", ex);
             }
         }
 
@@ -181,11 +177,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر إضافة العميل:\n\n" + ex.Message,
-                    "إدارة العملاء",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("إضافة العميل", ex);
             }
         }
 
@@ -264,11 +256,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تعديل بيانات العميل:\n\n" + ex.Message,
-                    "إدارة العملاء",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تعديل بيانات العميل", ex);
             }
         }
 
@@ -330,11 +318,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تغيير حالة العميل:\n\n" + ex.Message,
-                    "إدارة العملاء",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تغيير حالة العميل", ex);
             }
         }
 
@@ -371,11 +355,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر فتح حساب العميل:\n\n" + ex.Message,
-                    "حساب العميل",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح حساب العميل", ex);
             }
         }
 
