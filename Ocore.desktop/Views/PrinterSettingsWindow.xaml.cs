@@ -120,11 +120,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل إعدادات الطباعة:\n" + ex.Message,
-                    "خطأ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل إعدادات الطباعة", ex);
             }
             finally
             {
@@ -526,11 +522,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء حفظ إعدادات الطباعة:\n" + ex.Message,
-                    "خطأ في الحفظ",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("حفظ إعدادات الطباعة", ex);
             }
             finally
             {
