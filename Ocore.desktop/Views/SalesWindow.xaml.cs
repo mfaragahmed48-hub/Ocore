@@ -132,6 +132,9 @@ namespace Ocore.desktop.Views
             InvoiceDataGrid.SelectionChanged +=
                 InvoiceDataGrid_SelectionChanged;
 
+            InvoiceDataGrid.PreviewKeyDown +=
+                InvoiceDataGrid_PreviewKeyDown;
+
             CustomerComboBox.SelectionChanged +=
                 CustomerComboBox_SelectionChanged;
             ManageCustomersButton.Click +=
@@ -2835,6 +2838,419 @@ namespace Ocore.desktop.Views
                     "فتح نافذة اختيار التشغيلات",
                     ex);
             }
+        }
+
+        private void InvoiceDataGrid_PreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
+        {
+            if (e.Key != Key.Q ||
+                Keyboard.Modifiers != ModifierKeys.None)
+                return;
+
+            SaleInvoiceItem item = GetSelectedInvoiceItem();
+
+            if (item == null)
+                return;
+
+            e.Handled = true;
+            PromptForSmallUnitQuantity(item);
+        }
+
+        private void PromptForSmallUnitQuantity(SaleInvoiceItem item)
+        {
+            if (item == null)
+                return;
+
+            if (string.IsNullOrWhiteSpace(item.SmallUnitName) ||
+                item.UnitsPerPackage <= 1)
+            {
+                MessageBox.Show(
+                    "هذا الصنف لا يحتوي على وحدات صغيرة قابلة للبيع.",
+                    "بيع بالوحدة الصغيرة",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var quantityTextBox = new TextBox
+            {
+                Text = item.IsSmallUnit
+                    ? item.Quantity.ToString("0", CultureInfo.CurrentCulture)
+                    : "1",
+                MinWidth = 150,
+                FontSize = 16,
+                Margin = new Thickness(0, 8, 0, 12),
+                HorizontalContentAlignment = HorizontalAlignment.Center
+            };
+
+            var confirmButton = new Button
+            {
+                Content = "تأكيد",
+                Width = 90,
+                MinHeight = 32,
+                IsDefault = true,
+                Margin = new Thickness(5, 0, 0, 0)
+            };
+
+            var cancelButton = new Button
+            {
+                Content = "إلغاء",
+                Width = 90,
+                MinHeight = 32,
+                IsCancel = true,
+                Margin = new Thickness(5, 0, 0, 0)
+            };
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            buttons.Children.Add(confirmButton);
+            buttons.Children.Add(cancelButton);
+
+            var layout = new StackPanel
+            {
+                Margin = new Thickness(18),
+                FlowDirection = FlowDirection.RightToLeft
+            };
+            layout.Children.Add(new TextBlock
+            {
+                Text = "أدخل عدد الوحدات الصغيرة (" + item.SmallUnitName + ") للصنف:",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 13
+            });
+            layout.Children.Add(quantityTextBox);
+            layout.Children.Add(buttons);
+
+            var dialog = new Window
+            {
+                Title = "بيع بالوحدة الصغيرة - " + item.ItemName,
+                Content = layout,
+                Width = 370,
+                Height = 175,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ShowInTaskbar = false,
+                FlowDirection = FlowDirection.RightToLeft
+            };
+
+            confirmButton.Click += (s, e) => dialog.DialogResult = true;
+
+            dialog.Loaded += (s, e) =>
+            {
+                quantityTextBox.Focus();
+                quantityTextBox.SelectAll();
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            double smallUnitQuantity;
+
+            if (!TryParseQuantity(quantityTextBox.Text, out smallUnitQuantity) ||
+                !IsFinite(smallUnitQuantity) ||
+                smallUnitQuantity <= 0 ||
+                !IsWholeQuantity(smallUnitQuantity))
+            {
+                MessageBox.Show(
+                    "أدخل عددًا صحيحًا من الوحدات الصغيرة أكبر من صفر.",
+                    "كمية غير صحيحة",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            ApplySmallUnitQuantity(item, smallUnitQuantity);
+        }
+
+        private void ApplySmallUnitQuantity(
+            SaleInvoiceItem item,
+            double smallUnitQuantity)
+        {
+            if (item == null ||
+                !invoiceItems.Contains(item) ||
+                !IsFinite(smallUnitQuantity) ||
+                smallUnitQuantity <= 0 ||
+                !IsWholeQuantity(smallUnitQuantity))
+                return;
+
+            int unitsPerPackage = item.UnitsPerPackage;
+
+            if (unitsPerPackage <= 1 ||
+                string.IsNullOrWhiteSpace(item.SmallUnitName))
+                return;
+
+            double newPackageQuantity = Math.Round(
+                smallUnitQuantity / unitsPerPackage, 8);
+
+            SalesProductSearchResult searchResult =
+                allSearchResults == null
+                    ? null
+                    : allSearchResults.FirstOrDefault(
+                        p => p != null &&
+                             p.Product != null &&
+                             p.Product.Id == item.ProductId);
+
+            if (searchResult == null || searchResult.Product == null)
+            {
+                MessageBox.Show(
+                    "تعذر التحقق من رصيد الصنف الحالي.",
+                    "بيع بالوحدة الصغيرة",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            double otherRowsQuantity = invoiceItems
+                .Where(x => x != null &&
+                            x.ProductId == item.ProductId &&
+                            !ReferenceEquals(x, item))
+                .Sum(x => x.PackageQuantity);
+
+            double availableProductQuantity =
+                searchResult.Product.Quantity;
+
+            if (newPackageQuantity + otherRowsQuantity >
+                availableProductQuantity + BatchQuantityEpsilon)
+            {
+                MessageBox.Show(
+                    "الكمية المطلوبة تتجاوز رصيد الصنف.
+" +
+                    "المطلوب: " + newPackageQuantity.ToString("0.########") +
+                    " من الوحدة الأساسية P
+" +
+                    "الرصيد الحالي: " + availableProductQuantity.ToString("0.###"),
+                    "رصيد غير كافٍ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            List<SaleInvoiceBatchAllocation> currentAllocations =
+                item.BatchAllocations == null
+                    ? new List<SaleInvoiceBatchAllocation>()
+                    : item.BatchAllocations
+                        .Where(a => a != null &&
+                                    a.AllocatedQuantity > BatchQuantityEpsilon)
+                        .ToList();
+
+            if (currentAllocations.Count == 0)
+            {
+                MessageBox.Show(
+                    "يجب تحديد التشغيلة أو مجموعة السعر للصنف أولًا.",
+                    "تخصيص المخزون",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            List<ProductBatch> currentBatches =
+                productService.GetAvailableBatches(
+                    currentUserId,
+                    item.ProductId);
+
+            if (currentBatches == null)
+                currentBatches = new List<ProductBatch>();
+
+            var updatedAllocations =
+                new List<SaleInvoiceBatchAllocation>();
+
+            double packageSalePrice = searchResult.Product.SalePrice;
+
+            if (!item.IsUntrackedProduct)
+            {
+                if (currentAllocations.Count != 1)
+                {
+                    MessageBox.Show(
+                        "يجب أن يكون للصنف المتتبع تشغيلة واحدة فقط في صف الفاتورة.",
+                        "تخصيص التشغيلات",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                SaleInvoiceBatchAllocation oldAllocation =
+                    currentAllocations[0];
+
+                ProductBatch batch = currentBatches.FirstOrDefault(
+                    b => b != null && b.Id == oldAllocation.BatchId);
+
+                if (batch == null ||
+                    !IsFinite(batch.Quantity) ||
+                    batch.Quantity < 0 ||
+                    IsBatchExpiredOrInvalid(batch.ExpiryDate))
+                {
+                    MessageBox.Show(
+                        "التشغيلة المختارة غير متاحة أو منتهية الصلاحية.",
+                        "تخصيص التشغيلات",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                double allocatedByOtherRows = invoiceItems
+                    .Where(row => row != null &&
+                                  !ReferenceEquals(row, item) &&
+                                  row.ProductId == item.ProductId &&
+                                  row.BatchAllocations != null)
+                    .SelectMany(row => row.BatchAllocations)
+                    .Where(a => a != null &&
+                                a.BatchId == batch.Id &&
+                                IsFinite(a.AllocatedQuantity) &&
+                                a.AllocatedQuantity > 0)
+                    .Sum(a => a.AllocatedQuantity);
+
+                double remainingBatchQuantity = Math.Max(
+                    0, batch.Quantity - allocatedByOtherRows);
+
+                if (newPackageQuantity >
+                    remainingBatchQuantity + BatchQuantityEpsilon)
+                {
+                    MessageBox.Show(
+                        "رصيد التشغيلة لا يكفي للكمية المطلوبة.
+" +
+                        "المتاح: " + remainingBatchQuantity.ToString("0.###") +
+                        " من الوحدة الأساسية P",
+                        "رصيد التشغيلة غير كافٍ",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                packageSalePrice = batch.SalePrice.HasValue
+                    ? batch.SalePrice.Value
+                    : (oldAllocation.SalePrice.HasValue
+                        ? oldAllocation.SalePrice.Value
+                        : searchResult.Product.SalePrice);
+
+                updatedAllocations.Add(new SaleInvoiceBatchAllocation
+                {
+                    BatchId = batch.Id,
+                    BatchNumber = batch.BatchNumber,
+                    ExpiryDate = batch.ExpiryDate,
+                    SalePrice = batch.SalePrice ?? oldAllocation.SalePrice ?? (double?)searchResult.Product.SalePrice,
+                    AvailableQuantity = remainingBatchQuantity,
+                    AllocatedQuantity = newPackageQuantity
+                });
+            }
+            else
+            {
+                double? selectedPrice = currentAllocations[0].SalePrice;
+
+                if (!selectedPrice.HasValue)
+                {
+                    MessageBox.Show(
+                        "تعذر تحديد سعر مجموعة التشغيلات المختارة.",
+                        "تخصيص المخزون",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                packageSalePrice = selectedPrice.Value;
+
+                var availableBatches = currentBatches
+                    .Where(b => b != null &&
+                                b.Id > 0 &&
+                                b.IsUntrackedProduct &&
+                                string.IsNullOrWhiteSpace(b.BatchNumber) &&
+                                string.IsNullOrWhiteSpace(b.ExpiryDate) &&
+                                b.SalePrice.HasValue &&
+                                Math.Abs(b.SalePrice.Value - packageSalePrice) <= 0.000001)
+                    .OrderBy(b => b.Id)
+                    .Select(b => new
+                    {
+                        Batch = b,
+                        Available = Math.Max(
+                            0,
+                            b.Quantity - invoiceItems
+                                .Where(row => row != null &&
+                                              !ReferenceEquals(row, item) &&
+                                              row.ProductId == item.ProductId &&
+                                              row.BatchAllocations != null)
+                                .SelectMany(row => row.BatchAllocations)
+                                .Where(a => a != null &&
+                                            a.BatchId == b.Id &&
+                                            IsFinite(a.AllocatedQuantity) &&
+                                            a.AllocatedQuantity > 0)
+                                .Sum(a => a.AllocatedQuantity))
+                    })
+                    .Where(x => IsFinite(x.Available) &&
+                                x.Available > BatchQuantityEpsilon)
+                    .ToList();
+
+                double totalAvailable = availableBatches.Sum(x => x.Available);
+
+                if (newPackageQuantity >
+                    totalAvailable + BatchQuantityEpsilon)
+                {
+                    MessageBox.Show(
+                        "رصيد مجموعة السعر المختارة لا يكفي.
+" +
+                        "المتاح: " + totalAvailable.ToString("0.###") +
+                        " من الوحدة الأساسية P",
+                        "رصيد غير كافٍ",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                double remaining = newPackageQuantity;
+
+                foreach (var entry in availableBatches)
+                {
+                    double take = Math.Min(entry.Available, remaining);
+
+                    if (take > BatchQuantityEpsilon)
+                    {
+                        updatedAllocations.Add(new SaleInvoiceBatchAllocation
+                        {
+                            BatchId = entry.Batch.Id,
+                            BatchNumber = entry.Batch.BatchNumber,
+                            ExpiryDate = entry.Batch.ExpiryDate,
+                            SalePrice = entry.Batch.SalePrice,
+                            AvailableQuantity = entry.Available,
+                            AllocatedQuantity = take
+                        });
+                    }
+
+                    remaining = Math.Max(0, remaining - take);
+
+                    if (remaining <= BatchQuantityEpsilon)
+                        break;
+                }
+            }
+
+            double smallUnitPrice = packageSalePrice / unitsPerPackage;
+
+            if (!IsFinite(smallUnitPrice) || smallUnitPrice < 0)
+            {
+                MessageBox.Show(
+                    "سعر الوحدة الصغيرة غير صحيح.",
+                    "السعر",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            // تغيير اسم الوحدة قد يطلق معالج تغيير الوحدة القديم؛
+            // لذلك نضبط بعدها كل القيم النهائية صراحةً.
+            item.UnitName = item.SmallUnitName;
+            item.IsSmallUnit = true;
+            item.Quantity = smallUnitQuantity;
+            item.UnitPrice = smallUnitPrice;
+            item.PackageQuantity = newPackageQuantity;
+            item.Total = RoundMoney(smallUnitQuantity * smallUnitPrice);
+
+            item.BatchAllocations.Clear();
+
+            foreach (SaleInvoiceBatchAllocation allocation in updatedAllocations)
+                item.BatchAllocations.Add(allocation);
+
+            RefreshInvoice(item);
         }
 
         private void InvoiceDataGrid_SelectionChanged(
