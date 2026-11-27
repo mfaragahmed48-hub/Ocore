@@ -130,11 +130,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    ex.Message,
-                    "خطأ أثناء تحديث الحساب",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحديث حساب المدير", ex);
             }
         }
 
