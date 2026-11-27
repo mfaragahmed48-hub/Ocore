@@ -916,7 +916,9 @@ namespace Ocore.desktop.Services
 
                             bool isUntrackedProduct =
                                 InventoryCostLayerService.IsUntrackedProduct(
-                                    connection, transaction, item.ProductId);
+                                    connection, transaction, item.ProductId)
+                                && !item.ExpiryDate.HasValue
+                                && string.IsNullOrWhiteSpace(item.BatchNumber);
 
                             string effectiveBatchNumber = isUntrackedProduct
                                 ? null
@@ -944,7 +946,7 @@ namespace Ocore.desktop.Services
                                         supplierId,
                                         inventoryPackageCost,
                                         totalPackageQuantity,
-                                        activeAuditSessionId);
+                                        activeAuditSessionId.HasValue);
                             }
                             else
                             {
@@ -1138,7 +1140,7 @@ namespace Ocore.desktop.Services
                                     createdAt,
                                     inventoryPackageCost,
                                     totalPackageQuantity,
-                                    activeAuditSessionId.HasValue);
+                                    activeAuditSessionId);
                             }
 
                             if (activeAuditSessionId.HasValue)
