@@ -125,11 +125,9 @@ LIMIT 1;";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحميل إعدادات الصيدلية:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "تحميل إعدادات الصيدلية",
+                    ex);
             }
         }
 
@@ -161,11 +159,9 @@ LIMIT 1;";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء اختيار الشعار:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "اختيار شعار الصيدلية",
+                    ex);
             }
         }
 
@@ -259,11 +255,9 @@ LIMIT 1;";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر حفظ الإعدادات:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "حفظ إعدادات الصيدلية",
+                    ex);
             }
         }
 
@@ -354,11 +348,9 @@ LIMIT 1;";
                 DrugCatalogImportStatusText.Foreground =
                     System.Windows.Media.Brushes.DarkRed;
 
-                MessageBox.Show(
-                    "تعذر استيراد دليل الأدوية:\n\n" + ex.Message,
-                    "خطأ في الاستيراد",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "استيراد دليل الأدوية",
+                    ex);
             }
             finally
             {
@@ -437,13 +429,20 @@ LIMIT 1;";
                         "تم تنظيف",
                         StringComparison.Ordinal);
 
-                MessageBox.Show(
-                    result,
-                    "O CORE - إعادة ضبط البيانات",
-                    MessageBoxButton.OK,
-                    succeeded
-                        ? MessageBoxImage.Information
-                        : MessageBoxImage.Error);
+                if (succeeded)
+                {
+                    MessageBox.Show(
+                        result,
+                        "O CORE - إعادة ضبط البيانات",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    Ocore.desktop.ErrorDialog.Show(
+                        "إعادة ضبط قاعدة البيانات",
+                        result);
+                }
 
                 if (succeeded)
                 {
@@ -458,12 +457,9 @@ LIMIT 1;";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء إعادة ضبط البيانات:\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show(
+                    "إعادة ضبط قاعدة البيانات",
+                    ex);
             }
             finally
             {
