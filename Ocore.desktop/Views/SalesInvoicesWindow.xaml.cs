@@ -75,11 +75,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل سجل فواتير البيع:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل سجل فواتير البيع", ex);
             }
         }
 
@@ -226,11 +222,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تصدير Excel:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تصدير سجل فواتير البيع إلى Excel", ex);
             }
         }
 
@@ -452,11 +444,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تصدير التقرير:\n" + ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تصدير تقرير فواتير البيع", ex);
             }
         }
 
