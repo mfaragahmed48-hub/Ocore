@@ -106,12 +106,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تحميل النسخ الاحتياطية:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل النسخ الاحتياطية", ex);
             }
         }
 
@@ -216,15 +211,18 @@ namespace Ocore.desktop.Views
                     "تم تصدير قاعدة البيانات كاملة بنجاح.",
                     StringComparison.OrdinalIgnoreCase);
 
-                MessageBox.Show(
-                    result,
-                    succeeded
-                        ? "O CORE - تم التصدير"
-                        : "O CORE - تعذر التصدير",
-                    MessageBoxButton.OK,
-                    succeeded
-                        ? MessageBoxImage.Information
-                        : MessageBoxImage.Error);
+                if (succeeded)
+                {
+                    MessageBox.Show(
+                        result,
+                        "O CORE - تم التصدير",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    Ocore.desktop.ErrorDialog.Show("تصدير قاعدة البيانات", result);
+                }
 
                 if (succeeded)
                 {
@@ -235,12 +233,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء تصدير البيانات:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تصدير البيانات", ex);
             }
             finally
             {
@@ -297,15 +290,18 @@ namespace Ocore.desktop.Views
                     "تم تجهيز قاعدة البيانات للاستعادة بنجاح.",
                     StringComparison.OrdinalIgnoreCase);
 
-                MessageBox.Show(
-                    result,
-                    succeeded
-                        ? "O CORE - تجهيز الاستعادة"
-                        : "O CORE - تعذر تجهيز الاستعادة",
-                    MessageBoxButton.OK,
-                    succeeded
-                        ? MessageBoxImage.Information
-                        : MessageBoxImage.Error);
+                if (succeeded)
+                {
+                    MessageBox.Show(
+                        result,
+                        "O CORE - تجهيز الاستعادة",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    Ocore.desktop.ErrorDialog.Show("استرداد قاعدة بيانات خارجية", result);
+                }
 
                 if (succeeded)
                 {
@@ -318,12 +314,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "حدث خطأ أثناء استرداد قاعدة البيانات الخارجية:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("استرداد قاعدة البيانات الخارجية", ex);
             }
             finally
             {
@@ -377,15 +368,18 @@ namespace Ocore.desktop.Views
                     "تم تجهيز قاعدة البيانات للاستعادة بنجاح.",
                     StringComparison.OrdinalIgnoreCase);
 
-                MessageBox.Show(
-                    result,
-                    succeeded
-                        ? "O CORE - تجهيز الاستعادة"
-                        : "O CORE - تعذر تجهيز الاستعادة",
-                    MessageBoxButton.OK,
-                    succeeded
-                        ? MessageBoxImage.Information
-                        : MessageBoxImage.Error);
+                if (succeeded)
+                {
+                    MessageBox.Show(
+                        result,
+                        "O CORE - تجهيز الاستعادة",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    Ocore.desktop.ErrorDialog.Show("استعادة النسخة الاحتياطية", result);
+                }
 
                 if (succeeded)
                 {
@@ -397,12 +391,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تجهيز استعادة النسخة الاحتياطية:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تجهيز استعادة النسخة الاحتياطية", ex);
             }
         }
 
