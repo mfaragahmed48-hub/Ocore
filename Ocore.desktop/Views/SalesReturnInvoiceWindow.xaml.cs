@@ -128,11 +128,7 @@ namespace Ocore.desktop.Views
 
                 ReturnFullInvoiceButton.IsEnabled = false;
 
-                MessageBox.Show(
-                    ex.Message,
-                    "خطأ في تحميل الفاتورة",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحميل فاتورة المرتجع", ex);
             }
             finally
             {
@@ -208,11 +204,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    ex.Message,
-                    "خطأ في تحديد كميات المرتجع",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("تحديد كميات المرتجع", ex);
             }
         }
 
@@ -671,11 +663,7 @@ namespace Ocore.desktop.Views
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(
-                            ex.Message,
-                            "خطأ في حساب المرتجع",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
+                        Ocore.desktop.ErrorDialog.Show("حساب المرتجع", ex);
                     }
                 }));
         }
@@ -1095,11 +1083,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    ex.Message,
-                    "تعذر حفظ المرتجع",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("حفظ المرتجع", ex);
             }
             finally
             {
