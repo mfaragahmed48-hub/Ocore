@@ -415,11 +415,16 @@ namespace Ocore.desktop.Views
         private DataTemplate CreateAuditProductSearchTemplate(string searchField)
         {
             var factory = new FrameworkElementFactory(typeof(ComboBox));
-            factory.SetValue(FrameworkElement.NameProperty, searchField);
+            factory.SetValue(FrameworkElement.UidProperty, searchField);
             factory.SetValue(ComboBox.IsEditableProperty, true);
             factory.SetValue(ComboBox.IsTextSearchEnabledProperty, false);
             factory.SetValue(ComboBox.StaysOpenOnEditProperty, true);
             factory.SetValue(ComboBox.DisplayMemberPathProperty, searchField);
+            factory.SetBinding(ComboBox.TextProperty, new Binding(searchField)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+            });
             factory.SetValue(ComboBox.SelectedValuePathProperty, "ProductId");
             factory.SetValue(ComboBox.MinWidthProperty, 130.0);
             factory.SetValue(ComboBox.HeightProperty, 30.0);
@@ -449,12 +454,18 @@ namespace Ocore.desktop.Views
             return new DataTemplate { VisualTree = factory };
         }
 
+        private static string EscapeDataViewLikeValue(string value)
+        {
+            return (value ?? string.Empty).Replace("'", "''")
+                .Replace("[", "[[]").Replace("%", "[%]").Replace("*", "[*]");
+        }
+
         private void LoadAvailableProducts()
         {
             try
             {
                 availableBatchesTable = queryService.GetAvailableAuditTargets(currentUserId);
-                availableProductsTable = availableBatchesTable.DefaultView.ToTable(true, "ProductId", "ProductName", "ProductCode", "Barcode");
+                availableProductsTable = queryService.GetAllActiveAuditProducts(currentUserId);
             }
             catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("تحميل قائمة أصناف الجرد", ex); }
         }
@@ -498,8 +509,8 @@ namespace Ocore.desktop.Views
             if (combo == null || !auditProductViews.ContainsKey(combo)) return;
             var row = combo.DataContext as DataRowView;
             if (row == null || !IsEntryRow(row)) return;
-            string term = editor.Text.Trim().Replace("'", "''");
-            string searchField = combo.Name;
+            string term = EscapeDataViewLikeValue(editor.Text.Trim());
+            string searchField = combo.Uid;
             if (searchField != "ProductName" && searchField != "ProductCode" && searchField != "Barcode")
                 return;
             auditProductViews[combo].RowFilter = string.IsNullOrWhiteSpace(term)
@@ -518,7 +529,7 @@ namespace Ocore.desktop.Views
             string scanned = editor.Text.Trim();
             if (string.IsNullOrWhiteSpace(scanned)) return;
 
-            string searchField = combo.Name;
+            string searchField = combo.Uid;
             if (searchField != "ProductName" && searchField != "ProductCode" && searchField != "Barcode")
                 return;
 
@@ -573,7 +584,7 @@ namespace Ocore.desktop.Views
                 entryRow["Barcode"] = Convert.ToString(product["Barcode"]);
 
             string productCode = Convert.ToString(product["ProductCode"]);
-            string searchField = combo.Name;
+            string searchField = combo.Uid;
             combo.Text = searchField == "ProductName" ? productName :
                 searchField == "ProductCode" ? productCode :
                 Convert.ToString(product["Barcode"]);
@@ -751,8 +762,6 @@ namespace Ocore.desktop.Views
             if (sourceCombo != null)
             {
                 sourceCombo.Tag = "ready";
-                sourceCombo.SelectedIndex = -1;
-                sourceCombo.Text = "";
             }
         }
 

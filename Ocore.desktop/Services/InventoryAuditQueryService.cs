@@ -279,6 +279,24 @@ ORDER BY p.Name,b.ExpiryDate,b.Id;";
         }
 
 
+        public DataTable GetAllActiveAuditProducts(int managerId)
+        {
+            EnsureManager(managerId);
+
+            const string sql = @"
+SELECT p.Id AS ProductId,
+       p.Name AS ProductName,
+       COALESCE(p.ProductCode,'') AS ProductCode,
+       COALESCE((SELECT GROUP_CONCAT(pb.Barcode,'|')
+                 FROM ProductBarcodes pb
+                 WHERE pb.ProductId=p.Id),'') AS Barcode
+FROM Products p
+WHERE COALESCE(p.IsArchived,0)=0
+ORDER BY p.Name,p.Id;";
+
+            return ReadTable(sql, null);
+        }
+
         public DataTable GetAvailableAuditTargets(int managerId)
         {
             EnsureManager(managerId);
