@@ -95,11 +95,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    ex.Message,
-                    "خطأ في البحث",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("البحث عن فواتير المرتجع", ex);
             }
             finally
             {
@@ -161,11 +157,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    ex.Message,
-                    "خطأ في فتح الفاتورة",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("فتح تفاصيل فاتورة المرتجع", ex);
             }
             finally
             {
