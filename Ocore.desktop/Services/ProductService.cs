@@ -766,6 +766,8 @@ SELECT
     END AS SalePrice,
     CASE WHEN COALESCE(t.TrackBatchNumber, 1) = 0
            AND COALESCE(t.TrackExpiryDate, 1) = 0
+           AND TRIM(COALESCE(b.BatchNumber, '')) = ''
+           AND TRIM(COALESCE(b.ExpiryDate, '')) = ''
          THEN 1 ELSE 0 END AS IsUntrackedProduct
 FROM Batches b
 INNER JOIN Products p ON p.Id = b.ProductId
