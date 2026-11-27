@@ -290,7 +290,10 @@ namespace Ocore.desktop.Views
                 if (existingProductColumns.Count > 0)
                 {
                     var firstColumn = existingProductColumns[0];
-                    firstColumn.Header = "الصنف";
+                    firstColumn.Header = "اسم الصنف / بحث";
+                    firstColumn.IsReadOnly = false;
+                    firstColumn.CellTemplate = CreateAuditProductSearchTemplate("ProductName");
+                    firstColumn.CellEditingTemplate = CreateAuditProductSearchTemplate("ProductName");
 
                     foreach (var duplicateColumn in existingProductColumns.Skip(1))
                         itemsGrid.Columns.Remove(duplicateColumn);
@@ -301,11 +304,12 @@ namespace Ocore.desktop.Views
 
                 var productColumn = new DataGridTemplateColumn
                 {
-                    Header = "الصنف",
+                    Header = "اسم الصنف / بحث",
                     Width = new DataGridLength(2.2, DataGridLengthUnitType.Star),
                     MinWidth = 230,
-                    IsReadOnly = true,
-                    CellTemplate = CreateAuditProductDisplayTemplate(),
+                    IsReadOnly = false,
+                    CellTemplate = CreateAuditProductSearchTemplate("ProductName"),
+                    CellEditingTemplate = CreateAuditProductSearchTemplate("ProductName"),
                     SortMemberPath = "ProductName"
                 };
 
@@ -323,6 +327,9 @@ namespace Ocore.desktop.Views
                 {
                     var firstColumn = existingCodeColumns[0];
                     firstColumn.Header = "كود الصنف / بحث";
+                    firstColumn.IsReadOnly = false;
+                    firstColumn.CellTemplate = CreateAuditProductSearchTemplate("ProductCode");
+                    firstColumn.CellEditingTemplate = CreateAuditProductSearchTemplate("ProductCode");
                     foreach (var duplicateColumn in existingCodeColumns.Skip(1))
                         itemsGrid.Columns.Remove(duplicateColumn);
                     firstColumn.DisplayIndex = 1;
@@ -333,12 +340,46 @@ namespace Ocore.desktop.Views
                     Header = "كود الصنف / بحث",
                     Width = new DataGridLength(1.15, DataGridLengthUnitType.Star),
                     MinWidth = 155,
-                    CellTemplate = CreateAuditProductCodeDisplayTemplate(),
-                    CellEditingTemplate = CreateAuditProductCodeTemplate(),
+                    CellTemplate = CreateAuditProductSearchTemplate("ProductCode"),
+                    CellEditingTemplate = CreateAuditProductSearchTemplate("ProductCode"),
                     SortMemberPath = "ProductCode"
                 };
                 itemsGrid.Columns.Add(codeColumn);
                 codeColumn.DisplayIndex = Math.Min(1, itemsGrid.Columns.Count - 1);
+                return;
+            }
+
+            if (name == "Barcode")
+            {
+                args.Cancel = true;
+                var existingBarcodeColumns = itemsGrid.Columns
+                    .Where(column => string.Equals(column.SortMemberPath, "Barcode", StringComparison.Ordinal))
+                    .ToList();
+                if (existingBarcodeColumns.Count > 0)
+                {
+                    var firstColumn = existingBarcodeColumns[0];
+                    firstColumn.Header = "باركود الصنف / بحث";
+                    firstColumn.IsReadOnly = false;
+                    firstColumn.CellTemplate = CreateAuditProductSearchTemplate("Barcode");
+                    firstColumn.CellEditingTemplate = CreateAuditProductSearchTemplate("Barcode");
+                    foreach (var duplicateColumn in existingBarcodeColumns.Skip(1))
+                        itemsGrid.Columns.Remove(duplicateColumn);
+                    firstColumn.DisplayIndex = 2;
+                    return;
+                }
+
+                var barcodeColumn = new DataGridTemplateColumn
+                {
+                    Header = "باركود الصنف / بحث",
+                    Width = new DataGridLength(1.25, DataGridLengthUnitType.Star),
+                    MinWidth = 170,
+                    IsReadOnly = false,
+                    CellTemplate = CreateAuditProductSearchTemplate("Barcode"),
+                    CellEditingTemplate = CreateAuditProductSearchTemplate("Barcode"),
+                    SortMemberPath = "Barcode"
+                };
+                itemsGrid.Columns.Add(barcodeColumn);
+                barcodeColumn.DisplayIndex = Math.Min(2, itemsGrid.Columns.Count - 1);
                 return;
             }
 
@@ -392,28 +433,47 @@ namespace Ocore.desktop.Views
             return new DataTemplate { VisualTree = text };
         }
 
-        private DataTemplate CreateAuditProductCodeTemplate()
+        private DataTemplate CreateAuditProductBarcodeDisplayTemplate()
+        {
+            var text = new FrameworkElementFactory(typeof(TextBlock));
+            text.SetBinding(TextBlock.TextProperty, new Binding("Barcode"));
+            text.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+            text.SetValue(TextBlock.MarginProperty, new Thickness(5, 3, 5, 3));
+            return new DataTemplate { VisualTree = text };
+        }
+
+        private DataTemplate CreateAuditProductSearchTemplate(string searchField)
         {
             var factory = new FrameworkElementFactory(typeof(ComboBox));
+            factory.SetValue(FrameworkElement.NameProperty, searchField);
             factory.SetValue(ComboBox.IsEditableProperty, true);
             factory.SetValue(ComboBox.IsTextSearchEnabledProperty, false);
             factory.SetValue(ComboBox.StaysOpenOnEditProperty, true);
-            factory.SetValue(ComboBox.DisplayMemberPathProperty, "ProductCode");
+            factory.SetValue(ComboBox.DisplayMemberPathProperty, searchField);
             factory.SetValue(ComboBox.SelectedValuePathProperty, "ProductId");
-            factory.SetValue(ComboBox.MinWidthProperty, 145.0);
+            factory.SetValue(ComboBox.MinWidthProperty, 130.0);
             factory.SetValue(ComboBox.HeightProperty, 30.0);
             factory.SetValue(ComboBox.VerticalContentAlignmentProperty, VerticalAlignment.Center);
+
             var itemPanel = new FrameworkElementFactory(typeof(StackPanel));
             itemPanel.SetValue(StackPanel.OrientationProperty, Orientation.Vertical);
             var productName = new FrameworkElementFactory(typeof(TextBlock));
             productName.SetBinding(TextBlock.TextProperty, new Binding("ProductName"));
             productName.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
             itemPanel.AppendChild(productName);
+
             var productCode = new FrameworkElementFactory(typeof(TextBlock));
             productCode.SetBinding(TextBlock.TextProperty, new Binding("ProductCode"));
             productCode.SetValue(TextBlock.FontSizeProperty, 10.0);
             productCode.SetValue(TextBlock.ForegroundProperty, Brushes.DimGray);
             itemPanel.AppendChild(productCode);
+
+            var productBarcode = new FrameworkElementFactory(typeof(TextBlock));
+            productBarcode.SetBinding(TextBlock.TextProperty, new Binding("Barcode"));
+            productBarcode.SetValue(TextBlock.FontSizeProperty, 10.0);
+            productBarcode.SetValue(TextBlock.ForegroundProperty, Brushes.Gray);
+            itemPanel.AppendChild(productBarcode);
+
             factory.SetValue(ComboBox.ItemTemplateProperty, new DataTemplate { VisualTree = itemPanel });
             factory.AddHandler(FrameworkElement.LoadedEvent, new RoutedEventHandler(AuditProductComboBox_Loaded));
             return new DataTemplate { VisualTree = factory };
@@ -469,8 +529,12 @@ namespace Ocore.desktop.Views
             var row = combo.DataContext as DataRowView;
             if (row == null || !IsEntryRow(row)) return;
             string term = editor.Text.Trim().Replace("'", "''");
-            auditProductViews[combo].RowFilter = string.IsNullOrWhiteSpace(term) ? "" :
-                "ProductName LIKE '%" + term + "%' OR ProductCode LIKE '%" + term + "%' OR Barcode LIKE '%" + term + "%'";
+            string searchField = combo.Name;
+            if (searchField != "ProductName" && searchField != "ProductCode" && searchField != "Barcode")
+                return;
+            auditProductViews[combo].RowFilter = string.IsNullOrWhiteSpace(term)
+                ? ""
+                : searchField + " LIKE '%" + term + "%'";
             if (combo.Items.Count > 0) combo.IsDropDownOpen = true;
         }
 
@@ -484,13 +548,19 @@ namespace Ocore.desktop.Views
             string scanned = editor.Text.Trim();
             if (string.IsNullOrWhiteSpace(scanned)) return;
 
+            string searchField = combo.Name;
+            if (searchField != "ProductName" && searchField != "ProductCode" && searchField != "Barcode")
+                return;
+
             var exactMatches = availableProductsTable.Rows.Cast<DataRow>()
                 .Where(row =>
-                    (row["Barcode"] != DBNull.Value &&
-                     Convert.ToString(row["Barcode"]).Split('|').Any(code =>
-                         string.Equals(code.Trim(), scanned, StringComparison.OrdinalIgnoreCase))) ||
-                    string.Equals(Convert.ToString(row["ProductCode"]).Trim(), scanned, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(Convert.ToString(row["ProductName"]).Trim(), scanned, StringComparison.OrdinalIgnoreCase))
+                {
+                    string value = Convert.ToString(row[searchField]).Trim();
+                    if (searchField == "Barcode")
+                        return value.Split('|').Any(code =>
+                            string.Equals(code.Trim(), scanned, StringComparison.OrdinalIgnoreCase));
+                    return string.Equals(value, scanned, StringComparison.OrdinalIgnoreCase);
+                })
                 .GroupBy(row => Convert.ToInt32(row["ProductId"]))
                 .Select(group => group.First())
                 .ToList();
@@ -499,7 +569,7 @@ namespace Ocore.desktop.Views
             {
                 int productId = Convert.ToInt32(exactMatches[0]["ProductId"]);
                 combo.SelectedValue = productId;
-                combo.Text = Convert.ToString(exactMatches[0]["ProductName"]);
+                combo.Text = Convert.ToString(exactMatches[0][searchField]);
                 combo.IsDropDownOpen = false;
                 e.Handled = true;
             }
@@ -533,7 +603,10 @@ namespace Ocore.desktop.Views
                 entryRow["Barcode"] = Convert.ToString(product["Barcode"]);
 
             string productCode = Convert.ToString(product["ProductCode"]);
-            combo.Text = string.IsNullOrWhiteSpace(productCode) ? productName : productCode;
+            string searchField = combo.Name;
+            combo.Text = searchField == "ProductName" ? productName :
+                searchField == "ProductCode" ? productCode :
+                Convert.ToString(product["Barcode"]);
             combo.Tag = "opening";
             AddProductToInvoiceRow(productId, combo);
         }
@@ -800,7 +873,7 @@ namespace Ocore.desktop.Views
                 itemsGrid.SelectedItem = entry;
                 itemsGrid.ScrollIntoView(entry);
                 var searchColumn = itemsGrid.Columns.FirstOrDefault(c =>
-                    string.Equals(Convert.ToString(c.SortMemberPath), "ProductCode", StringComparison.Ordinal));
+                    string.Equals(Convert.ToString(c.SortMemberPath), "ProductName", StringComparison.Ordinal));
                 if (searchColumn != null)
                 {
                     Dispatcher.BeginInvoke(new Action(() =>
@@ -817,7 +890,7 @@ namespace Ocore.desktop.Views
             var entry = itemsGrid.Items.Cast<object>().OfType<DataRowView>().LastOrDefault(IsEntryRow);
             if (entry == null) return;
             var searchColumn = itemsGrid.Columns.FirstOrDefault(c =>
-                string.Equals(Convert.ToString(c.SortMemberPath), "ProductCode", StringComparison.Ordinal));
+                string.Equals(Convert.ToString(c.SortMemberPath), "ProductName", StringComparison.Ordinal));
             if (searchColumn == null) return;
             itemsGrid.SelectedItem = entry;
             itemsGrid.ScrollIntoView(entry);
