@@ -286,12 +286,7 @@ namespace Ocore.desktop.Views
                 PreviewStatusText.Text =
                     "حدث خطأ أثناء تجهيز المعاينة.";
 
-                MessageBox.Show(
-                    "تعذر إنشاء معاينة الإيصال الحراري:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ErrorDialog.Show("تعذر إنشاء معاينة الإيصال الحراري", ex);
             }
         }
 
@@ -488,12 +483,7 @@ namespace Ocore.desktop.Views
                 PreviewStatusText.Text =
                     "تعذر إرسال الإيصال إلى الطابعة.";
 
-                MessageBox.Show(
-                    "حدث خطأ أثناء طباعة الإيصال الحراري:\n\n" +
-                    ex.Message,
-                    "O CORE",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ErrorDialog.Show("حدث خطأ أثناء طباعة الإيصال الحراري", ex);
             }
             finally
             {
