@@ -92,11 +92,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تحميل التصنيفات الضريبية:\n" + ex.Message,
-                    "إدارة الضرائب",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ErrorDialog.Show("تعذر تحميل التصنيفات الضريبية", ex);
             }
             finally
             {
@@ -529,11 +525,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر حفظ التصنيف الضريبي:\n" + ex.Message,
-                    "إدارة الضرائب",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ErrorDialog.Show("تعذر حفظ التصنيف الضريبي", ex);
             }
         }
 
@@ -590,11 +582,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "تعذر تعطيل التصنيف:\n" + ex.Message,
-                    "إدارة الضرائب",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ErrorDialog.Show("تعذر تعطيل التصنيف", ex);
             }
         }
 
