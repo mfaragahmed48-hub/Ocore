@@ -376,7 +376,7 @@ namespace Ocore.desktop.Views
                 availableBatchesTable = queryService.GetAvailableAuditTargets(currentUserId);
                 availableProductsTable = availableBatchesTable.DefaultView.ToTable(true, "ProductId", "ProductName", "ProductCode", "Barcode");
             }
-            catch (Exception ex) { Error("تعذر تحميل قائمة أصناف الجرد: " + ex.Message); }
+            catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("تحميل قائمة أصناف الجرد", ex); }
         }
 
         private void AuditProductComboBox_Loaded(object sender, RoutedEventArgs e)
@@ -633,7 +633,7 @@ namespace Ocore.desktop.Views
                     picker.DialogResult = true;
                 }
                 catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
-                catch (Exception ex) { Error(ex.Message); }
+                catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("تنفيذ عملية الجرد", ex); }
             };
             buttons.Children.Add(MakeButton("إضافة المحدد للجرد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
@@ -827,7 +827,7 @@ namespace Ocore.desktop.Views
                 LoadSessions(selectedSessionId);
                 SelectNextUncountedItem(itemId);
             }
-            catch (Exception ex) { Error("تعذر حفظ كمية السطر: " + ex.Message); }
+            catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("حفظ كمية بند الجرد", ex); }
         }
 
         private static DataGrid CreateGrid()
@@ -1054,7 +1054,7 @@ namespace Ocore.desktop.Views
                     picker.DialogResult = true;
                     LoadSessions(id);
                 }
-                catch (Exception ex) { Error(ex.Message); }
+                catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("إنشاء جلسة الجرد", ex); }
             };
             buttons.Children.Add(MakeButton("إنشاء الجرد المحدد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
@@ -1162,7 +1162,7 @@ namespace Ocore.desktop.Views
                     picker.DialogResult = true;
                 }
                 catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
-                catch (Exception ex) { Error(ex.Message); }
+                catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("إضافة الأهداف إلى جلسة الجرد", ex); }
             };
             buttons.Children.Add(MakeButton("إضافة المحدد للجرد", addSelectedAction));
             choose.PreviewKeyDown += (sender, args) =>
@@ -1435,7 +1435,7 @@ namespace Ocore.desktop.Views
                 window.ShowDialog();
             }
             catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
-            catch (Exception ex) { Error(ex.Message); }
+            catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("فتح تقارير الجرد", ex); }
         }
 
         private void OpenTrackingSettings()
@@ -1449,17 +1449,12 @@ namespace Ocore.desktop.Views
         {
             try { action(); }
             catch (UnauthorizedAccessException ex) { Warn(ex.Message); }
-            catch (Exception ex) { Error(ex.Message); }
+            catch (Exception ex) { Ocore.desktop.ErrorDialog.Show("تنفيذ عملية الجرد", ex); }
         }
 
         private void Warn(string message)
         {
             MessageBox.Show(this, message, "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-
-        private void Error(string message)
-        {
-            MessageBox.Show(this, message, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         private void Info(string message)
