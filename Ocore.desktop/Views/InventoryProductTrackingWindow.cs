@@ -386,12 +386,7 @@ namespace Ocore.desktop.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    this,
-                    ex.Message,
-                    "تعذر حفظ الإعدادات",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Ocore.desktop.ErrorDialog.Show("حفظ إعدادات تتبع الصنف", ex);
             }
         }
     }
