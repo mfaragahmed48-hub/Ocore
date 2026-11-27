@@ -122,7 +122,20 @@ SELECT p.Id AS ProductId,p.Name AS ProductName,
 FROM Products p
 LEFT JOIN InventoryProductTracking t ON t.ProductId=p.Id
 LEFT JOIN Batches b ON b.ProductId=p.Id
-LEFT JOIN PurchaseInvoiceItems pii ON pii.BatchId=b.Id
+LEFT JOIN PurchaseInvoiceItems pii ON pii.Id = (
+    SELECT pii2.Id
+    FROM PurchaseInvoiceItems pii2
+    LEFT JOIN PurchaseInvoices pi2 ON pi2.Id=pii2.InvoiceId
+    WHERE pii2.BatchId=b.Id
+    ORDER BY COALESCE(pi2.CreatedAt,
+        (SELECT MAX(al2.CreatedAt)
+         FROM AuditLogs al2
+         WHERE al2.EntityType='Batch'
+           AND al2.EntityId=b.Id
+           AND al2.ActionType='Create'),'') DESC,
+        pii2.Id DESC
+    LIMIT 1
+)
 LEFT JOIN PurchaseInvoices pi ON pi.Id=pii.InvoiceId
 WHERE p.IsArchived=0
 ORDER BY p.Id,
@@ -430,7 +443,20 @@ SELECT p.Id AS ProductId,p.Name AS ProductName,
 FROM Products p
 LEFT JOIN InventoryProductTracking t ON t.ProductId=p.Id
 LEFT JOIN Batches b ON b.ProductId=p.Id
-LEFT JOIN PurchaseInvoiceItems pii ON pii.BatchId=b.Id
+LEFT JOIN PurchaseInvoiceItems pii ON pii.Id = (
+    SELECT pii2.Id
+    FROM PurchaseInvoiceItems pii2
+    LEFT JOIN PurchaseInvoices pi2 ON pi2.Id=pii2.InvoiceId
+    WHERE pii2.BatchId=b.Id
+    ORDER BY COALESCE(pi2.CreatedAt,
+        (SELECT MAX(al2.CreatedAt)
+         FROM AuditLogs al2
+         WHERE al2.EntityType='Batch'
+           AND al2.EntityId=b.Id
+           AND al2.ActionType='Create'),'') DESC,
+        pii2.Id DESC
+    LIMIT 1
+)
 LEFT JOIN PurchaseInvoices pi ON pi.Id=pii.InvoiceId
 WHERE p.IsArchived=0
   AND
