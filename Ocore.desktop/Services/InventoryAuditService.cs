@@ -1789,81 +1789,90 @@ WHERE Id=@S AND Status IN('Open','Submitted','PartiallyApproved');",
             reason = string.IsNullOrWhiteSpace(reason)
                 ? "تم الإلغاء بواسطة المدير دون إدخال سبب."
                 : reason.Trim();
+            int unresolvedMovements = 0;
 
             using (var connection = new SQLiteConnection(connectionString))
             {
                 connection.Open();
-
                 using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable))
                 {
                     EnsureManager(connection, transaction, managerId);
-
-                    using (var command = new SQLiteCommand(@"
-SELECT COUNT(*)
-FROM InventoryCountItems
-WHERE SessionId=@S
-  AND (
-      ItemStatus='Approved'
-      OR AppliedQuantity IS NOT NULL
-      OR ABS(COALESCE(NetVarianceQuantity,0)) > 0.00000001
-  );", connection, transaction))
+                    using (var command = new SQLiteCommand(
+                        "SELECT Status FROM InventoryCountSessions WHERE Id=@S;", connection, transaction))
                     {
                         command.Parameters.AddWithValue("@S", sessionId);
-
-                        if (Convert.ToInt32(command.ExecuteScalar()) > 0)
-                        {
-                            throw new InvalidOperationException(
-                                "لا يمكن إلغاء جلسة سبق اعتماد أحد بنودها أو تطبيق تسوية مخزون بها.");
-                        }
-                    }
-
-                    using (var command = new SQLiteCommand(@"
-SELECT COUNT(*)
-FROM InventoryCountPendingMovements
-WHERE SessionId=@S
-  AND ProcessingStatus IN ('Pending','Failed');",
-                        connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@S", sessionId);
-
-                        if (Convert.ToInt32(command.ExecuteScalar()) > 0)
-                        {
-                            throw new InvalidOperationException(
-                                "لا يمكن إلغاء الجلسة لوجود حركات معلقة أو فاشلة. عالج الحركات أولاً.");
-                        }
-                    }
-
-                    using (var command = new SQLiteCommand(@"
-UPDATE InventoryCountSessions
-SET Status='Cancelled',CancelledBy=@U,CancelledAt=@N,CancelReason=@R
-WHERE Id=@S AND Status='Open';", connection, transaction))
-                    {
-                        command.Parameters.AddWithValue("@U", managerId);
-                        command.Parameters.AddWithValue("@N", Now());
-                        command.Parameters.AddWithValue("@R", reason.Trim());
-                        command.Parameters.AddWithValue("@S", sessionId);
-
-                        if (command.ExecuteNonQuery() != 1)
+                        if (Convert.ToString(command.ExecuteScalar()) != "Open")
                             throw new InvalidOperationException("يمكن إلغاء الجلسة المفتوحة فقط.");
                     }
 
                     using (var command = new SQLiteCommand(@"
+SELECT COUNT(*) FROM InventoryCountItems
+WHERE SessionId=@S
+  AND (ItemStatus='Approved' OR AppliedQuantity IS NOT NULL
+       OR ABS(COALESCE(NetVarianceQuantity,0)) > 0.00000001);", connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        if (Convert.ToInt32(command.ExecuteScalar()) > 0)
+                            throw new InvalidOperationException(
+                                "لا يمكن إلغاء جلسة سبق اعتماد أحد بنودها أو تطبيق تسوية مخزون بها.");
+                    }
+
+                    // إلغاء بنود الجرد غير المعتمدة وتحرير الأقفال أولًا.
+                    using (var command = new SQLiteCommand(@"
 UPDATE InventoryCountItems
-SET ItemStatus='Cancelled',
-    LockUserId=NULL,LockToken=NULL,LockUntil=NULL
-WHERE SessionId=@S AND ItemStatus<>'Approved';",
+SET ItemStatus='Cancelled',LockUserId=NULL,LockToken=NULL,LockUntil=NULL
+WHERE SessionId=@S AND ItemStatus NOT IN ('Approved','Cancelled');",
                         connection, transaction))
                     {
                         command.Parameters.AddWithValue("@S", sessionId);
                         command.ExecuteNonQuery();
                     }
 
-                    Event(connection, transaction, sessionId, null,
-                        "SessionCancelled", managerId, reason.Trim());
+                    // تمرير حركات البيع والاستلام إلى معالج المخزون الأصلي، دون حذفها.
+                    ProcessPendingMovementsForSession(connection, transaction, sessionId, managerId);
 
+                    using (var command = new SQLiteCommand(@"
+SELECT COUNT(*) FROM InventoryCountPendingMovements
+WHERE SessionId=@S AND ProcessingStatus IN ('Pending','Failed');",
+                        connection, transaction))
+                    {
+                        command.Parameters.AddWithValue("@S", sessionId);
+                        unresolvedMovements = Convert.ToInt32(command.ExecuteScalar());
+                    }
+
+                    if (unresolvedMovements == 0)
+                    {
+                        using (var command = new SQLiteCommand(@"
+UPDATE InventoryCountSessions
+SET Status='Cancelled',CancelledBy=@U,CancelledAt=@N,CancelReason=@R
+WHERE Id=@S AND Status='Open';", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@U", managerId);
+                            command.Parameters.AddWithValue("@N", Now());
+                            command.Parameters.AddWithValue("@R", reason);
+                            command.Parameters.AddWithValue("@S", sessionId);
+                            if (command.ExecuteNonQuery() != 1)
+                                throw new InvalidOperationException("تغيرت حالة الجلسة أثناء الإلغاء.");
+                        }
+                        Event(connection, transaction, sessionId, null, "SessionCancelled", managerId, reason);
+                    }
+                    else
+                    {
+                        Event(connection, transaction, sessionId, null,
+                            "SessionCancellationWaitingForMovements", managerId,
+                            "تم إلغاء بنود الجرد وتحرير التجميد، لكن توجد " +
+                            unresolvedMovements.ToString(CultureInfo.InvariantCulture) +
+                            " حركة لم تتم معالجتها بعد.");
+                    }
                     transaction.Commit();
                 }
             }
+
+            if (unresolvedMovements > 0)
+                throw new InvalidOperationException(
+                    "تم إلغاء بنود الجرد وتحرير التجميد، لكن لم يتم إغلاق الجلسة لوجود " +
+                    unresolvedMovements.ToString(CultureInfo.InvariantCulture) +
+                    " حركة معلقة أو فاشلة. راجع تبويب الحركات المعلقة واضغط «معالجة الحركات»، ثم أغلق الشاشة مرة أخرى.");
         }
 
         public void ReopenSelectedItems(

@@ -44,6 +44,7 @@ namespace Ocore.desktop.Views
             FlowDirection = FlowDirection.RightToLeft;
             Background = new SolidColorBrush(Color.FromRgb(243, 246, 248));
             Content = BuildLayout();
+            Closing += InventoryAuditWindow_Closing;
             Loaded += (sender, args) => Dispatcher.BeginInvoke(new Action(FocusEntrySearchRow), DispatcherPriority.Loaded);
             LoadAvailableProducts();
             LoadSessions();
@@ -249,6 +250,26 @@ namespace Ocore.desktop.Views
             root.Children.Add(footer);
 
             return root;
+        }
+
+
+        private void InventoryAuditWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (selectedSessionId <= 0) return;
+            var selectedRow = sessionsGrid.SelectedItem as DataRowView;
+            if (selectedRow == null ||
+                !string.Equals(Convert.ToString(selectedRow["Status"]), "Open", StringComparison.OrdinalIgnoreCase))
+                return;
+            try
+            {
+                auditService.CancelSession(currentUserId, selectedSessionId,
+                    "إلغاء تلقائي عند إغلاق شاشة الجرد.");
+            }
+            catch (Exception ex)
+            {
+                e.Cancel = true;
+                Ocore.desktop.ErrorDialog.Show("إلغاء جلسة الجرد عند إغلاق الشاشة", ex);
+            }
         }
 
         private DataGrid CreateItemsGrid()
