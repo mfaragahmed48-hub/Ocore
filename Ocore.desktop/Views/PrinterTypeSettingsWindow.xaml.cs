@@ -242,13 +242,17 @@ namespace Ocore.desktop.Views
                 DialogResult = true;
                 Close();
             }
-            catch (Exception ex)
+            catch (ArgumentException ex)
             {
                 MessageBox.Show(
                     ex.Message,
-                    "تعذر حفظ الإعدادات",
+                    "مراجعة البيانات",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                Ocore.desktop.ErrorDialog.Show("حفظ إعدادات الطابعة", ex);
             }
         }
 
